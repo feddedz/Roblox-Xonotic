@@ -145,7 +145,7 @@ Roles: **engine port** → `engine/<file>.luau` mirror · **split** → CPU logi
 `tools/` · **n/a** → other-OS backend not compiled into the Linux SDL client/dedicated server ·
 **needs §DIFFS** → falls under an allowed difference, log before closing · **optional** → comparison
 mode only. Status: not started / partial / done / verified (= passes differential tests).
-Source: `work/release-standard/Xonotic/source/darkplaces/` (identical to tag xonotic-v0.8.6, D-003).
+Source: `work/source/Xonotic/source/darkplaces/` (`tools/release/fetch.sh source`; identical to tag xonotic-v0.8.6, D-003).
 
 | C file | lines | role | Luau module | status | tests | notes |
 |---|---:|---|---|---|---|---|

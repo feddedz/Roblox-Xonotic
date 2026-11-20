@@ -25,6 +25,6 @@ get() { # file unpackdir
 case $want in
 	standard) get xonotic-$V.zip release-standard ;;
 	high) get xonotic-$V-high.zip release-high ;;
-	source) get xonotic-$V-source.zip "" ;;
-	all) get xonotic-$V.zip release-standard; get xonotic-$V-high.zip release-high; get xonotic-$V-source.zip "" ;;
+	source) get xonotic-$V-source.zip source ;;
+	all) get xonotic-$V.zip release-standard; get xonotic-$V-high.zip release-high; get xonotic-$V-source.zip source ;;
 esac
