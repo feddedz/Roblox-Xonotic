@@ -357,8 +357,7 @@ resolution in Lune and in Roblox's require-by-string (verified: Roblox docs + Lu
 in `platform/render` through one constant, chosen in M5 after Studio tests of near-plane and light range
 (G-007, G-009, Q-005).
 
-**D-009 (2026-11-20) Visual reference** = Ultra preset exactly as `effects-ultra.cfg` in the pinned data
-(cvar list in `docs/subsystems/visual-reference.md`), on the `-high` build, defaults otherwise.
+**D-009 (2026-11-20) Visual reference** = `-high` build, Ultra preset (`effects-ultra.cfg`; docs/subsystems/visual-reference.md).
 
 **D-010 (2026-11-20) Data locations.** Downloads/extracted data in `work/` (gitignored; regenerate with
 `tools/release/fetch.sh`, `tools/pk3/manifest.py`). Manifests, generated tables, test vectors are committed.
@@ -368,11 +367,7 @@ environment assigns a git branch, use it instead of `<task-id>-<short-name>` and
 **D-012 (2026-11-20) `main` is the integration branch** (owner). Sessions work on a branch, PR into `main`.
 **D-013 (2026-11-20)** Owner confirmed D-002 (textures and reference screenshots from `-high`); closes Q-001.
 
-**D-014 (2026-11-20, superseded by D-015) Gentle mode on by default (owner, Roblox policy).** On Roblox, `cl_gentle` defaults to 1
-(Xonotic's own gentle mode, unchanged; full analysis `docs/policy/gentle-mode.md`). `sv_gentle` stays 0.
-The normal gore path (gibs, blood, stains, damage effects, kill wording) stays fully ported and is tested
-like everything else (task GENTLE-TESTS). Logged as DIFF-001. The content-ratings questionnaire is answered
-by the owner from the facts in that doc (Q-007).
+**D-014 (2026-11-20, superseded by D-015)** Gentle mode on by default; withdrawn by the owner the same day.
 **D-015 (2026-11-20) Supersedes D-014: blood/gore policy deferred by the owner until before publishing.**
 No gentle-mode default: `cl_gentle` behaves exactly as in Xonotic (default 0, menu checkbox). DIFF-001
 withdrawn. Q-007 (questionnaire, default, locking) stays open until the owner decides.
