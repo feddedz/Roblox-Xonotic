@@ -272,9 +272,8 @@ function prvm_exec.PRVM_ExecuteProgram(prog: Prog, fnum: number, errormessage: s
 		elseif op == OP.NOT_S then
 			local s = readi32(G, A)
 			writef32(G, C, if s == 0 or PRVM_GetString(prog, s) == "" then 1 else 0)
-		elseif op == OP.NOT_FNC then
-			writef32(G, C, if readi32(G, A) == 0 then 1 else 0)
-		elseif op == OP.NOT_ENT then
+		elseif op == OP.NOT_FNC or op == OP.NOT_ENT then
+			-- C: !OPA->function / (OPA->edict == 0): both an int compare with 0
 			writef32(G, C, if readi32(G, A) == 0 then 1 else 0)
 		elseif op == OP.EQ_F then
 			writef32(G, C, if readf32(G, A) == readf32(G, B) then 1 else 0)
@@ -405,7 +404,7 @@ function prvm_exec.PRVM_ExecuteProgram(prog: Prog, fnum: number, errormessage: s
 			if not istrue(readi32(G, A)) then
 				st = readi32(S, w + 16) - 1 -- offset the st++
 				jumpcount += 1
-				if jumpcount == 10000000 and prog.cvar_prvm_runawaycheck ~= 0 then
+				if jumpcount == prog.runaway_limit and prog.cvar_prvm_runawaycheck ~= 0 then
 					runaway()
 				end
 			end
@@ -413,14 +412,14 @@ function prvm_exec.PRVM_ExecuteProgram(prog: Prog, fnum: number, errormessage: s
 			if istrue(readi32(G, A)) then
 				st = readi32(S, w + 16) - 1
 				jumpcount += 1
-				if jumpcount == 10000000 and prog.cvar_prvm_runawaycheck ~= 0 then
+				if jumpcount == prog.runaway_limit and prog.cvar_prvm_runawaycheck ~= 0 then
 					runaway()
 				end
 			end
 		elseif op == OP.GOTO then
 			st = readi32(S, w + 16) - 1
 			jumpcount += 1
-			if jumpcount == 10000000 and prog.cvar_prvm_runawaycheck ~= 0 then
+			if jumpcount == prog.runaway_limit and prog.cvar_prvm_runawaycheck ~= 0 then
 				runaway()
 			end
 		elseif op >= OP.CALL0 and op <= OP.CALL8 then

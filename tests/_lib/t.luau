@@ -2,7 +2,7 @@
 -- Minimal test helpers for the Lune runner (tests/run.luau).
 local t = {}
 
-export type Ctx = { name: string, failures: { string }, checks: number }
+export type Ctx = { name: string, failures: { string }, checks: number, skipped: string? }
 
 function t.eq(ctx: Ctx, got: any, want: any, msg: string?)
 	ctx.checks += 1
@@ -18,6 +18,11 @@ function t.ok(ctx: Ctx, cond: any, msg: string?)
 	if not cond and #ctx.failures < 25 then
 		table.insert(ctx.failures, msg or "assertion failed")
 	end
+end
+
+-- Mark the test as skipped (e.g. game data in work/ not present, as in CI).
+function t.skip(ctx: Ctx, reason: string)
+	ctx.skipped = reason
 end
 
 -- Read a repo-relative file (tests run with the repo root as cwd).

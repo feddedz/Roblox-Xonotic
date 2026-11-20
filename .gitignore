@@ -17,3 +17,5 @@ __pycache__/
 *.rbxlx
 *.rbxm
 sourcemap.json
+# AOT output: regenerate with tools/qcaot/compile.py (D-017); test outputs
+/game/generated/*/

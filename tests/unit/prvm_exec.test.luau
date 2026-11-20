@@ -18,13 +18,10 @@ end
 local function gf(p: prvm_edict.Prog, ofs: number): number
 	return buffer.readf32(p.globals, ofs * 4)
 end
-local function gi(p: prvm_edict.Prog, ofs: number): number
-	return buffer.readi32(p.globals, ofs * 4)
-end
 local function bits(x: number): number
 	return f32.tobits(x)
 end
-local function main(stmts: { { number } }): { Func: any }
+local function main(_stmts: { { number } }): { Func: any }
 	return { { name = "main", first = 1, parm_start = 28, locals = 0 } } :: any
 end
 

@@ -36,7 +36,7 @@ table.sort(files)
 
 local failed = 0
 for _, p in files do
-	local ctx = { name = p, failures = {}, checks = 0 }
+	local ctx: any = { name = p, failures = {}, checks = 0 }
 	local t0 = os.clock()
 	local ok, err = pcall(function()
 		local fn = require("../" .. string.sub(p, 1, -6)) :: any
@@ -46,7 +46,9 @@ for _, p in files do
 		table.insert(ctx.failures, "error: " .. tostring(err))
 	end
 	local dt = os.clock() - t0
-	if #ctx.failures == 0 then
+	if #ctx.failures == 0 and ctx.skipped then
+		print(string.format("SKIP %-50s %s", p, ctx.skipped))
+	elseif #ctx.failures == 0 then
 		print(string.format("PASS %-50s %7d checks %6.2fs", p, ctx.checks, dt))
 	else
 		failed += 1

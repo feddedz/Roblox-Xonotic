@@ -87,6 +87,11 @@ export type Prog = {
 	warning: (msg: string) -> (),
 	cvar_developer: number,
 	cvar_prvm_runawaycheck: number,
+	-- AOT (engine/_port/qcrt.luau): compiled functions by fnum, and the per-ExecuteProgram jump counter
+	aot: { [number]: (prog: any) -> () },
+	jc: number,
+	-- 10000000 in C (prvm_execprogram.h `++jumpcount == 10000000`); only tests lower it
+	runaway_limit: number,
 }
 
 export type RequiredDef = { type: number, name: string }
@@ -296,6 +301,9 @@ function prvm_edict.NewProg(name: string): Prog
 		warning = defaultWarning,
 		cvar_developer = 0,
 		cvar_prvm_runawaycheck = 1,
+		aot = {},
+		jc = 0,
+		runaway_limit = 10000000,
 	}
 end
 
