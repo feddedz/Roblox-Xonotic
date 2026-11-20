@@ -17,15 +17,16 @@ Every section except §MAP and §DIFFS stays under ~60 lines; detail lives in `d
 
 <!-- §STATUS -->
 ## §STATUS (rewritten 2026-11-20, session 017gQiyN)
-- **Milestone:** M0 done. M1: VFS/manifests + shader parser done. M2: progs.dat reader + CFG analysis done.
-- **Works:** toolchain bootstrap; pinned release fetch; DarkPlaces-exact VFS + manifests; shader table
-  (2,447); reader for all 3 .dat; f32 helper verified bit-exact; Lune runner; CI; Rojo build. Studio
-  test place (`tests/studio/`, probes + 4 prototypes) built and lint-clean, **not yet run in Studio**.
-- **Policy:** gentle mode on by default (D-014, DIFF-001); open point Q-007 (players can untick it).
-- **Not yet:** no engine module ported; no texture/model/BSP/sound converters.
-- **FPS / server tick:** not measurable yet.
-- **Next step:** M2-INTERP + M2-AOT (docs/subsystems/qcvm.md). Parallel-safe: M1-TEX, M1-BSP, REF-DP,
-  M1-RTVFS. Anyone with Studio: run `tests/studio/README.md` and record results in §GOTCHAS.
+- **Milestone:** M0 done; M1 partly (VFS, manifests, shaders); **M2: reference interpreter + AOT compiler
+  done**: all 25,509 QC functions of progs/csprogs/menu behave identically compiled and interpreted.
+- **Works headless:** toolchain, release fetch, VFS + manifests, shader table, progs reader, f32 helper,
+  interpreter (`engine/prvm_exec.luau`), compiler (`tools/qcaot/compile.py`) + runtime, content-policy switch.
+  Tests: 5 Lune files (17k+ checks; real-data diff skips without game data), 15 Python tests.
+- **Not yet:** builtins, edicts/strings allocation, server loop; no converters beyond VFS/shaders; nothing in
+  Studio beyond boot warnings and the unrun test place ([needs Studio]).
+- **Open owner points:** Q-007 gore policy (deferred), Q-008 intro line (assists/game passes).
+- **FPS / server tick:** not measurable yet. AOT ≈ 1.5× interpreter in Lune (not a benchmark).
+- **Next step:** M2-RUNNER (worldspawn on a stock map headless). Parallel: REF-DP, M3-BSPLOAD, M1-TEX.
 <!-- /§STATUS -->
 
 <!-- §RULES -->
@@ -118,9 +119,12 @@ before working. One claimed task per subsystem at a time. Details per task in th
 | M1-SOUNDS | Sound pipeline: ogg/wav metadata (rate, loop points), upload-ready files | open | tools/sounds/ | M1-VFS |
 | M1-UPLOAD | Open Cloud uploader + `assets/manifest/roblox-ids.tsv`; key via env var, never committed | open | tools/upload/ | M1-TEX, Q-004 |
 | M2-PROGS | progs.dat reader (all 3 .dat) + CFG/reducibility analysis | done | tools/qcaot/progs.py, cfg.py | M1-VFS |
-| M2-INTERP | Straight port of prvm_exec.c + prvm_execprogram.h (reference interpreter for AOT diffing) | claimed by 017gQiyN 2026-11-20 | engine/prvm_exec.luau | M2-PROGS |
-| M2-AOT | QC bytecode → Luau AOT compiler (f32 globals/fields in buffers, one Luau fn per QC fn); plan in docs/subsystems/qcvm.md | claimed by 017gQiyN 2026-11-20 | tools/qcaot/, game/generated/ | M2-PROGS |
-| M2-RUNNER | Headless runner, all builtins stubbed + logged; done = server QC runs worldspawn on a stock map | open | tests/, engine/prvm_*.luau | M2-AOT, M2-INTERP |
+| M2-INTERP | Straight port of prvm_exec.c + prvm_execprogram.h (reference interpreter for AOT diffing) | done (29 semantic tests) | engine/prvm_exec.luau | M2-PROGS |
+| M2-AOT | QC bytecode → Luau AOT compiler (f32 globals/fields in buffers, one Luau fn per QC fn); docs/subsystems/qcvm.md | done v1 (all 25,509 functions == interpreter) |
+| M2-AOT-STRUCT | Structured control flow for reducible CFGs (performance only; must pass qcaot_diff unchanged) | open | tools/qcaot/ | M2-AOT |
+| M2-AOT-SHIP | How generated code ships to Roblox: verify script/module size limits in docs, chunking, `--!native` effect; decide commit vs build step (D-017) | open | tools/qcaot/, game/generated/ | M2-AOT |
+| M2-INTERP-DEBUG | Port tracing/profiling/coverage/watchpoints of prvm_exec.c (console commands use them) | open | engine/prvm_exec.luau | M2-INTERP | tools/qcaot/, game/generated/ | M2-PROGS |
+| M2-RUNNER | Headless runner: rest of PRVM_Prog_Load (required fields/globals of svvm, field lookup), edict alloc, strings, all builtins stubbed + logged; done = server QC runs worldspawn on a stock map | open (next) | tests/, engine/prvm_*.luau, engine/svvm_cmds.luau | M2-AOT, M2-INTERP |
 | M2-DEBUG | Rebuild progs.dat from qcsrc with the pinned gmqcc; prove byte-identical; emit line-number debug info | open | tools/qcaot/ | M2-PROGS |
 | REF-DP | Instrumented DarkPlaces (from release source) that records traces, server frames, net messages, particles | open | tools/darkplaces-ref/ | M0-PIN |
 | M3-BSPLOAD | Port model_brush.c (Q3 BSP), model_shared.c, bih.c, collision.c | open | engine/ | M1-RTVFS |
@@ -227,8 +231,8 @@ Source: `work/source/Xonotic/source/darkplaces/` (`tools/release/fetch.sh source
 | portals.c | 480 | engine port | engine/portals.luau | not started | — |  |
 | protocol.c | 3418 | engine port | engine/protocol.luau | not started | — |  |
 | prvm_cmds.c | 7366 | engine port | engine/prvm_cmds.luau | not started | — |  |
-| prvm_edict.c | 3442 | engine port | engine/prvm_edict.luau | not started | — | progs loading/strings/edicts; reader prototype tools/qcaot/progs.py |
-| prvm_exec.c | 1054 | engine port | engine/prvm_exec.luau | not started | — | reference interpreter (M2-INTERP); AOT replaces the hot path; docs/subsystems/qcvm.md |
+| prvm_edict.c | 3442 | engine port | engine/prvm_edict.luau | partial | tests/unit/prvm_exec.test.luau | PRVM_Prog_Load (to statement checks) + PRVM_GetString done; rest M2-RUNNER |
+| prvm_exec.c | 1054 | engine port | engine/prvm_exec.luau | partial | tests/unit/prvm_exec.test.luau, qcaot_* | Enter/Leave/ExecuteProgram + all opcodes done; debug/profiling not yet (M2-INTERP-DEBUG); docs/subsystems/qcvm.md |
 | r_explosion.c | 285 | engine port | engine/r_explosion.luau | not started | — |  |
 | r_lerpanim.c | 0 | engine port | engine/r_lerpanim.luau | not started | — |  |
 | r_lightning.c | 196 | engine port | engine/r_lightning.luau | not started | — |  |
@@ -283,6 +287,7 @@ Source: `work/source/Xonotic/source/darkplaces/` (`tools/release/fetch.sh source
 | platform/input | — | platform | platform/input/init.luau | not started | — | SDL input → UserInputService |
 | platform/storage | — | platform | platform/storage/init.luau | not started | — | fs writes → DataStores |
 | platform/contentpolicy + assets/optional/gore | — | platform | platform/contentpolicy/init.luau | partial | tests/unit/contentpolicy.test.luau | gore isolation switch + separate gore asset group (D-016) |
+| engine/_port/qcrt | — | port support | engine/_port/qcrt.luau | verified vs interpreter | tests/integration/qcaot_diff.test.luau, tests/unit/qcaot_synth.test.luau | AOT runtime (calls, returns, edict access, runaway counter) |
 | engine/_port/f32 | — | port support | engine/_port/f32.luau | verified | tests/unit/f32.test.luau | docs/subsystems/float32.md |
 <!-- /§MAP -->
 
@@ -353,17 +358,14 @@ per-move player physics.
 **D-007 (2026-11-20) Requires** use relative string paths only (`./`, `../`, `@self/`), no aliases — same
 resolution in Lune and in Roblox's require-by-string (verified: Roblox docs + Lune test).
 
-**D-008 (2026-11-20) Units.** The engine works in Quake units, unchanged. Conversion to studs happens only
-in `platform/render` through one constant, chosen in M5 after Studio tests of near-plane and light range
-(G-007, G-009, Q-005).
+**D-008 (2026-11-20) Units.** Engine in Quake units; studs only in `platform/render` via one constant (M5; G-007, G-009, Q-005).
 
 **D-009 (2026-11-20) Visual reference** = `-high` build, Ultra preset (`effects-ultra.cfg`; docs/subsystems/visual-reference.md).
 
 **D-010 (2026-11-20) Data locations.** Downloads/extracted data in `work/` (gitignored; regenerate with
 `tools/release/fetch.sh`, `tools/pk3/manifest.py`). Manifests, generated tables, test vectors are committed.
 
-**D-011 (2026-11-20) Session id** = first 8 characters of the Claude session id (e.g. `017gQiyN`). If the
-environment assigns a git branch, use it instead of `<task-id>-<short-name>` and name the task in the PR.
+**D-011 (2026-11-20) Session id** = first 8 chars of the Claude session id; an environment-assigned branch replaces `<task-id>-<name>`.
 **D-012 (2026-11-20) `main` is the integration branch** (owner). Sessions work on a branch, PR into `main`.
 **D-013 (2026-11-20)** Owner confirmed D-002 (textures and reference screenshots from `-high`); closes Q-001.
 
@@ -379,6 +381,9 @@ separately. One switch, `platform/contentpolicy` (`MODE`), selects `player-choic
 placeholders so precache indices, effect numbers and server model loading stay identical). Changing the
 mode touches only that switch. Proof: server frame-diff and net byte tests identical in all modes;
 `removed` runs with no missing-asset errors. Server-side gore paths: docs/policy/gentle-mode.md.
+**D-017 (2026-11-20) Generated QuakeC is not committed yet.** `game/generated/*/` is gitignored and
+regenerated with `tools/qcaot/compile.py work/vfs-high/<prog>.dat game/generated/<prog>` (~65 MB of Luau,
+seconds to build). How it reaches Studio (commit, build step, size limits) is task M2-AOT-SHIP.
 <!-- /§DECISIONS -->
 
 <!-- §QUESTIONS -->
@@ -396,6 +401,11 @@ mode touches only that switch. Proof: server frame-diff and net byte tests ident
   Also: upload to your user or a group?
 - **Q-005 (2026-11-20, owner: will test later; [needs Studio]) Studio measurements needed** (cannot be done headless): `Camera.NearPlaneZ` on your
   devices, and the maximum `PointLight.Range` Studio accepts (docs give none). These set the stud scale (D-008).
+- **Q-008 (2026-11-20) Intro line added to HANDOFF.md** (commit 405c971, "Zane", GitHub web edit) says
+  console/mobile players get their own controls and "slight gameplay assists", and that game passes are
+  added later. Neither is in the allowed-differences list (§RULES), and gameplay assists contradict the
+  one-to-one rule. Sessions treat §RULES as binding until you decide: (a) add them as allowed differences
+  (I'd log them in §DIFFS with exact scope), or (b) remove the line. Default meanwhile: no assists, no passes.
 <!-- /§QUESTIONS -->
 
 <!-- §GOTCHAS -->
@@ -445,4 +455,7 @@ Roblox facts are from create.roblox.com / github.com/Roblox/creator-docs, read 2
 - **G-021** Runtime geometry route: `AssetService:CreateEditableMesh()` → AddVertex/AddUV/AddNormal/
   AddTriangle/SetFaceUVs/SetFaceNormals → `AssetService:CreateMeshPartAsync(Content.fromObject(mesh))`.
   `CreateEditableImage` returns nil when the per-device budget is exhausted. Pixels: `WritePixelsBuffer`, RGBA8.
+- **G-022** Lune: `require` needs a relative (`./`, `../`) or `@` path (no absolute paths); dynamic
+  string requires work; no Roblox `Random` (use the PRNG in tests/integration/qcaot_diff.test.luau). Lune
+  loads all 65 MB of generated QC Luau without hitting compiler limits (largest function 3,921 statements).
 <!-- /§GOTCHAS -->

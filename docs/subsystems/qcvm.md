@@ -61,3 +61,27 @@ no jump leaves its function. `s_file` is sometimes garbage (gmqcc quirk): don't 
    (REF-DP). The interpreter is also the fallback while the AOT is incomplete.
 6. Debug symbols: M2-DEBUG rebuilds progs.dat from `source/qcsrc` with the pinned gmqcc; if byte-identical,
    gmqcc's `.lno` output maps statements to source lines for comments and error messages.
+
+## Implementation status (2026-11-20, session 017gQiyN)
+- **Reference interpreter** `engine/prvm_exec.luau`: PRVM_EnterFunction, PRVM_LeaveFunction,
+  PRVM_ExecuteProgram + every opcode of prvm_execprogram.h, same checks and error text. Loader
+  `engine/prvm_edict.luau`: PRVM_Prog_Load up to the statement checks, PRVM_GetString. Not ported yet:
+  profiling/coverage/trace/watchpoints (no effect on results), OP_STATE body (unused by 0.8.6),
+  the rest of Prog_Load (required functions, field lookup, PRVM_Init_Exec), edict and string allocation.
+- **Compiler** `tools/qcaot/compile.py` → `game/generated/<prog>/` (init.luau + c###.luau chunks,
+  ~20k statements each): menu 8.3 MB, csprogs 20.0 MB, progs 37.2 MB of Luau; ~1 s / 10 s to generate.
+  Control flow v1: block dispatch loop (`pc`, binary if-tree); straight-line code for jump-free functions.
+  Runtime `engine/_port/qcrt.luau` shares code paths and error text with the interpreter.
+- **Proof so far:**
+  - `tests/unit/prvm_exec.test.luau` (29 checks): interpreter vs C semantics on hand-assembled programs
+    (f32 rounding, DIV by 0/-0, -0.0/NaN truthiness, (int) truncation incl. NaN→INT_MIN, strcmp
+    difference, recursion with locals restore, builtins/argc, edict bounds, runaway at exactly 10M jumps,
+    loader checks).
+  - `tests/unit/qcaot_synth.test.luau` (CI): compiled == interpreted on synthetic programs (found and fixed
+    a self-looping single-block bug).
+  - `tests/integration/qcaot_diff.test.luau` (needs game data): **all 25,509 QC functions of progs,
+    csprogs and menu give identical globals, edict fields, builtin call sequences and error text** under
+    random parameters and deterministic builtin stubs (two seeds; ~58% of calls complete, the rest end in
+    QC errors that also match). A planted one-character bug is detected.
+  - Not yet proven: interpreter == real DarkPlaces on recorded data (needs REF-DP).
+- Speed (Lune, no native codegen, dominated by logging stubs, not a benchmark): AOT ≈ 1.5× interpreter.
