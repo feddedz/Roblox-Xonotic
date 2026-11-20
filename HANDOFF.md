@@ -1,6 +1,6 @@
 # HANDOFF — Xonotic → Roblox one-to-one port
 
-Single source of project state. **Do not read this whole file.** Print one section with
+Single source of project state. **Do not read this whole file, you can skip around. You don’t need to read this whole file; the short version is that this project is a one-to-one port of Xonotic to Roblox that keeps the gameplay, UI, models and lighting as close to the original as possible, with only these planned changes: it runs on Roblox servers instead of Xonotic servers, console and mobile players get their own controls and slight gameplay assists, and game passes are added much later in development.** Print one section with
 `tools/handoff.sh STATUS` (or find its unique marker line `<!-- §NAME -->`; it ends at `<!-- /§NAME -->`).
 Every section except §MAP and §DIFFS stays under ~60 lines; detail lives in `docs/subsystems/`.
 
