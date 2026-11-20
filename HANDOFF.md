@@ -358,6 +358,8 @@ generated tables and test vectors are committed.
 
 **D-011 (2026-11-20) Session id** = first 8 characters of the Claude session id (e.g. `017gQiyN`). If the
 environment assigns a git branch, use it instead of `<task-id>-<short-name>` and name the task in the PR.
+**D-012 (2026-11-20) `main` is the integration branch** (owner: "use main"). Created from the first session
+branch. Sessions work on their own branch and open PRs into `main`; CI runs on PRs and pushes to `main`.
 <!-- /§DECISIONS -->
 
 <!-- §QUESTIONS -->
@@ -366,24 +368,20 @@ environment assigns a git branch, use it instead of `<task-id>-<short-name>` and
 - **Q-001 (2026-11-20) Which build is "real Xonotic"?** Ultra disables DDS, and only the `-high` build
   ships the uncompressed textures it loads. Default taken: textures from `-high` (D-002). Please confirm,
   and take reference screenshots with the `-high` build.
-- **Q-002 (2026-11-20) Max image size.** Roblox docs conflict: "up to 4096×4096" vs "up to 1024×1024 pixel
+- **Q-002 (2026-11-20, owner: will test later) Max image size.** Roblox docs conflict: "up to 4096×4096" vs "up to 1024×1024 pixel
   spaces for texture maps" (G-004). Default taken: tile anything > 1024 (lossless either way). Please test
   in Studio: upload one 2048² and one 4096² image and check whether they display at full resolution.
-- **Q-003 (2026-11-20) Content ratings for blood/gibs.** Roblox requires the IARC content-ratings
+- **Q-003 (2026-11-20, owner 2026-11-20: will handle before publishing) Content ratings for blood/gibs.** Roblox requires the IARC content-ratings
   questionnaire, which asks about violence, blood and gore (create.roblox.com/docs/production/promotion/content-ratings,
   section "Violence, blood, or gory images", read 2026-11-20). It also says: "Realistic or excessive
   depictions of violence, blood, crude humor, or romantic themes may be moderated regardless of your game's
   content ratings" (for uploaded assets). Xonotic has blood particles, decals and gibs. Nothing is changed;
   you decide how to answer the questionnaire and whether to accept the moderation risk.
-- **Q-004 (2026-11-20) Open Cloud API key** for uploading assets (M1-UPLOAD): needs Assets read+write
+- **Q-004 (2026-11-20, owner: will provide later) Open Cloud API key** for uploading assets (M1-UPLOAD): needs Assets read+write
   for your account or group. Provide it as a session network secret or local env var, never in the repo.
   Also: upload to your user or a group?
-- **Q-005 (2026-11-20) Studio measurements needed** (cannot be done headless): `Camera.NearPlaneZ` on your
+- **Q-005 (2026-11-20, owner: will test later) Studio measurements needed** (cannot be done headless): `Camera.NearPlaneZ` on your
   devices, and the maximum `PointLight.Range` Studio accepts (docs give none). These set the stud scale (D-008).
-- **Q-006 (2026-11-20) Default branch.** The repo was empty, so the first session branch
-  `claude/xonotic-roblox-setup-gb3pjp` became the only (default) branch and no PR could be opened. Please
-  rename it to `main` in GitHub (Settings → Branches) or allow a session to create `main`. Until then,
-  sessions branch from `claude/xonotic-roblox-setup-gb3pjp`. CI runs on PRs and pushes to `main`.
 <!-- /§QUESTIONS -->
 
 <!-- §GOTCHAS -->
