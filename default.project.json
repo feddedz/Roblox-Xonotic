@@ -45,6 +45,11 @@
 					"$path": "platform/boot/XonoticClient.client.luau"
 				}
 			}
+		},
+		"Lighting": {
+			"$properties": {
+				"Technology": "Future"
+			}
 		}
 	}
 }

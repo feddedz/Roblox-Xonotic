@@ -18,14 +18,14 @@ Every section except §MAP and §DIFFS stays under ~60 lines; detail lives in `d
 <!-- §STATUS -->
 ## §STATUS (rewritten 2026-11-20, session 017gQiyN)
 - **Milestone:** M0 done. M1: VFS/manifests + shader parser done. M2: progs.dat reader + CFG analysis done.
-- **Works:** toolchain bootstrap; pinned release fetch (sha512); DarkPlaces-exact VFS + manifests (both
-  builds); shader table (2,447 shaders); reader for all 3 .dat validated like PRVM_Prog_Load; f32 helper
-  verified bit-exact; Lune runner; CI; Rojo build. Tests: Lune 17,050 checks pass, 15 Python tests pass.
-- **Not yet:** no engine module ported; no texture/model/BSP/sound converters; Studio shows only two
-  `NOT YET PORTED` warnings (expected).
+- **Works:** toolchain bootstrap; pinned release fetch; DarkPlaces-exact VFS + manifests; shader table
+  (2,447); reader for all 3 .dat; f32 helper verified bit-exact; Lune runner; CI; Rojo build. Studio
+  test place (`tests/studio/`, probes + 4 prototypes) built and lint-clean, **not yet run in Studio**.
+- **Policy:** gentle mode on by default (D-014, DIFF-001); open point Q-007 (players can untick it).
+- **Not yet:** no engine module ported; no texture/model/BSP/sound converters.
 - **FPS / server tick:** not measurable yet.
-- **Next step:** M2-INTERP + M2-AOT (plan in docs/subsystems/qcvm.md). Independent, parallel-safe:
-  M1-TEX, M1-BSP, REF-DP, M1-RTVFS.
+- **Next step:** M2-INTERP + M2-AOT (docs/subsystems/qcvm.md). Parallel-safe: M1-TEX, M1-BSP, REF-DP,
+  M1-RTVFS. Anyone with Studio: run `tests/studio/README.md` and record results in §GOTCHAS.
 <!-- /§STATUS -->
 
 <!-- §RULES -->
@@ -133,7 +133,11 @@ before working. One claimed task per subsystem at a time. Details per task in th
 | M9-* | Dlights, shader stages, particles/decals/beams, post-processing, screenshot passes | open | platform/render | M5 |
 | TOOL-SHOTDIFF | Screenshot diff tool + camera position list per map + effect scenes | open | tools/shotdiff/, tests/reference/screens/ | — |
 | REF-SHOTS | Capture Ultra reference screenshots from real Xonotic 0.8.6-high | open | tests/reference/screens/ | TOOL-SHOTDIFF |
-| POLICY-1 | Content-ratings questionnaire & asset moderation for blood/gibs (owner decision) | blocked (Q-003) | — | — |
+| POLICY-1 | Content-ratings questionnaire (owner fills it in from docs/policy/gentle-mode.md) | blocked (Q-007, owner) | docs/policy/ | — |
+| GENTLE-DEFAULT | Ship `cl_gentle 1` as the Roblox default (default config layer, not by editing Xonotic cfgs), menu checkbox works | open | engine/cvar, platform/storage | M7-* |
+| GENTLE-TESTS | Differential tests for both paths: gib/blood messages and effects with cl_gentle 0 and 1 match real DP | open | tests/ | M4, M9 |
+| STUDIO-TESTS | Studio test place: probes + V1–V4 prototypes (built; awaiting a run in Studio, results → §GOTCHAS) | done (run pending) | tests/studio/, studio-tests.project.json | — |
+| VIS-SPECCAL | Specular calibration per texture against Ultra screenshots (docs/subsystems/specular-calibration.md) | open | tools/, assets/data/ | STUDIO-TESTS, REF-SHOTS, M1-TEX |
 | M10/M11 | Full content pass; performance pass | open (later) | — | M9 |
 <!-- /§TASKS -->
 
@@ -287,7 +291,7 @@ If it isn't here, it isn't allowed.
 
 | ID | What differs | Tried | Why impossible | Category | Closeness |
 |---|---|---|---|---|---|
-| (none yet) | | | | | |
+| DIFF-001 | `cl_gentle` defaults to 1 instead of 0 (Xonotic's own gentle mode: no blood/gibs, gentle kill wording). Players can still turn it off in the menu (Q-007). | n/a: owner decision, not a technical limit | Roblox content ratings / asset moderation (Q-003, D-014) | Roblox policy (owner-approved 2026-11-20) | identical to Xonotic with `cl_gentle 1`; gore path unchanged and tested |
 
 Candidates already known (become entries when the subsystem lands, after real attempts):
 - FOV above ~133.4° (4:3 horizontal) — Roblox `Camera.FieldOfView` is vertical, clamped 1–120 (G-006).
@@ -352,31 +356,36 @@ in `platform/render` through one constant, chosen in M5 after Studio tests of ne
 **D-009 (2026-11-20) Visual reference** = Ultra preset exactly as `effects-ultra.cfg` in the pinned data
 (cvar list in `docs/subsystems/visual-reference.md`), on the `-high` build, defaults otherwise.
 
-**D-010 (2026-11-20) Data locations.** Downloads and extracted pk3 contents live in `work/` (gitignored,
-regenerate with `tools/release/fetch.sh` + `tools/pk3/manifest.py --build <b> --extract`). Manifests,
-generated tables and test vectors are committed.
+**D-010 (2026-11-20) Data locations.** Downloads/extracted data in `work/` (gitignored; regenerate with
+`tools/release/fetch.sh`, `tools/pk3/manifest.py`). Manifests, generated tables, test vectors are committed.
 
 **D-011 (2026-11-20) Session id** = first 8 characters of the Claude session id (e.g. `017gQiyN`). If the
 environment assigns a git branch, use it instead of `<task-id>-<short-name>` and name the task in the PR.
-**D-012 (2026-11-20) `main` is the integration branch** (owner: "use main"). Created from the first session
-branch. Sessions work on their own branch and open PRs into `main`; CI runs on PRs and pushes to `main`.
+**D-012 (2026-11-20) `main` is the integration branch** (owner). Sessions work on a branch, PR into `main`.
+**D-013 (2026-11-20)** Owner confirmed D-002 (textures and reference screenshots from `-high`); closes Q-001.
+
+**D-014 (2026-11-20) Gentle mode on by default (owner, Roblox policy).** On Roblox, `cl_gentle` defaults to 1
+(Xonotic's own gentle mode, unchanged; full analysis `docs/policy/gentle-mode.md`). `sv_gentle` stays 0.
+The normal gore path (gibs, blood, stains, damage effects, kill wording) stays fully ported and is tested
+like everything else (task GENTLE-TESTS). Logged as DIFF-001. The content-ratings questionnaire is answered
+by the owner from the facts in that doc (Q-007).
 <!-- /§DECISIONS -->
 
 <!-- §QUESTIONS -->
 ## §QUESTIONS
 
-- **Q-001 (2026-11-20) Which build is "real Xonotic"?** Ultra disables DDS, and only the `-high` build
-  ships the uncompressed textures it loads. Default taken: textures from `-high` (D-002). Please confirm,
-  and take reference screenshots with the `-high` build.
 - **Q-002 (2026-11-20, owner: will test later) Max image size.** Roblox docs conflict: "up to 4096×4096" vs "up to 1024×1024 pixel
   spaces for texture maps" (G-004). Default taken: tile anything > 1024 (lossless either way). Please test
   in Studio: upload one 2048² and one 4096² image and check whether they display at full resolution.
-- **Q-003 (2026-11-20, owner 2026-11-20: will handle before publishing) Content ratings for blood/gibs.** Roblox requires the IARC content-ratings
-  questionnaire, which asks about violence, blood and gore (create.roblox.com/docs/production/promotion/content-ratings,
-  section "Violence, blood, or gory images", read 2026-11-20). It also says: "Realistic or excessive
-  depictions of violence, blood, crude humor, or romantic themes may be moderated regardless of your game's
-  content ratings" (for uploaded assets). Xonotic has blood particles, decals and gibs. Nothing is changed;
-  you decide how to answer the questionnaire and whether to accept the moderation risk.
+- **Q-007 (2026-11-20) Gentle mode is a checkbox players can untick.** D-014 makes `cl_gentle 1` the
+  default, but Xonotic's menu (Settings → User, "Disable gore effects and harsh language") lets any player
+  switch it off, and then blood, wall stains and gibs appear. Roblox: answers must "accurately reflect the
+  content of your game … If you misrepresent your game, you may be subject to moderation consequences"
+  (content-ratings page, read 2026-11-20). So answering only for gentle-on may be inaccurate while the
+  checkbox works. Options: (a) keep the checkbox and answer for gentle-off content; (b) lock gentle on for
+  Roblox (removes a player option: needs a §DIFFS entry under Roblox policy); (c) another rule you choose.
+  Default meanwhile: the checkbox stays functional (nothing removed); facts for both states are in
+  `docs/policy/gentle-mode.md`. The questionnaire itself is yours (Q-003 closed: you handle it before publishing).
 - **Q-004 (2026-11-20, owner: will provide later) Open Cloud API key** for uploading assets (M1-UPLOAD): needs Assets read+write
   for your account or group. Provide it as a session network secret or local env var, never in the repo.
   Also: upload to your user or a group?
@@ -420,4 +429,15 @@ Roblox facts are from create.roblox.com / github.com/Roblox/creator-docs, read 2
   loadimagepixelsbgra). The `-high` build has 2,326 such files; converters must merge them.
 - **G-017** Roblox content ratings: an IARC-based questionnaire; uploaded assets with realistic or excessive
   blood can be moderated regardless of rating (Q-003).
+- **G-018** SurfaceAppearance map properties (`ColorMapContent`, `NormalMapContent`, …) are write
+  `PluginSecurity`: game scripts must use `AssetService:CreateSurfaceAppearanceAsync({ColorMap, NormalMap,
+  RoughnessMap, MetalnessMap, EmissiveMask})` (maps fixed at creation; `EmissiveMask` exists for glow maps).
+  EditableImages don't replicate: build EditableImage-based appearances on the client.
+- **G-019** `Lighting.Technology` is write `RobloxScriptSecurity`: set it in the Rojo project file
+  (`$properties`), open the built place; scripts and probably the Rojo plugin can't set it.
+- **G-020** ViewportFrame: no shadows, no post-processing, Neon/Glass at lowest quality, environment
+  lighting off by default. Limits scripted reflections and FOV stitching (Studio test V2/V3 measures it).
+- **G-021** Runtime geometry route: `AssetService:CreateEditableMesh()` → AddVertex/AddUV/AddNormal/
+  AddTriangle/SetFaceUVs/SetFaceNormals → `AssetService:CreateMeshPartAsync(Content.fromObject(mesh))`.
+  `CreateEditableImage` returns nil when the per-device budget is exhausted. Pixels: `WritePixelsBuffer`, RGBA8.
 <!-- /§GOTCHAS -->
