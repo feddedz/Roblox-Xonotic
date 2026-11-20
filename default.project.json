@@ -1,0 +1,50 @@
+{
+	"name": "Xonotic",
+	"tree": {
+		"$className": "DataModel",
+		"ReplicatedStorage": {
+			"Xonotic": {
+				"$className": "Folder",
+				"engine": {
+					"$path": "engine"
+				},
+				"platform": {
+					"$className": "Folder",
+					"render": {
+						"$path": "platform/render"
+					},
+					"sound": {
+						"$path": "platform/sound"
+					},
+					"net": {
+						"$path": "platform/net"
+					},
+					"input": {
+						"$path": "platform/input"
+					},
+					"storage": {
+						"$path": "platform/storage"
+					}
+				},
+				"game": {
+					"$className": "Folder",
+					"generated": {
+						"$path": "game/generated"
+					}
+				}
+			}
+		},
+		"ServerScriptService": {
+			"XonoticServer": {
+				"$path": "platform/boot/XonoticServer.server.luau"
+			}
+		},
+		"StarterPlayer": {
+			"StarterPlayerScripts": {
+				"XonoticClient": {
+					"$path": "platform/boot/XonoticClient.client.luau"
+				}
+			}
+		}
+	}
+}

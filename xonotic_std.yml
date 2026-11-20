@@ -1,0 +1,31 @@
+# Selene std for this repo: Luau + the Roblox globals we use. Works offline (selene's
+# `generate-roblox-std` needs GitHub raw access with its own TLS roots, which cloud sessions lack).
+# Add a global here when platform/ code starts using a new Roblox global.
+base: luau
+name: xonotic_std
+globals:
+  game: { any: true }
+  workspace: { any: true }
+  script: { any: true }
+  plugin: { any: true }
+  Instance: { any: true }
+  Enum: { any: true }
+  Vector2: { any: true }
+  Vector3: { any: true }
+  CFrame: { any: true }
+  Color3: { any: true }
+  ColorSequence: { any: true }
+  ColorSequenceKeypoint: { any: true }
+  NumberSequence: { any: true }
+  NumberSequenceKeypoint: { any: true }
+  NumberRange: { any: true }
+  UDim: { any: true }
+  UDim2: { any: true }
+  Rect: { any: true }
+  Font: { any: true }
+  Content: { any: true }
+  RaycastParams: { any: true }
+  task: { any: true }
+  vector: { any: true }
+  buffer: { any: true }
+  warn: { args: [ { type: "..." } ] }

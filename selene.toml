@@ -1,0 +1,6 @@
+std = "xonotic_std"
+
+[lints]
+# Ported C code mirrors DarkPlaces exactly; shadowing and long functions are expected.
+shadowing = "allow"
+unused_variable = "warn"

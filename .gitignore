@@ -1,0 +1,19 @@
+# Local tool binaries (tools/bootstrap.sh)
+/.tools/
+# Release downloads and extracted game data: never committed (huge; regenerate with tools/)
+/work/
+*.pk3
+*.zip
+# Secrets: the Open Cloud API key is NEVER committed
+.env
+*.key
+opencloud-key*
+# Python
+__pycache__/
+*.pyc
+.venv/
+# Rojo build output
+*.rbxl
+*.rbxlx
+*.rbxm
+sourcemap.json
