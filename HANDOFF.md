@@ -129,10 +129,10 @@ before working. One claimed task per subsystem at a time. Details per task in th
 | GAMEPASSES | Game passes (DIFF-003) | blocked (Q-009), much later | — | Q-009 |
 | M2-AOT-SHIP | Ship generated code: build step + Rojo mapping + 190k-char modules done (D-020); **[needs Studio]** confirm rojo serve/publish with 380 modules, client load time + memory | partial | tools/qcaot/, game/generated/ | M2-AOT |
 | M2-INTERP-DEBUG | Port tracing/profiling/coverage/watchpoints of prvm_exec.c (console commands use them) | open | engine/prvm_exec.luau | M2-INTERP | tools/qcaot/, game/generated/ | M2-PROGS |
-| M2-RUNNER | Headless runner: rest of PRVM_Prog_Load (required fields/globals of svvm, field lookup), edict alloc, strings, all builtins stubbed + logged; done = server QC runs worldspawn on a stock map | open (next) | tests/, engine/prvm_*.luau, engine/svvm_cmds.luau | M2-AOT, M2-INTERP |
+| M2-RUNNER | Headless runner: rest of PRVM_Prog_Load (required fields/globals of svvm, field lookup), edict alloc, strings, all builtins stubbed + logged; done = server QC runs worldspawn on a stock map | claimed by 017gQiyN 2026-11-20 | tests/, engine/prvm_*.luau, engine/svvm_cmds.luau | M2-AOT, M2-INTERP |
 | M2-DEBUG | Rebuild progs.dat from qcsrc with the pinned gmqcc; prove byte-identical; emit line-number debug info | open | tools/qcaot/ | M2-PROGS |
 | REF-DP | Instrumented DarkPlaces (from release source) that records traces, server frames, net messages, particles | open | tools/darkplaces-ref/ | M0-PIN |
-| M3-BSPLOAD | Port model_brush.c (Q3 BSP), model_shared.c, bih.c, collision.c | open | engine/ | M1-RTVFS |
+| M3-BSPLOAD | Port model_brush.c (Q3 BSP), model_shared.c, bih.c, collision.c; headless reads work/vfs-high (Roblox runtime loading needs M1-RTVFS later) | open | engine/ | M1-VFS |
 | M3-TRACEREF | Record ≥1000 traceline/tracebox per stock map from REF-DP | open | tests/reference/traces/ | REF-DP |
 | M3-TRACE | Port world.c/sv traces; bit-identical vs M3-TRACEREF on all stock maps | open | engine/ | M3-BSPLOAD, M3-TRACEREF |
 | M4-* | Server: sv_phys/sv_main/sv_user/sv_move, prvm_*, svvm_cmds builtins, host loop; bot match frame-diff | open (split when M3 done) | engine/ | M2-RUNNER, M3-TRACE |
