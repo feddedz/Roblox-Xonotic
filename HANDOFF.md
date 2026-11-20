@@ -99,7 +99,8 @@ Particles: diff sim state vs instrumented DP. Visuals: screenshot process. Data 
 <!-- §TASKS -->
 ## §TASKS
 
-Status: `open` · `claimed by <session> <date>` · `done` · `blocked (<why>)`. Claim = edit + commit + push
+Status: `open` · `claimed by <session> <date>` · `done` · `blocked (<why>)`. **[needs Studio]** = can only be
+checked in Roblox Studio (nobody has it now): prefer headless tasks. Claim = edit + commit + push
 before working. One claimed task per subsystem at a time. Details per task in the linked subsystem doc.
 
 | ID | Title | Status | Files | Deps |
@@ -117,8 +118,8 @@ before working. One claimed task per subsystem at a time. Details per task in th
 | M1-SOUNDS | Sound pipeline: ogg/wav metadata (rate, loop points), upload-ready files | open | tools/sounds/ | M1-VFS |
 | M1-UPLOAD | Open Cloud uploader + `assets/manifest/roblox-ids.tsv`; key via env var, never committed | open | tools/upload/ | M1-TEX, Q-004 |
 | M2-PROGS | progs.dat reader (all 3 .dat) + CFG/reducibility analysis | done | tools/qcaot/progs.py, cfg.py | M1-VFS |
-| M2-INTERP | Straight port of prvm_exec.c + prvm_execprogram.h (reference interpreter for AOT diffing) | open | engine/prvm_exec.luau | M2-PROGS |
-| M2-AOT | QC bytecode → Luau AOT compiler (f32 globals/fields in buffers, one Luau fn per QC fn); plan in docs/subsystems/qcvm.md | open | tools/qcaot/, game/generated/ | M2-PROGS |
+| M2-INTERP | Straight port of prvm_exec.c + prvm_execprogram.h (reference interpreter for AOT diffing) | claimed by 017gQiyN 2026-11-20 | engine/prvm_exec.luau | M2-PROGS |
+| M2-AOT | QC bytecode → Luau AOT compiler (f32 globals/fields in buffers, one Luau fn per QC fn); plan in docs/subsystems/qcvm.md | claimed by 017gQiyN 2026-11-20 | tools/qcaot/, game/generated/ | M2-PROGS |
 | M2-RUNNER | Headless runner, all builtins stubbed + logged; done = server QC runs worldspawn on a stock map | open | tests/, engine/prvm_*.luau | M2-AOT, M2-INTERP |
 | M2-DEBUG | Rebuild progs.dat from qcsrc with the pinned gmqcc; prove byte-identical; emit line-number debug info | open | tools/qcaot/ | M2-PROGS |
 | REF-DP | Instrumented DarkPlaces (from release source) that records traces, server frames, net messages, particles | open | tools/darkplaces-ref/ | M0-PIN |
@@ -126,18 +127,20 @@ before working. One claimed task per subsystem at a time. Details per task in th
 | M3-TRACEREF | Record ≥1000 traceline/tracebox per stock map from REF-DP | open | tests/reference/traces/ | REF-DP |
 | M3-TRACE | Port world.c/sv traces; bit-identical vs M3-TRACEREF on all stock maps | open | engine/ | M3-BSPLOAD, M3-TRACEREF |
 | M4-* | Server: sv_phys/sv_main/sv_user/sv_move, prvm_*, svvm_cmds builtins, host loop; bot match frame-diff | open (split when M3 done) | engine/ | M2-RUNNER, M3-TRACE |
-| M5-* | Client: map render, models, input, CSQC + prediction, camera/viewmodel | open (split later) | engine/, platform/render, platform/input | M1-*, M4 |
+| M5-* | Client: map render, models, input, CSQC + prediction, camera/viewmodel (CPU logic headless; visual check **[needs Studio]**) | open (split later) | engine/, platform/render, platform/input | M1-*, M4 |
 | M6-NET | DarkPlaces message layer on RemoteEvents, fragmentation, byte-match | open | engine/netconn, platform/net | M4 |
 | M7-* | 2D draw builtins, menu.dat, fonts, DataStore persistence, Credits & License entry | open | engine/, platform/ | M2, M5 |
 | M8-SOUND | Channels, attenuation, spatialisation, timing | open | engine/snd_main, platform/sound | M1-SOUNDS |
-| M9-* | Dlights, shader stages, particles/decals/beams, post-processing, screenshot passes | open | platform/render | M5 |
+| M9-* | Dlights, shader stages, particles/decals/beams, post-processing (sims headless; screenshot passes **[needs Studio]**) | open | platform/render | M5 |
 | TOOL-SHOTDIFF | Screenshot diff tool + camera position list per map + effect scenes | open | tools/shotdiff/, tests/reference/screens/ | — |
 | REF-SHOTS | Capture Ultra reference screenshots from real Xonotic 0.8.6-high | open | tests/reference/screens/ | TOOL-SHOTDIFF |
-| POLICY-1 | Content-ratings questionnaire (owner fills it in from docs/policy/gentle-mode.md) | blocked (Q-007, owner) | docs/policy/ | — |
-| GENTLE-DEFAULT | Ship `cl_gentle 1` as the Roblox default (default config layer, not by editing Xonotic cfgs), menu checkbox works | open | engine/cvar, platform/storage | M7-* |
+| POLICY-1 | Content-ratings questionnaire (owner, from docs/policy/gentle-mode.md) | deferred by owner (Q-007) | docs/policy/ | — |
+| CONTENT-POLICY | Switch module (done) + wiring: locked cvars after config load, VFS placeholders, gore-group loader | partial (module done) | platform/contentpolicy, engine/fs, engine/cvar | M1-RTVFS, M7-* |
+| GORE-ASSETS | Classify gore-only assets (gib models+skins, gore sounds, gore-only particle-atlas tiles, stains, damage flash) → `assets/optional/gore/manifest.tsv`; placeholders for `removed` | open | tools/, assets/optional/gore/ | M1-VFS |
+| GORE-MODE-TESTS | Server frame-diff + net byte tests identical in all 3 modes; `removed` runs with zero missing-asset errors | open | tests/ | M4, CONTENT-POLICY, GORE-ASSETS |
 | GENTLE-TESTS | Differential tests for both paths: gib/blood messages and effects with cl_gentle 0 and 1 match real DP | open | tests/ | M4, M9 |
-| STUDIO-TESTS | Studio test place: probes + V1–V4 prototypes (built; awaiting a run in Studio, results → §GOTCHAS) | done (run pending) | tests/studio/, studio-tests.project.json | — |
-| VIS-SPECCAL | Specular calibration per texture against Ultra screenshots (docs/subsystems/specular-calibration.md) | open | tools/, assets/data/ | STUDIO-TESTS, REF-SHOTS, M1-TEX |
+| STUDIO-TESTS | **[needs Studio]** Run the Studio test place (tests/studio/README.md), results → §GOTCHAS | open (place built) | tests/studio/, studio-tests.project.json | — |
+| VIS-SPECCAL | **[needs Studio]** Specular calibration per texture against Ultra screenshots (docs/subsystems/specular-calibration.md) | open | tools/, assets/data/ | STUDIO-TESTS, REF-SHOTS, M1-TEX |
 | M10/M11 | Full content pass; performance pass | open (later) | — | M9 |
 <!-- /§TASKS -->
 
@@ -279,6 +282,7 @@ Source: `work/source/Xonotic/source/darkplaces/` (`tools/release/fetch.sh source
 | platform/net | — | platform | platform/net/init.luau | not started | — | lhnet → RemoteEvent / UnreliableRemoteEvent |
 | platform/input | — | platform | platform/input/init.luau | not started | — | SDL input → UserInputService |
 | platform/storage | — | platform | platform/storage/init.luau | not started | — | fs writes → DataStores |
+| platform/contentpolicy + assets/optional/gore | — | platform | platform/contentpolicy/init.luau | partial | tests/unit/contentpolicy.test.luau | gore isolation switch + separate gore asset group (D-016) |
 | engine/_port/f32 | — | port support | engine/_port/f32.luau | verified | tests/unit/f32.test.luau | docs/subsystems/float32.md |
 <!-- /§MAP -->
 
@@ -291,7 +295,7 @@ If it isn't here, it isn't allowed.
 
 | ID | What differs | Tried | Why impossible | Category | Closeness |
 |---|---|---|---|---|---|
-| DIFF-001 | `cl_gentle` defaults to 1 instead of 0 (Xonotic's own gentle mode: no blood/gibs, gentle kill wording). Players can still turn it off in the menu (Q-007). | n/a: owner decision, not a technical limit | Roblox content ratings / asset moderation (Q-003, D-014) | Roblox policy (owner-approved 2026-11-20) | identical to Xonotic with `cl_gentle 1`; gore path unchanged and tested |
+| (none yet; DIFF-001 withdrawn 2026-11-20, see D-015) | | | | | |
 
 Candidates already known (become entries when the subsystem lands, after real attempts):
 - FOV above ~133.4° (4:3 horizontal) — Roblox `Camera.FieldOfView` is vertical, clamped 1–120 (G-006).
@@ -364,32 +368,38 @@ environment assigns a git branch, use it instead of `<task-id>-<short-name>` and
 **D-012 (2026-11-20) `main` is the integration branch** (owner). Sessions work on a branch, PR into `main`.
 **D-013 (2026-11-20)** Owner confirmed D-002 (textures and reference screenshots from `-high`); closes Q-001.
 
-**D-014 (2026-11-20) Gentle mode on by default (owner, Roblox policy).** On Roblox, `cl_gentle` defaults to 1
+**D-014 (2026-11-20, superseded by D-015) Gentle mode on by default (owner, Roblox policy).** On Roblox, `cl_gentle` defaults to 1
 (Xonotic's own gentle mode, unchanged; full analysis `docs/policy/gentle-mode.md`). `sv_gentle` stays 0.
 The normal gore path (gibs, blood, stains, damage effects, kill wording) stays fully ported and is tested
 like everything else (task GENTLE-TESTS). Logged as DIFF-001. The content-ratings questionnaire is answered
 by the owner from the facts in that doc (Q-007).
+**D-015 (2026-11-20) Supersedes D-014: blood/gore policy deferred by the owner until before publishing.**
+No gentle-mode default: `cl_gentle` behaves exactly as in Xonotic (default 0, menu checkbox). DIFF-001
+withdrawn. Q-007 (questionnaire, default, locking) stays open until the owner decides.
+
+**D-016 (2026-11-20) Gore is ported in full but isolated** (owner). QuakeC is never edited. Every gore-only
+asset goes in a separate group `assets/optional/gore/` with its own manifest, built and uploaded
+separately. One switch, `platform/contentpolicy` (`MODE`), selects `player-choice` (Xonotic default),
+`forced-gentle` (cl_gentle locked 1) or `removed` (locked 1, gore group never uploaded/loaded, VFS serves
+placeholders so precache indices, effect numbers and server model loading stay identical). Changing the
+mode touches only that switch. Proof: server frame-diff and net byte tests identical in all modes;
+`removed` runs with no missing-asset errors. Server-side gore paths: docs/policy/gentle-mode.md.
 <!-- /§DECISIONS -->
 
 <!-- §QUESTIONS -->
 ## §QUESTIONS
 
-- **Q-002 (2026-11-20, owner: will test later) Max image size.** Roblox docs conflict: "up to 4096×4096" vs "up to 1024×1024 pixel
+- **Q-002 (2026-11-20, owner: will test later; [needs Studio]) Max image size.** Roblox docs conflict: "up to 4096×4096" vs "up to 1024×1024 pixel
   spaces for texture maps" (G-004). Default taken: tile anything > 1024 (lossless either way). Please test
   in Studio: upload one 2048² and one 4096² image and check whether they display at full resolution.
-- **Q-007 (2026-11-20) Gentle mode is a checkbox players can untick.** D-014 makes `cl_gentle 1` the
-  default, but Xonotic's menu (Settings → User, "Disable gore effects and harsh language") lets any player
-  switch it off, and then blood, wall stains and gibs appear. Roblox: answers must "accurately reflect the
-  content of your game … If you misrepresent your game, you may be subject to moderation consequences"
-  (content-ratings page, read 2026-11-20). So answering only for gentle-on may be inaccurate while the
-  checkbox works. Options: (a) keep the checkbox and answer for gentle-off content; (b) lock gentle on for
-  Roblox (removes a player option: needs a §DIFFS entry under Roblox policy); (c) another rule you choose.
-  Default meanwhile: the checkbox stays functional (nothing removed); facts for both states are in
-  `docs/policy/gentle-mode.md`. The questionnaire itself is yours (Q-003 closed: you handle it before publishing).
+- **Q-007 (2026-11-20) Blood/gore policy: deferred by owner until before publishing.** Covers the content-
+  ratings questionnaire, any gentle-mode default and locking. Until decided: `cl_gentle` exactly as in
+  Xonotic; gore isolated per D-016 so any choice is a one-line `platform/contentpolicy` change. Facts for
+  the questionnaire (both states, and that players can untick gentle mode): docs/policy/gentle-mode.md.
 - **Q-004 (2026-11-20, owner: will provide later) Open Cloud API key** for uploading assets (M1-UPLOAD): needs Assets read+write
   for your account or group. Provide it as a session network secret or local env var, never in the repo.
   Also: upload to your user or a group?
-- **Q-005 (2026-11-20, owner: will test later) Studio measurements needed** (cannot be done headless): `Camera.NearPlaneZ` on your
+- **Q-005 (2026-11-20, owner: will test later; [needs Studio]) Studio measurements needed** (cannot be done headless): `Camera.NearPlaneZ` on your
   devices, and the maximum `PointLight.Range` Studio accepts (docs give none). These set the stud scale (D-008).
 <!-- /§QUESTIONS -->
 

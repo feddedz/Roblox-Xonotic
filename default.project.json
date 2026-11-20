@@ -24,6 +24,9 @@
 					},
 					"storage": {
 						"$path": "platform/storage"
+					},
+					"contentpolicy": {
+						"$path": "platform/contentpolicy"
 					}
 				},
 				"game": {

@@ -1,7 +1,9 @@
 # Gentle mode (cl_gentle / sv_gentle) in Xonotic 0.8.6, and the content-ratings questionnaire
 
-Source: `source/qcsrc` and the cfg files of the pinned release (D-001), read 2026-11-20. Owner decision
-D-014: on Roblox, `cl_gentle` defaults to 1; the normal gore path stays ported and tested.
+Source: `source/qcsrc` and the cfg files of the pinned release (D-001), read 2026-11-20.
+Status: the blood/gore policy is **deferred by the owner until before publishing** (Q-007, D-015).
+`cl_gentle` behaves exactly as in Xonotic (default 0, menu checkbox). Gore is ported in full and kept
+isolated so it can later be locked or removed by one switch (D-016, section "Isolation" below).
 
 ## The cvars (defaults in the pinned cfgs)
 | cvar | default | meaning (cfg description) |
@@ -54,3 +56,42 @@ so content behind it is still reachable in the game. See HANDOFF Q-007 before an
 | Gore | none: no body parts; bodies dissolve into clouds when gibbed; corpses stay, intact | gibs: eyes, skulls, arms, legs, torso chunks fly and splat |
 | Death presentation | death animation, corpse on floor, death scream | same, plus gibbing |
 | Language | gentle wording for kill messages ("First score!") | "First blood!", "drew first blood", frag wording |
+
+## Server-side analysis (for isolation, D-016; verified 2026-11-20)
+- **The server never reads `cl_gentle`.** It is not replicated (no REPLICATE/sendcvar use in qcsrc);
+  every `cl_gentle*` read is CSQC (`gibs.qc` net_gibsplash, `damageeffects.qc`, `view.qc`, notification
+  wording via `GENTLE` in CSQC). So the client mode cannot change server state.
+- **Gib splash on the server** (`gibs.qc` L17-55, SVQC): `Violence_GibSplash_At` spawns a temporary
+  `new_pure` entity, writes the `net_gibsplash` temp message (type, amount, origin/4, compressed velocity)
+  to every real client and deletes the entity. This edict allocate/free happens on every server in every
+  mode (it does not depend on any client setting) and the message bytes are identical. All gib entities,
+  blood particles and stains are created **only in CSQC** from that message.
+- **Corpses** (`player.qc` CopyBody, classname "body") are gameplay, not gore: they exist with or without
+  gentle mode and stay untouched. `sv_gibhealth` gibbing (player.qc L212) hides the body server-side and
+  sends the splash; that server logic is identical in all modes.
+- **Precache affects the server.** Gib models are registered with `MODEL()` (`common/models/all.inc`
+  L130-140) and gore sounds with `SOUND()` (`common/sounds/all.inc` L264-268: misc/gib, gib_splat01-04).
+  Registries precache on server and client alike, so these names take model/sound **index numbers** that
+  appear in network messages. The server loads every precached model with `Mod_ForName(…, crash=true, …)`
+  (`sv_main.c` SV_ModelIndex): a missing gib model file is a fatal server error. Sound precache on the server
+  only records the name.
+- **effectinfo.txt** defines blood effects by name; effect numbers come from the file's order. The file
+  must stay byte-identical in every mode (otherwise every effect number after the first gore effect shifts).
+- **No server-emitted blood effects:** the server never calls a blood effect by number (only
+  `sv_cmd.qc` debug prints of TE_BLOOD/TR_BLOOD indices).
+
+## Isolation (D-016)
+QuakeC is not edited. Isolation lives in the asset and platform layers:
+- **Gore asset group** `assets/optional/gore/` with its own manifest: gib models (`models/gibs/*` that only
+  gibs use) and their skins/textures, gore sounds (misc/gib*, gib_splat*), blood/gib particle textures
+  (the particle-atlas tiles used *only* by gore effects; shared tiles stay in the main group), blood
+  decal/stain textures, and the red damage-flash image. Built and uploaded separately (task GORE-ASSETS).
+- **One switch** `platform/contentpolicy` with three modes:
+  - `player-choice`: Xonotic behaviour (cl_gentle default 0, checkbox works), gore group loaded;
+  - `forced-gentle`: `cl_gentle` locked to 1 (checkbox shown locked), gore group still loaded but never shown;
+  - `removed`: `cl_gentle` locked to 1, gore group never uploaded or loaded. The runtime VFS returns
+    policy placeholders for gore paths (a minimal valid model with the same name, silent sound, blank
+    texture), so precache order, index numbers, effectinfo numbering and server model loading stay exactly
+    as in Xonotic and no missing-asset error occurs.
+- **Proof** (task GORE-MODE-TESTS): server frame-diff tests produce identical results in all three modes,
+  network messages are byte-identical, and `removed` runs a full match with zero missing-asset messages.
