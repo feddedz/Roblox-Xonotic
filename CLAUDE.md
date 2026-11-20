@@ -12,10 +12,11 @@ sessions test headless with Lune. Many sessions work in turn; `HANDOFF.md` is th
 Never change content for Roblox policy on your own: ask in §QUESTIONS.
 
 ## Session protocol
-1. **Start, without reading the whole repo:** read HANDOFF.md `§STATUS`, `§RULES`, `§TASKS` (grep the
-   marker, read only that section), then the top 5 lines of `docs/log/INDEX.md`. Read other sections or
+1. **Start, without reading the whole repo:** `tools/handoff.sh STATUS RULES TASKS` (prints only those
+   HANDOFF.md sections), then the top 5 lines of `docs/log/INDEX.md`. Read other sections or
    `docs/subsystems/*.md` only when your task needs them. Toolchain: `tools/bootstrap.sh &&
    export PATH="$PWD/.tools/bin:$PATH"`; game data: `tools/release/fetch.sh` + `python3 tools/pk3/manifest.py --build high --extract`.
+   Cloud sessions need the "Roblox-Xonotic" environment (its allowlist has dl.xonotic.org etc.; G-013).
 2. **Claim:** pick an `open` task whose deps are `done`, not in a subsystem another session has claimed.
    Set it to `claimed by <session> <date>` in §TASKS, **commit and push that alone before any work**.
    Branch `<task-id>-<short-name>` (or the branch the environment assigns; D-011).

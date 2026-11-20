@@ -1,41 +1,40 @@
 # HANDOFF — Xonotic → Roblox one-to-one port
 
-Single source of project state. **Do not read this whole file.** Search for a section marker
-(e.g. `grep -n "§STATUS" HANDOFF.md`) and read only that section. Every section except §MAP and
-§DIFFS stays under ~60 lines; detail lives in `docs/subsystems/` and is linked from here.
+Single source of project state. **Do not read this whole file.** Print one section with
+`tools/handoff.sh STATUS` (or find its unique marker line `<!-- §NAME -->`; it ends at `<!-- /§NAME -->`).
+Every section except §MAP and §DIFFS stays under ~60 lines; detail lives in `docs/subsystems/`.
 
-| Marker | Contents |
+| Section | Contents |
 |---|---|
-| `<!-- §STATUS -->` | ≤15 lines: milestone, works, broken, FPS / tick time, next step. Rewritten each session. |
-| `<!-- §RULES -->` | The project rules (condensed owner brief). Absolute. |
-| `<!-- §TASKS -->` | Task board: ID, title, status, files, deps. |
-| `<!-- §MAP -->` | Every DarkPlaces C file + platform backend: role, module, status, tests. |
-| `<!-- §DIFFS -->` | Every remaining difference from real Xonotic. Not listed = not allowed. |
-| `<!-- §DECISIONS -->` | Numbered, dated decisions. Never contradict; supersede with a new one. |
-| `<!-- §QUESTIONS -->` | Open questions for the owner (+ the faithful default taken meanwhile). |
-| `<!-- §GOTCHAS -->` | Verified limits (with date) and hard-won lessons. |
+| §STATUS | ≤15 lines: milestone, works, broken, FPS / tick time, next step. Rewritten each session. |
+| §RULES | The project rules (condensed owner brief). Absolute. |
+| §TASKS | Task board: ID, title, status, files, deps. |
+| §MAP | Every DarkPlaces C file + platform backend: role, module, status, tests. |
+| §DIFFS | Every remaining difference from real Xonotic. Not listed = not allowed. |
+| §DECISIONS | Numbered, dated decisions. Never contradict; supersede with a new one. |
+| §QUESTIONS | Open questions for the owner (+ the faithful default taken meanwhile). |
+| §GOTCHAS | Verified limits (with date) and hard-won lessons. |
 
 <!-- §STATUS -->
 ## §STATUS (rewritten 2026-11-20, session 017gQiyN)
-
-- **Milestone:** M0 done. M1 started (VFS + manifest + shader parser done). M2 started (progs.dat parser).
-- **Works:** toolchain (`tools/bootstrap.sh`), release fetch + sha512 check (`tools/release/fetch.sh`),
-  DarkPlaces-exact VFS resolution and asset manifests for both 0.8.6 builds (`assets/manifest/`),
-  float32 helper verified bit-exact (`engine/_port/f32.luau`), Lune test runner, CI workflow, Rojo build.
-- **Not yet:** no engine code ported, no converters beyond VFS/shaders, nothing runs in Studio except two
-  boot scripts that print `NOT YET PORTED`.
-- **FPS / server tick:** not measurable yet (nothing renders or simulates).
-- **Next step:** M2-AOT — compile `progs.dat` to Luau (see §TASKS; parser in `tools/qcaot/progs.py`).
+- **Milestone:** M0 done. M1: VFS/manifests + shader parser done. M2: progs.dat reader + CFG analysis done.
+- **Works:** toolchain bootstrap; pinned release fetch (sha512); DarkPlaces-exact VFS + manifests (both
+  builds); shader table (2,447 shaders); reader for all 3 .dat validated like PRVM_Prog_Load; f32 helper
+  verified bit-exact; Lune runner; CI; Rojo build. Tests: Lune 17,050 checks pass, 15 Python tests pass.
+- **Not yet:** no engine module ported; no texture/model/BSP/sound converters; Studio shows only two
+  `NOT YET PORTED` warnings (expected).
+- **FPS / server tick:** not measurable yet.
+- **Next step:** M2-INTERP + M2-AOT (plan in docs/subsystems/qcvm.md). Independent, parallel-safe:
+  M1-TEX, M1-BSP, REF-DP, M1-RTVFS.
 <!-- /§STATUS -->
 
 <!-- §RULES -->
 ## §RULES (condensed from the owner's brief; absolute)
 
-**Goal.** Port Xonotic to Roblox one-to-one: a Xonotic player must find no difference in gameplay or
-visuals. Same game code, assets, engine behaviour, hitboxes, movement, weapon numbers, timings, look.
-Nothing simplified, "Roblox-ified", rebalanced or removed. Anything unavoidable is logged in §DIFFS with
-justification, never changed silently. "Easier", "Roblox players prefer", "close enough", "probably fine"
-are never reasons.
+**Goal.** Xonotic on Roblox one-to-one: no difference in gameplay or visuals (code, assets, engine
+behaviour, hitboxes, movement, weapon numbers, timings, look). Nothing simplified, "Roblox-ified",
+rebalanced or removed. Anything unavoidable goes in §DIFFS with justification, never silently. "Easier",
+"Roblox players prefer", "close enough", "probably fine" are never reasons.
 
 **Fixed decisions (owner; do not revisit).**
 1. Match the latest stable release exactly (pinned in D-001). Never mix code/assets from master or other versions.
@@ -52,8 +51,8 @@ are never reasons.
 5. Visual fidelity first; FPS only needs to stay playable (report FPS in §STATUS; if fidelity makes it
    unplayable, ask in §QUESTIONS — never cut fidelity yourself). Reference look = Ultra preset (D-009).
    Main renderer = Roblox 3D pushed to max; a software renderer may exist only as a comparison mode.
-6. Workflow: GitHub + Rojo. Owner tests in Studio; sessions test headless with Lune. Selene + StyLua.
-7. GPLv3+. Repo public. Menu has a small "Credits & License" entry (repo link, GPL text, Team Xonotic and
+6. GitHub + Rojo; owner tests in Studio; sessions test headless with Lune; Selene + StyLua.
+7. GPLv3+, public repo; menu gets a small "Credits & License" entry (repo link, GPL text, Team Xonotic and
    asset authors). Keep all original copyright notices in ported files.
 
 **Visual fidelity (close every gap; log only what remains after real effort, verified against current docs).**
@@ -84,21 +83,17 @@ after every technique was tried (log tries + closeness); settings may hide optio
 if logged. Roblox policy requirements — **never change content for policy on your own**: put the exact
 guideline in §QUESTIONS and wait.
 
-**Performance.** Server tick must keep up with Xonotic's tick rate (D-005) — non-negotiable. Client:
-playable, fidelity first. Use `--!native`/`--!strict` where they help (verify codegen applies), no
-allocations in hot paths, `buffer` storage, Parallel Luau only where it measurably helps without changing
-results. Optimisations must pass the same differential and screenshot tests as the code they replace.
+**Performance.** Server tick keeps up with Xonotic's tick rate (D-005): non-negotiable. Client playable,
+fidelity first: `--!native`/`--!strict` where they help (verify codegen), no hot-path allocations, `buffer`
+storage, Parallel Luau only where it measurably helps without changing results. Every optimisation passes
+the same differential and screenshot tests as the code it replaces.
 
-**Differential testing (a subsystem is done when it matches the reference on recorded data).**
-Collision: thousands of traceline/tracebox per stock map from real DarkPlaces, bit-identical (tolerances
-justified in writing). Physics/gameplay: frame-by-frame entity diffs from scripted inputs/demos/bot
-matches. Network: byte-compare messages. Particles: diff sim state vs instrumented DP. Visuals: screenshot
-process. Reference data or regeneration scripts in `tests/reference/`; instrumented DP build in `tools/`.
-If the network can't fetch something, stop and tell the owner exactly which files to put where.
-
-**Protocol.** See `CLAUDE.md` (session start/claim/work/log/finish). Never delete/skip functionality or
-lower visual quality: stub with a logged `NOT YET PORTED: <name>` and add a task. Never guess Roblox
-limits/APIs from memory: verify in current docs, record result + date in §GOTCHAS.
+**Differential testing: done = matches the reference on recorded data.** Collision: thousands of
+traceline/tracebox per stock map from real DarkPlaces, bit-identical (tolerances justified in writing).
+Physics: frame-by-frame entity diffs from scripted inputs/demos/bot matches. Network: byte-compare.
+Particles: diff sim state vs instrumented DP. Visuals: screenshot process. Data or regeneration scripts in
+`tests/reference/`; instrumented DP in `tools/`. Can't fetch something? Tell the owner exactly what/where.
+**Protocol:** `CLAUDE.md` (start, claim, work, log, finish; stubs log `NOT YET PORTED: <name>`).
 <!-- /§RULES -->
 
 <!-- §TASKS -->
@@ -121,9 +116,10 @@ before working. One claimed task per subsystem at a time. Details per task in th
 | M1-MODELS | MD3/IQM/DPM/ZYM/OBJ/ASE/SP2 → meshes, skins, animations (framegroups) | open | tools/models/ | M1-VFS |
 | M1-SOUNDS | Sound pipeline: ogg/wav metadata (rate, loop points), upload-ready files | open | tools/sounds/ | M1-VFS |
 | M1-UPLOAD | Open Cloud uploader + `assets/manifest/roblox-ids.tsv`; key via env var, never committed | open | tools/upload/ | M1-TEX, Q-004 |
-| M2-PROGS | progs.dat parser (header, statements, defs, fields, functions, strings) for all 3 .dat | done | tools/qcaot/progs.py | M1-VFS |
-| M2-AOT | QC bytecode → Luau AOT compiler (f32 globals/fields in buffers, one Luau fn per QC fn) | open | tools/qcaot/, game/generated/ | M2-PROGS |
-| M2-RUNNER | Headless runner, all builtins stubbed + logged; done = server QC runs worldspawn on a stock map | open | tests/, engine/prvm_*.luau | M2-AOT |
+| M2-PROGS | progs.dat reader (all 3 .dat) + CFG/reducibility analysis | done | tools/qcaot/progs.py, cfg.py | M1-VFS |
+| M2-INTERP | Straight port of prvm_exec.c + prvm_execprogram.h (reference interpreter for AOT diffing) | open | engine/prvm_exec.luau | M2-PROGS |
+| M2-AOT | QC bytecode → Luau AOT compiler (f32 globals/fields in buffers, one Luau fn per QC fn); plan in docs/subsystems/qcvm.md | open | tools/qcaot/, game/generated/ | M2-PROGS |
+| M2-RUNNER | Headless runner, all builtins stubbed + logged; done = server QC runs worldspawn on a stock map | open | tests/, engine/prvm_*.luau | M2-AOT, M2-INTERP |
 | M2-DEBUG | Rebuild progs.dat from qcsrc with the pinned gmqcc; prove byte-identical; emit line-number debug info | open | tools/qcaot/ | M2-PROGS |
 | REF-DP | Instrumented DarkPlaces (from release source) that records traces, server frames, net messages, particles | open | tools/darkplaces-ref/ | M0-PIN |
 | M3-BSPLOAD | Port model_brush.c (Q3 BSP), model_shared.c, bih.c, collision.c | open | engine/ | M1-RTVFS |
@@ -189,7 +185,7 @@ Source: `work/release-standard/Xonotic/source/darkplaces/` (identical to tag xon
 | dpvsimpledecode.c | 656 | needs §DIFFS | — | not started | — | video capture/cinematics: check use in Xonotic data before deciding |
 | filematch.c | 223 | engine port | engine/filematch.luau | not started | — |  |
 | fractalnoise.c | 226 | engine port | engine/fractalnoise.luau | not started | — |  |
-| fs.c | 4160 | split | engine/fs.luau | not started | — | CPU logic → engine/, GL/OS calls → platform/ |
+| fs.c | 4160 | split | engine/fs.luau | not started | — | VFS order mirrored offline by tools/pk3/vfs.py; CPU logic → engine/, writes → platform/storage |
 | ft2.c | 1693 | split | engine/ft2.luau | not started | — | CPU logic → engine/, GL/OS calls → platform/ |
 | gl_backend.c | 4914 | platform | platform/… | not started | — | → platform/render |
 | gl_draw.c | 2156 | split | engine/gl_draw.luau | not started | — | CPU logic → engine/, GL/OS calls → platform/ |
@@ -215,7 +211,7 @@ Source: `work/release-standard/Xonotic/source/darkplaces/` (identical to tag xon
 | mod_skeletal_animatevertices_sse.c | 446 | n/a | — | not started | — | SIMD variant of the generic file; port generic only (same results) |
 | model_alias.c | 4072 | engine port | engine/model_alias.luau | not started | — |  |
 | model_brush.c | 8790 | engine port | engine/model_brush.luau | not started | — |  |
-| model_shared.c | 4851 | engine port | engine/model_shared.luau | not started | — |  |
+| model_shared.c | 4851 | engine port | engine/model_shared.luau | not started | — | Mod_LoadQ3Shaders mirrored offline by tools/shaders/parse.py |
 | model_sprite.c | 489 | engine port | engine/model_sprite.luau | not started | — |  |
 | mvm_cmds.c | 1638 | engine port | engine/mvm_cmds.luau | not started | — |  |
 | netconn.c | 3963 | split | engine/netconn.luau | not started | — | CPU logic → engine/, GL/OS calls → platform/ |
@@ -224,8 +220,8 @@ Source: `work/release-standard/Xonotic/source/darkplaces/` (identical to tag xon
 | portals.c | 480 | engine port | engine/portals.luau | not started | — |  |
 | protocol.c | 3418 | engine port | engine/protocol.luau | not started | — |  |
 | prvm_cmds.c | 7366 | engine port | engine/prvm_cmds.luau | not started | — |  |
-| prvm_edict.c | 3442 | engine port | engine/prvm_edict.luau | not started | — |  |
-| prvm_exec.c | 1054 | engine port | engine/prvm_exec.luau | not started | — |  |
+| prvm_edict.c | 3442 | engine port | engine/prvm_edict.luau | not started | — | progs loading/strings/edicts; reader prototype tools/qcaot/progs.py |
+| prvm_exec.c | 1054 | engine port | engine/prvm_exec.luau | not started | — | reference interpreter (M2-INTERP); AOT replaces the hot path; docs/subsystems/qcvm.md |
 | r_explosion.c | 285 | engine port | engine/r_explosion.luau | not started | — |  |
 | r_lerpanim.c | 0 | engine port | engine/r_lerpanim.luau | not started | — |  |
 | r_lightning.c | 196 | engine port | engine/r_lightning.luau | not started | — |  |
@@ -313,7 +309,7 @@ Data pk3 sha256 (full table + sizes: `assets/manifest/pk3-{standard,high}.tsv`):
 - maps `d10e5a8eac468a4a5b6d80f9603d95949971c6b10f86bec65a79e19f0d424f54`, maps-high `7569dc8354e61d8f74a5908816b66adf8835ce9de64a915c7d49a00f0d1df455`
 - nexcompat `34021da1176e2b47383c94707b5922d9a5f3c4ff43f8ac4ac0e39da44648ccbe`, -high `c37e73cd8dbae1f27d06d91b9c2f1bff8ee1b758b061790aa76d9847a8775b16`
 - xoncompat `e3aaff8e6dfb7a0031e2a04d62e5146fd7a9710264c7af1c3be752b62629b739`, -high `ed76e54fd340053da00e854d4b8a915cd82c21f498ebc7b3922fd2db084b1b62`
-- music `133fbcfa5766cd6849c2918bb34ce4d749aeafcbf89de54df467a61296353f48`; fonts: unifont `7cc9ca2e…dba2b`, xolonium `d6404f31…6b586`
+- music `133fbcfa5766cd6849c2918bb34ce4d749aeafcbf89de54df467a61296353f48`; fonts: see pk3-*.tsv
 - QuakeC (identical in both builds): progs.dat `e6f5c70b8e0e5f329531ce53ac982eb698a12660a1b45622a900a7bc3bb87a62`,
   csprogs.dat `7d7807166d38521aadb8109830b69580596be4c05924d1b1fd8b71c31d4def13`, menu.dat `dc75076060bac00aacdcd58d6a216cfb33f7a4665a18a622ff970bc73869bbb8`
 
@@ -343,9 +339,8 @@ engine default). Client: `cl_netfps 60`, `cl_movement 1` (prediction, server run
 packet), `cl_maxfps 250` (`xonotic-client.cfg`). The Roblox server must sustain 30 Hz SV_Frame plus
 per-move player physics.
 
-**D-006 (2026-11-20) Tooling.** Lune 0.11.1, Rojo 7.7.1, StyLua 2.6.0, Selene 0.31.0 (`rokit.toml`;
-`tools/bootstrap.sh` for cloud sessions). Offline converters in Python 3 (numpy, Pillow pinned in
-`tools/requirements.txt`). Selene uses the repo-local `xonotic_std.yml` (G-012).
+**D-006 (2026-11-20) Tooling.** Lune 0.11.1, Rojo 7.7.1, StyLua 2.6.0, Selene 0.31.0 (`rokit.toml`,
+`tools/bootstrap.sh`); offline converters in Python 3 (`tools/requirements.txt`); Selene std `xonotic_std.yml`.
 
 **D-007 (2026-11-20) Requires** use relative string paths only (`./`, `../`, `@self/`), no aliases — same
 resolution in Lune and in Roblox's require-by-string (verified: Roblox docs + Lune test).
