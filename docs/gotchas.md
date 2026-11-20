@@ -63,3 +63,9 @@ Roblox facts are from create.roblox.com / github.com/Roblox/creator-docs, read 2
   So each client would download ≈ 48 MB of bytecode and hold ≈ 53 MB for csprogs+menu (Q-010). Control-flow
   scaffolding is ≈ 30% of generated source. Every QC function is referenced by a function-typed global
   constant, so naive dead-code elimination removes 0 functions.
+- **G-027** progs.dat (0.8.6) declares builtins #352 registercommand, #566 findbox/findbox_tofield and #608
+  parseentitydata, which are NULL in vm_sv_builtins[] (svvm_cmds.c). Real DarkPlaces raises "No such builtin"
+  only if one is called; the QC guards them with extension checks. Keep them NULL
+  (tests/integration/sv_vm_setup.test.luau pins the list).
+- **G-028** Xonotic's progs.dat header crc is 5927 = PROGHEADER_CRC (progdefs.h L166), so SV_VM_Setup's branch
+  that takes engine field offsets from the entvars_t struct (PRVM_ED_FindFieldOffset_FromStruct) applies.

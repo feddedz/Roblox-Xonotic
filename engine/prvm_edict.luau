@@ -66,8 +66,11 @@ export type Prog = {
 	edictsfields: buffer,
 	-- strings created at runtime
 	tempstringsbuf: { data: buffer, cursize: number, maxsize: number },
-	knownstrings: { [number]: string | false }, -- index num + 1
+	-- engine strings: a C `const char *` is represented by a unique reference { str = "..." } (pointer identity)
+	knownstrings: { [number]: { str: string } | false }, -- index num + 1
 	numknownstrings: number,
+	maxknownstrings: number,
+	firstfreeknownstring: number,
 	-- execution state (prvm_exec.c)
 	depth: number,
 	stack_s: { number }, -- prvm_stack_t.s, index depth + 1
@@ -284,6 +287,8 @@ function prvm_edict.NewProg(name: string): Prog
 		tempstringsbuf = { data = buffer.create(65536), cursize = 0, maxsize = 65536 },
 		knownstrings = {},
 		numknownstrings = 0,
+		maxknownstrings = 0,
+		firstfreeknownstring = 0,
 		depth = 0,
 		stack_s = {},
 		stack_f = {},
@@ -329,6 +334,10 @@ function prvm_edict.PRVM_Prog_Load(
 	local function L(ofs: number): number
 		return buffer.readi32(data, ofs)
 	end
+	prog.numknownstrings = 0
+	prog.maxknownstrings = 0
+	prog.firstfreeknownstring = 0
+	prog.knownstrings = {}
 	-- dprograms_t header
 	prog.progs_version = L(0)
 	prog.progs_crc = L(4)
@@ -399,7 +408,10 @@ function prvm_edict.PRVM_Prog_Load(
 	end
 	local appendedGlobalNames: { string } = {}
 	for _, rg in required_globals or {} do
-		table.insert(prog.globaldefs, { type = rg.type, ofs = prog.numglobals, s_name = -1 })
+		table.insert(
+			prog.globaldefs,
+			{ type = rg.type, ofs = prog.numglobals, s_name = prvm_edict.PRVM_SetEngineString(prog, { str = rg.name }) }
+		)
 		table.insert(appendedGlobalNames, rg.name)
 		prog.numglobals += if rg.type == ev_vector then 3 else 1
 	end
@@ -415,10 +427,15 @@ function prvm_edict.PRVM_Prog_Load(
 		prog.fielddefs[i + 1] = { type = t, ofs = buffer.readu16(data, o + 2), s_name = L(o + 4) }
 	end
 	for _, rf in required_fields or {} do
-		table.insert(prog.fielddefs, { type = rf.type, ofs = prog.entityfields, s_name = -1 })
+		table.insert(prog.fielddefs, {
+			type = rf.type,
+			ofs = prog.entityfields,
+			s_name = prvm_edict.PRVM_SetEngineString(prog, { str = rf.name }),
+		})
 		prog.entityfields += if rf.type == ev_vector then 3 else 1
 	end
 
+	-- (prvm_edict.c L2004-2005: the known-string table starts empty for each load)
 	-- copy globals: with PRVM_64 off both branches of the int/float heuristic store the same 32 bits
 	prog.globals = buffer.create(prog.numglobals * 4)
 	buffer.copy(prog.globals, 0, data, ofs_globals, numglobals * 4)
@@ -549,7 +566,7 @@ function prvm_edict.PRVM_GetString(prog: Prog, num: number): string
 				prog.warning(string.format("PRVM_GetString: Invalid zone-string offset (%d has been freed)\n", num))
 				return ""
 			end
-			return s
+			return s.str
 		else
 			prog.warning(
 				string.format("PRVM_GetString: Invalid zone-string offset (%d >= %d)\n", num, prog.numknownstrings)
@@ -567,6 +584,73 @@ function prvm_edict.PRVM_GetString(prog: Prog, num: number): string
 		)
 		return ""
 	end
+end
+
+-- port: prvm_edict.c PRVM_SetEngineString L3023-3072 @xonotic-v0.8.6
+-- `s` is the engine string reference ({ str = ... }); identity of the table = identity of the C pointer.
+-- Tempstring-area pointers (s >= tempstringsbuf.data) are represented by { tempofs = n } references.
+function prvm_edict.PRVM_SetEngineString(prog: Prog, s: any): number
+	if s == nil then
+		return 0
+	end
+	if s.tempofs ~= nil then
+		-- if it's in the tempstrings area, use a reserved range
+		return prog.stringssize + s.tempofs
+	end
+	-- see if it's a known string address
+	for i = 0, prog.numknownstrings - 1 do
+		if prog.knownstrings[i + 1] == s then
+			return PRVM_KNOWNSTRINGBASE + i
+		end
+	end
+	-- new unknown engine string
+	local i = prog.firstfreeknownstring
+	while i < prog.numknownstrings do
+		if not prog.knownstrings[i + 1] then
+			break
+		end
+		i += 1
+	end
+	if i >= prog.numknownstrings then
+		if i >= prog.maxknownstrings then
+			prog.maxknownstrings += 128
+		end
+		prog.numknownstrings += 1
+	end
+	prog.firstfreeknownstring = i + 1
+	prog.knownstrings[i + 1] = s
+	return PRVM_KNOWNSTRINGBASE + i
+end
+
+-- port: prvm_edict.c PRVM_ED_FindField L360-372 @xonotic-v0.8.6 (returns the 1-based def index or nil)
+function prvm_edict.PRVM_ED_FindField(prog: Prog, name: string)
+	for i, def in prog.fielddefs do
+		if prvm_edict.PRVM_GetString(prog, def.s_name) == name then
+			return def, i
+		end
+	end
+	return nil
+end
+
+-- port: prvm_edict.c PRVM_ED_FindGlobal L379-391 @xonotic-v0.8.6
+function prvm_edict.PRVM_ED_FindGlobal(prog: Prog, name: string)
+	for i, def in prog.globaldefs do
+		if prvm_edict.PRVM_GetString(prog, def.s_name) == name then
+			return def, i
+		end
+	end
+	return nil
+end
+
+-- port: prvm_edict.c PRVM_ED_FindFunction L399-411 @xonotic-v0.8.6 (returns function record and fnum)
+function prvm_edict.PRVM_ED_FindFunction(prog: Prog, name: string)
+	for i = 0, prog.numfunctions - 1 do
+		local func = prog.functions[i + 1]
+		if prvm_edict.PRVM_GetString(prog, func.s_name) == name then
+			return func, i
+		end
+	end
+	return nil
 end
 
 return prvm_edict

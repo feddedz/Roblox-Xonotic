@@ -17,16 +17,15 @@ Every section except §MAP and §DIFFS stays under ~60 lines; detail lives in `d
 
 <!-- §STATUS -->
 ## §STATUS (rewritten 2026-11-20, session 017gQiyN)
-- **Milestone:** M0 done; M1 partly (VFS, manifests, shaders); **M2: reference interpreter + AOT compiler
-  done**: all 25,509 QC functions of progs/csprogs/menu behave identically compiled and interpreted.
-- **Works headless:** toolchain, release fetch, VFS + manifests, shader table, progs reader, f32 helper,
-  interpreter (`engine/prvm_exec.luau`), compiler (`tools/qcaot/compile.py`) + runtime, content-policy switch.
-  Tests: 5 Lune files (17k+ checks; real-data diff skips without game data), 15 Python tests.
-- **Not yet:** builtins, edicts/strings allocation, server loop; no converters beyond VFS/shaders; nothing in
-  Studio beyond boot warnings and the unrun test place ([needs Studio]).
-- **Open owner points:** Q-007 gore (deferred), Q-009 define assists/game passes, Q-010 client code size.
-- **FPS / server tick:** not measurable yet. AOT ≈ 1.5× interpreter in Lune (not a benchmark).
-- **Next step:** M2-RUNNER (worldspawn on a stock map headless). Parallel: REF-DP, M3-BSPLOAD, M1-TEX.
+- **Milestone:** M0 done; M1 partly (VFS, manifests, shaders); M2: interpreter + AOT compiler done (all
+  25,509 QC functions identical compiled vs interpreted); M2-RUNNER partial: real progs.dat loads through
+  SV_VM_Setup and worldspawn runs identically on both with all builtins stubbed.
+- **Build:** `tools/build.sh` → game/generated (never committed, D-020); place builds to 14 MB.
+- **Tests:** 6 Lune files (2 skip without game data), 15 Python tests; StyLua/Selene clean.
+- **Parallel sessions running:** REF-DP (session_017gQiyKAbN1VAofn9a3CDvm), M3-BSPLOAD (session_017gQiyJc8jR6adsLPSpNWp8).
+- **Open owner points:** Q-007 gore (deferred), Q-009 define assists/game passes, Q-010 client code size (≈48 MB).
+- **FPS / server tick:** not measurable yet; PERF-SVBENCH [needs Studio] is the early check.
+- **Next step:** M2-RUNNER steps 1-2 (cvar.c + config exec, rest of PRVM_Prog_Load), see docs/subsystems/server-runner.md.
 <!-- /§STATUS -->
 
 <!-- §RULES -->
@@ -129,7 +128,7 @@ before working. One claimed task per subsystem at a time. Details per task in th
 | GAMEPASSES | Game passes (DIFF-003) | blocked (Q-009), much later | — | Q-009 |
 | M2-AOT-SHIP | Ship generated code: build step + Rojo mapping + 190k-char modules done (D-020); **[needs Studio]** confirm rojo serve/publish with 380 modules, client load time + memory | partial | tools/qcaot/, game/generated/ | M2-AOT |
 | M2-INTERP-DEBUG | Port tracing/profiling/coverage/watchpoints of prvm_exec.c (console commands use them) | open | engine/prvm_exec.luau | M2-INTERP | tools/qcaot/, game/generated/ | M2-PROGS |
-| M2-RUNNER | Headless runner: rest of PRVM_Prog_Load (required fields/globals of svvm, field lookup), edict alloc, strings, all builtins stubbed + logged; done = server QC runs worldspawn on a stock map | claimed by 017gQiyN 2026-11-20 | tests/, engine/prvm_*.luau, engine/svvm_cmds.luau | M2-AOT, M2-INTERP |
+| M2-RUNNER | Headless runner: rest of PRVM_Prog_Load (required fields/globals of svvm, field lookup), edict alloc, strings, all builtins stubbed + logged; done = server QC runs worldspawn on a stock map | partial, unclaimed (next steps: docs/subsystems/server-runner.md) | tests/, engine/prvm_*.luau, engine/sv_main.luau, engine/svvm_cmds.luau | M2-AOT, M2-INTERP |
 | M2-DEBUG | Rebuild progs.dat from qcsrc with the pinned gmqcc; prove byte-identical; emit line-number debug info | open | tools/qcaot/ | M2-PROGS |
 | REF-DP | Instrumented DarkPlaces (from release source) that records traces, server frames, net messages, particles | open | tools/darkplaces-ref/ | M0-PIN |
 | M3-BSPLOAD | Port model_brush.c (Q3 BSP), model_shared.c, bih.c, collision.c; headless reads work/vfs-high (Roblox runtime loading needs M1-RTVFS later) | open | engine/ | M1-VFS |
@@ -260,12 +259,12 @@ Source: `work/source/Xonotic/source/darkplaces/` (`tools/release/fetch.sh source
 | snd_wav.c | 348 | offline tool | — | not started | — | decode offline in tools/sounds; sample metadata kept for engine |
 | snd_win.c | 897 | n/a | — | not started | — | other OS backend |
 | sv_demo.c | 99 | engine port | engine/sv_demo.luau | not started | — |  |
-| sv_main.c | 4089 | engine port | engine/sv_main.luau | not started | — |  |
+| sv_main.c | 4089 | engine port | engine/sv_main.luau | partial | tests/integration/sv_vm_setup.test.luau | SV_VM_Setup up to Prog_Load; docs/subsystems/server-runner.md |
 | sv_move.c | 448 | engine port | engine/sv_move.luau | not started | — |  |
 | sv_phys.c | 3232 | engine port | engine/sv_phys.luau | not started | — |  |
 | sv_user.c | 975 | engine port | engine/sv_user.luau | not started | — |  |
 | svbsp.c | 453 | engine port | engine/svbsp.luau | not started | — |  |
-| svvm_cmds.c | 3862 | engine port | engine/svvm_cmds.luau | not started | — |  |
+| svvm_cmds.c | 3862 | engine port | engine/svvm_cmds.luau | partial | tests/integration/sv_vm_setup.test.luau | builtin table (generated names) + logging stubs; no builtin ported yet |
 | sys_linux.c | 184 | n/a | — | not started | — | other OS backend |
 | sys_sdl.c | 262 | platform | platform/… | not started | — | → platform/boot (time, main loop) |
 | sys_shared.c | 652 | engine port | engine/sys_shared.luau | not started | — |  |
@@ -292,6 +291,7 @@ Source: `work/source/Xonotic/source/darkplaces/` (`tools/release/fetch.sh source
 | platform/input | — | platform | platform/input/init.luau | not started | — | SDL input → UserInputService |
 | platform/storage | — | platform | platform/storage/init.luau | not started | — | fs writes → DataStores |
 | platform/contentpolicy + assets/optional/gore | — | platform | platform/contentpolicy/init.luau | partial | tests/unit/contentpolicy.test.luau | gore isolation switch + separate gore asset group (D-016) |
+| prvm_offsets.h + builtin tables | — | port support | engine/prvm_offsets.luau, engine/_port/builtin_names.luau | done (generated) | tests/integration/sv_vm_setup.test.luau | tools/engine/gen_tables.py from the pinned source |
 | engine/_port/qcrt | — | port support | engine/_port/qcrt.luau | verified vs interpreter | tests/integration/qcaot_diff.test.luau, tests/unit/qcaot_synth.test.luau | AOT runtime (calls, returns, edict access, runaway counter) |
 | engine/_port/f32 | — | port support | engine/_port/f32.luau | verified | tests/unit/f32.test.luau | docs/subsystems/float32.md |
 <!-- /§MAP -->
@@ -416,5 +416,7 @@ One line each; **details and sources: `docs/gotchas.md`** (add to both). Roblox 
 - **G-023** Place ≤ 100 MB; full place with generated QC = 14 MB .rbxl.
 - **G-024** No documented script size limit; DevForum: 200,000 chars via plugin `Source` → modules ≤ 190k chars ([needs Studio] confirm).
 - **G-025** ReplicatedStorage replicates to all clients (bytecode even if unused); server code in ServerScriptService.
+- **G-027** progs.dat declares 3 builtins that are NULL in vm_sv_builtins (#352, #566, #608): keep NULL; real DP errors only if called.
+- **G-028** Xonotic progs crc 5927 == PROGHEADER_CRC, so SV_VM_Setup's entvars_t field-offset branch applies.
 - **G-026** Bytecode ≈ 1.65× source: client ≈ 48 MB download, ≈ 53 MB heap for csprogs+menu (Q-010).
 <!-- /§GOTCHAS -->
