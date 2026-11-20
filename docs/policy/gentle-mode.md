@@ -93,5 +93,10 @@ QuakeC is not edited. Isolation lives in the asset and platform layers:
     policy placeholders for gore paths (a minimal valid model with the same name, silent sound, blank
     texture), so precache order, index numbers, effectinfo numbering and server model loading stay exactly
     as in Xonotic and no missing-asset error occurs.
+    **Approved by the owner 2026-11-20 (D-019).** Requirements for GORE-ASSETS: every gore model path the
+    server or client precaches gets a same-name placeholder model (valid file for the engine's model
+    loader, so `Mod_ForName(..., crash=true)` on the server succeeds; no render data, never uploaded);
+    every gore sound gets a same-name silent placeholder; precache calls happen in the same order with the
+    same names, so model/sound index numbers in network messages are unchanged.
 - **Proof** (task GORE-MODE-TESTS): server frame-diff tests produce identical results in all three modes,
   network messages are byte-identical, and `removed` runs a full match with zero missing-asset messages.

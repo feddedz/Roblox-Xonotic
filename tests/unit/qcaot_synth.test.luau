@@ -132,7 +132,7 @@ return function(ctx: t.Ctx)
 		end
 		local pI, pA = prep(data), prep(data)
 		local gen = (require :: any)("../../game/generated/_test_" .. name)
-		gen.install(pA)
+		gen.install(pA, { qcrt = qcrt, f32 = require("../../engine/_port/f32") })
 		local entry = spec.entry or 1
 		local okI, errI = pcall(prvm_exec.PRVM_ExecuteProgram, pI, entry, "synth")
 		local okA, errA = pcall(qcrt.ExecuteProgram, pA, entry, "synth")

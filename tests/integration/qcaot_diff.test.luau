@@ -100,7 +100,7 @@ return function(ctx: t.Ctx)
 		local logI, logA = {}, {}
 		local pI, pA = makeProg(name, data, logI), makeProg(name, data, logA)
 		local gen = (require :: any)("../../game/generated/" .. name)
-		gen.install(pA)
+		gen.install(pA, { qcrt = qcrt, f32 = require("../../engine/_port/f32") })
 		local rng = newRng(seed)
 		local tested, mismatches, completed = 0, 0, 0
 		local timeI, timeA = 0, 0

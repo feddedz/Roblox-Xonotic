@@ -31,8 +31,11 @@
 				},
 				"game": {
 					"$className": "Folder",
-					"generated": {
-						"$path": "game/generated"
+					"csprogs": {
+						"$path": "game/generated/csprogs"
+					},
+					"menu": {
+						"$path": "game/generated/menu"
 					}
 				}
 			}
@@ -40,6 +43,12 @@
 		"ServerScriptService": {
 			"XonoticServer": {
 				"$path": "platform/boot/XonoticServer.server.luau"
+			},
+			"XonoticServerGame": {
+				"$className": "Folder",
+				"progs": {
+					"$path": "game/generated/progs"
+				}
 			}
 		},
 		"StarterPlayer": {
