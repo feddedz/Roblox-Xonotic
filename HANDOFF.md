@@ -380,6 +380,10 @@ environment assigns a git branch, use it instead of `<task-id>-<short-name>` and
   Also: upload to your user or a group?
 - **Q-005 (2026-11-20) Studio measurements needed** (cannot be done headless): `Camera.NearPlaneZ` on your
   devices, and the maximum `PointLight.Range` Studio accepts (docs give none). These set the stud scale (D-008).
+- **Q-006 (2026-11-20) Default branch.** The repo was empty, so the first session branch
+  `claude/xonotic-roblox-setup-gb3pjp` became the only (default) branch and no PR could be opened. Please
+  rename it to `main` in GitHub (Settings → Branches) or allow a session to create `main`. Until then,
+  sessions branch from `claude/xonotic-roblox-setup-gb3pjp`. CI runs on PRs and pushes to `main`.
 <!-- /§QUESTIONS -->
 
 <!-- §GOTCHAS -->
