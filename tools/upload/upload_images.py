@@ -50,9 +50,10 @@ def main():
     ap.add_argument("--jobs", type=int, default=8)
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--type", default="Image")
-    ap.add_argument("--tier", default="auto", help="only this tier of assets/manifest/texture-review.tsv (auto/review/approved)")
+    ap.add_argument("--tier", default="all", help="only this tier of assets/manifest/texture-review.tsv (auto/review/approved)")
     ap.add_argument("--batch", type=int, default=300, help="upload N, then wait until Roblox moderated all of them")
     ap.add_argument("--max-batches", type=int, default=1000)
+    ap.add_argument("--dry-run", action="store_true", help="list what would be uploaded, upload nothing")
     a = ap.parse_args()
     done = set()
     if IDS.exists():
@@ -62,30 +63,33 @@ def main():
                 done.add(c[0])
     else:
         IDS.write_text("# sha256\tvpath\tasset_id\toperation\tstatus\tdetail\n")
-    gore = set()
-    gf = ROOT / "assets/optional/gore/textures.tsv"  # GORE-ASSETS: never uploaded to the main account
-    if gf.exists():
-        gore = {l.split("\t")[0] for l in gf.read_text().splitlines() if l and not l.startswith("#")}
+    # Reviewed set (tools/upload/build_ready.py): key = sha256 of the file actually uploaded, so a fixed
+    # version of an already-uploaded original is uploaded as a new asset; originals keep their old key.
     todo, seen = [], set()
-    for l in (ROOT / "assets/manifest/vfs-high.tsv").read_text().splitlines():
-        c = l.split("\t")
-        if l.startswith("#") or c[1] != "texture" or c[4] in done or c[4] in seen or c[0] in gore:
+    for l in (ROOT / "assets/manifest/upload-ready.tsv").read_text().splitlines():
+        if not l or l.startswith("#"):
             continue
-        p = ROOT / "work/vfs-high" / c[0]
-        if p.suffix.lower() not in CT:
+        v, kind, ready_sha, orig_sha = l.split("\t")[:4]
+        key = orig_sha if kind == "original" else ready_sha
+        if key in done or key in seen:
             continue
-        seen.add(c[4])
-        todo.append((c[0], c[4], p))
+        seen.add(key)
+        todo.append((v, key, ROOT / "work/upload/ready" / v))
     tiers = {}
     tf = ROOT / "assets/manifest/texture-review.tsv"
     for l in tf.read_text().splitlines():
         if l and not l.startswith("#"):
             v, k = l.split("\t")[:2]
             tiers[v] = k
-    todo = [x for x in todo if tiers.get(x[0]) == a.tier]
+    if a.tier != "all":
+        todo = [x for x in todo if tiers.get(x[0]) == a.tier]
     if a.limit:
         todo = todo[: a.limit]
     print(f"{len(done)} done, {len(todo)} to upload", flush=True)
+    if a.dry_run:
+        for v, key, p in todo[:20]:
+            print(f"  would upload {v} ({p.relative_to(ROOT)})")
+        return
     lock, n = threading.Lock(), {"ok": 0, "err": 0, "i": 0}
 
     stop = threading.Event()

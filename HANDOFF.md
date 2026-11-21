@@ -17,8 +17,9 @@ Every section except §MAP and §DIFFS stays under ~60 lines; detail lives in `d
 
 <!-- §STATUS -->
 ## §STATUS (rewritten 2026-11-21 late, Claude-Anvil)
-- **Owner's account: appeal succeeded** (G-043; the suspension asset is now Approved). **Uploads still paused** until the
-  review step exists and the owner signs off risky categories (G-042).
+- **Owner's account: 2nd 1-day suspension (G-045).** Ready for after it: every texture reviewed + fixed (D-025/DIFF-008),
+  `assets/manifest/upload-ready.tsv`; order: (1) tools/upload/patch_metadata.py (G-047), (2) owner archives the old
+  assets in assets/manifest/replace-after-review.tsv, (3) gated upload `tools/upload/run_unattended.sh` (8,537 files).
 - **Assets on Roblox:** sounds 804/805 approved (13 bleeped D-022, meet pitch D-023, heavymetal appeal); textures
   1,752 uploaded (43 of them on the gore list), 55 gore held back (assets/optional/gore/textures.tsv), 9,103 waiting.
 - **Studio-ready:** `tools/build.sh` + `rojo build` → 18 MB place; pressing Play runs Host_Init, the quake.rc config
@@ -319,6 +320,7 @@ If it isn't here, it isn't allowed.
 | DIFF-005 | 13 voice lines (Q-013 list) play with the profanity bleeped ("bitch", "retard", "pussy", "ass" → 1 kHz tone); timing/length identical | uploading the originals and one identical retry: rejected by Roblox moderation | Roblox Community Rules for audio | Roblox policy, owner decision D-022 | everything except the bleeped words is sample-identical |
 | DIFF-006 | soldier/coms/meet: besides the DIFF-005 bleep (wider: mid "your".."to"), pitch +3% (≈ half a semitone), same length | bleep only (2 versions): rejected | Roblox moderation (likely matched to the rejected recording) | Roblox policy, owner decision D-023 | slight pitch change; timing identical |
 | DIFF-007 | Textures with web addresses / phone-number text: those text areas blurred (list + boxes in assets/manifest, tool tools/upload/blur_text.py) | uploading as-is: account warnings + 2 one-day suspensions (off-platform links) | Roblox Community Standards (off-platform links) | Roblox policy, owner decision D-024 | only the text areas differ |
+| DIFF-008 | 106 textures changed for Roblox (gore: splat icons → blobs, blood decals → soot, stains → grime, gibs/flesh → rock; text: URLs/IP/phone digits/"NO PORNOGRAPHIC..."/"PILLS"/crude lines/brands removed or blurred). Lists: assets/manifest/review/{gore_fixes,content_fixes}.tsv; tools/upload/{gore_fix,content_fix,blur_text}.py; set: tools/upload/build_ready.py → assets/manifest/upload-ready.tsv | originals uploaded: warnings + 2 suspensions | Roblox Community Standards | Roblox policy, owner decisions D-022/D-024/D-025 | only the listed areas differ |
 (DIFF-001 withdrawn 2026-11-20, see D-015.)
 
 Candidates already known (become entries when the subsystem lands, after real attempts):
@@ -378,6 +380,9 @@ Data pk3 sha256 (full table + sizes: `assets/manifest/pk3-{standard,high}.tsv`):
   + pitch +3% (rubberband, formants kept, same length) → approved; heavymetal.ogg pitch +3% → still rejected.
 - **D-024** (owner, 2026-11-21) Textures with web addresses ("xonotic.org" etc.) or phone-number-like text get only
   those text areas blurred for the Roblox upload; everything else and the originals stay unchanged (DIFF-007).
+- **D-025** (owner, 2026-11-21 night) Every asset must reach the game; anything against Roblox rules is changed as subtly
+  as possible (owner's example: blood-splat kill-feed icons → irregular rounded blobs). Done by 6 review agents (all
+  10,910 textures: content sheets + zoomed text sheets) and 2 fix agents; DIFF-008.
 <!-- /§DECISIONS -->
 
 <!-- §QUESTIONS -->

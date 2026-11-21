@@ -20,7 +20,7 @@ Methods (see RECIPES at the bottom for which file gets which):
   stain         map tiles with blood stains: only pixels that are redder than the surrounding surface are
                 recoloured to the surface's local colour (low-frequency fill from the unstained pixels),
                 their luminance detail kept, so the stain reads as dirt/grime; other pixels are unchanged.
-  inpaint       small red features (cut on a face) replaced by the surrounding surface colour.
+  ink           red face markings that read as cuts -> dark charcoal ink (same design).
   debris        gib/flesh textures: hue mapped to grey-brown rock, luminance and structure kept.
 """
 from __future__ import annotations
@@ -48,7 +48,7 @@ def save(v: str, a: np.ndarray) -> None:
     out = DST / v
     out.parent.mkdir(parents=True, exist_ok=True)
     a = np.clip(np.rint(a), 0, 255).astype(np.uint8)
-    Image.fromarray(a, "L" if a.ndim == 2 else "RGB").save(out, quality=95)
+    Image.fromarray(a, "L" if a.ndim == 2 else "RGB").save(out, quality=95, subsampling=0)
 
 
 def lum(c: np.ndarray) -> np.ndarray:
@@ -385,6 +385,19 @@ def stain(v: str, t0=0.18, t1=0.38, keep_luma=1.0, lift=0.0, region=None):
     return c * (1 - w[..., None]) + np.clip(rec, 0, 255) * w[..., None]
 
 
+def ink(v: str, regions, t0=0.40, t1=0.60):
+    """Red painted mark (reads as a bleeding cut) -> dark charcoal ink, same design and shading."""
+    c = load(v)
+    reg = np.zeros(c.shape[:2])
+    for x0, y0, x1, y1 in regions:
+        reg[y0:y1, x0:x1] = 1
+    w = smoothstep(t0, t1, redness(c)) * reg
+    w = np.maximum(w, blur(w, 1.0, False) * 0.9)[..., None]  # the anti-aliased fringe too
+    y = lum(c)[..., None]
+    dark = np.clip(y * np.array([0.92, 0.92, 0.98]) * 0.75, 0, 255)
+    return c * (1 - w) + dark * w
+
+
 def debris(v: str, t0=0.08, t1=0.3):
     """Flesh/gib colours -> grey-brown rock: hue and most saturation replaced, luminance kept."""
     c = load(v)
@@ -400,8 +413,8 @@ def veins(v: str):
     y = lum(c)[..., None]
     grey = np.clip(y * np.array([1.0, 0.99, 1.0]), 0, 255)
     h, s, _ = rgb_to_hsv(c)
-    hue_red = (h < 0.04) | (h > 0.90)
-    w = (smoothstep(0.06, 0.20, s) * hue_red)[..., None]
+    hue_red = (h < 0.03) | (h > 0.85)
+    w = (smoothstep(0.03, 0.12, s) * hue_red)[..., None]
     return c * (1 - w) + grey * w
 
 
@@ -446,33 +459,34 @@ rec(["textures/trak4x/decal/decal_help.jpg", "textures/trak4x/decal/decal_help_a
     "decal_help", lambda: decal_help("textures/trak4x/decal/decal_help.jpg", "textures/trak4x/decal/decal_help_alpha.jpg"))
 
 STAIN = {
-    "textures/evil1_floors/br_tiles_blood.jpg": {},
-    "textures/evil1_floors/br_tiles_brkblood.jpg": {},
+    "textures/evil1_floors/br_tiles_blood.jpg": {"t0": 0.08, "t1": 0.25},
+    "textures/evil1_floors/br_tiles_brkblood.jpg": {"t0": 0.06, "t1": 0.22},
     "textures/evil1_floors/carpet_drty_blood.jpg": {"t0": 0.42, "t1": 0.62},
     "textures/evil1_floors/carpet_drty_blood2.jpg": {"t0": 0.42, "t1": 0.62},
-    "textures/evil1_floors/floortilebig2.jpg": {},
-    "textures/evil2_basefloor/flr_b-w_drty_bbig.jpg": {},
-    "textures/evil2_basefloor/flr_b-w_drty_bld.jpg": {},
-    "textures/evil2_basefloor/flr_b-w_drty_bld2.jpg": {},
+    "textures/evil1_floors/floortilebig2.jpg": {"t0": 0.06, "t1": 0.22},
+    "textures/evil2_basefloor/flr_b-w_drty_bbig.jpg": {"t0": 0.14, "t1": 0.30},
+    "textures/evil2_basefloor/flr_b-w_drty_bld.jpg": {"t0": 0.16, "t1": 0.32},
+    "textures/evil2_basefloor/flr_b-w_drty_bld2.jpg": {"t0": 0.14, "t1": 0.30},
     "textures/evil2_basefloor/flr_tmtl_drk_bld.jpg": {},
-    "textures/evil2_basewall/cementwall_btm_gore.jpg": {},
-    "textures/evil2_misc/crate_drtycamo2.jpg": {},
-    "textures/evil2_misc/crate_drtyow.jpg": {},
-    "textures/evil2_misc/ecrate_drty2.jpg": {},
-    "textures/evil2_misc/ecrate_drty3ow.jpg": {},
+    "textures/evil2_basewall/cementwall_btm_gore.jpg": {"t0": 0.06, "t1": 0.20},
+    "textures/evil2_misc/crate_drtycamo2.jpg": {"t0": 0.30, "t1": 0.46},
+    "textures/evil2_misc/crate_drtyow.jpg": {"t0": 0.32, "t1": 0.48},
+    "textures/evil2_misc/ecrate_drty2.jpg": {"t0": 0.34, "t1": 0.50},
+    "textures/evil2_misc/ecrate_drty3ow.jpg": {"t0": 0.32, "t1": 0.48},
     "textures/evil3_floors/bdirt_blood.jpg": {"t0": 0.22, "t1": 0.42},
     "textures/evil3_floors/cemdrk_oddtile_bld.jpg": {},
     "textures/evil3_floors/cemdrk_oddtile_bldb.jpg": {"t0": 0.12, "t1": 0.30},
-    "textures/evil3_floors/wd_tile_drk_bld.jpg": {},
-    "textures/evil3_floors/woodvfloor3_brain.jpg": {},
+    "textures/evil3_floors/wd_tile_drk_bld.jpg": {"t0": 0.26, "t1": 0.44},
+    "textures/evil3_floors/woodvfloor3_brain.jpg": {"t0": 0.20, "t1": 0.38},
     "textures/techpanelx/panel/panel_tech2r_gloss.jpg": {},
 }
 for v, kw in STAIN.items():
     rec([v], "blood stains recoloured to the surrounding surface colour (luminance detail kept, reads as dirt/grime); "
         "unstained pixels unchanged", "stain", (lambda v=v, kw=kw: [stain(v, **kw)]))
 for v in ("textures/ignishead.jpg", "textures/ignisheadfb.jpg"):
-    rec([v], "bleeding cut/drip on the forehead painted over with the surrounding skin colour; rest unchanged",
-        "inpaint", (lambda v=v: [stain(v, t0=0.40, t1=0.55, keep_luma=0.35, region=(130, 560, 120, 1050))]))
+    rec([v], "blood-red face mark across the eye and the red IGNIS mark on the back of the head (read as bleeding "
+        "cuts) recoloured to dark charcoal ink; design, shading and everything else unchanged",
+        "ink", (lambda v=v: [ink(v, [(250, 500, 800, 1000), (1300, 300, 1650, 800)])]))
 rec(["textures/gib1.jpg"], "red flesh gib texture recoloured to grey-brown rock (luminance/structure kept)", "debris",
     lambda: [debris("textures/gib1.jpg")])
 rec(["models/gibs/chunk.mdl_0.jpg"], "red flesh chunk skin recoloured to grey-brown rock (luminance kept)", "debris",

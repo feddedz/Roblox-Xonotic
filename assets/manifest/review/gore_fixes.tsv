@@ -47,13 +47,13 @@ textures/evil3_floors/woodvfloor3_brain.jpg	blood stains recoloured to the surro
 textures/eye.jpg	pink-red veins on the eyeball made pale grey (shape kept); iris unchanged	veins
 textures/final_rage/lava_glow.jpg	lava glow map (molten rock), no blood -> unchanged	unchanged
 textures/gib1.jpg	red flesh gib texture recoloured to grey-brown rock (luminance/structure kept)	debris
-textures/ignishead.jpg	bleeding cut/drip on the forehead painted over with the surrounding skin colour; rest unchanged	inpaint
+textures/ignishead.jpg	blood-red face mark across the eye and the red IGNIS mark on the back of the head (read as bleeding cuts) recoloured to dark charcoal ink; design, shading and everything else unchanged	ink
 textures/ignishead_gloss.jpg	gloss map of the head (dim skin tint), no blood feature -> unchanged	unchanged
 textures/ignishead_glow.jpg	glow mask (white/grey) of the head, no blood -> unchanged	unchanged
 textures/ignishead_norm.jpg	normal map: shape only -> unchanged	unchanged
 textures/ignishead_reflect.jpg	reflection mask: shape only -> unchanged	unchanged
 textures/ignishead_shirt.jpg	colormap mask (grayscale) -> unchanged	unchanged
-textures/ignisheadfb.jpg	bleeding cut/drip on the forehead painted over with the surrounding skin colour; rest unchanged	inpaint
+textures/ignisheadfb.jpg	blood-red face mark across the eye and the red IGNIS mark on the back of the head (read as bleeding cuts) recoloured to dark charcoal ink; design, shading and everything else unchanged	ink
 textures/ignisheadfb_shirt.jpg	colormap mask (grayscale) -> unchanged	unchanged
 textures/techpanelx/panel/panel_tech2r_gloss.jpg	blood stains recoloured to the surrounding surface colour (luminance detail kept, reads as dirt/grime); unstained pixels unchanged	stain
 textures/trak4x/decal/decal_help.jpg	HELP written in dripping blood -> dark-grey spray paint, thin drips under the letters trimmed (same in _alpha)	decal_help
