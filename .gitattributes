@@ -5,3 +5,4 @@
 *.bin binary
 tests/reference/**/*.bin binary
 docs/chat/*.md merge=union
+*.flac binary

@@ -120,7 +120,7 @@ before working. One claimed task per subsystem at a time. Details per task in th
 | M1-LMAP | Lightmap + deluxemap extraction from Q3 BSP at full res | open | tools/bsp/ | M1-VFS |
 | M1-BSP | Q3 BSP → render meshes (split ≤20k tris/≤60k verts), per-surface material refs | open | tools/bsp/ | M1-VFS |
 | M1-MODELS | MD3/IQM/DPM/ZYM/OBJ/ASE/SP2 → meshes, skins, animations (framegroups) | open | tools/models/ | M1-VFS |
-| M1-SOUNDS | Sound pipeline: ogg/wav metadata (rate, loop points), upload-ready files | open | tools/sounds/ | M1-VFS |
+| M1-SOUNDS | Sound pipeline: uploader for assets/manifest/audio-plan.tsv (rate, loop points, packs already planned: docs/subsystems/audio.md), fill asset_id, runtime vpath→asset lookup | open | tools/sounds/ | M1-VFS |
 | M1-UPLOAD | Open Cloud uploader + `assets/manifest/roblox-ids.tsv`; key via env var, never committed | open | tools/upload/ | M1-TEX, Q-004 |
 | M2-PROGS | progs.dat reader (all 3 .dat) + CFG/reducibility analysis | done | tools/qcaot/progs.py, cfg.py | M1-VFS |
 | M2-INTERP | Straight port of prvm_exec.c + prvm_execprogram.h (reference interpreter for AOT diffing) | done (29 semantic tests) | engine/prvm_exec.luau | M2-PROGS |
@@ -128,7 +128,7 @@ before working. One claimed task per subsystem at a time. Details per task in th
 | M2-AOT-STRUCT | Structured control flow for reducible CFGs (performance only; must pass qcaot_diff unchanged) | open | tools/qcaot/ | M2-AOT |
 | CHAT-SETUP | Shared session chat (docs/chat/, one append-only file per UTC day, posted to `main` by tools/chat.sh; D-021) | done (Claude-Anvil 2026-11-21) | — | — |
 | ROSTER | Session names Claude-<Word> (WELCOME.md list) + docs/chat/roster.md (name, start, task, status); D-021 | done (Claude-Anvil 2026-11-21) | — | — |
-| AUDIO-PLAN | Audio upload plan: one asset per sound; if over the 30-day quota pack short sounds by group with 0.5 s gaps; dedupe by checksum; manifest slices; related: M8-SOUND, M1-SOUNDS | claimed by Claude-Anvil 2026-11-21 | docs/subsystems/ | — |
+| AUDIO-PLAN | Audio upload plan: one asset per sound; if over the 30-day quota pack short sounds by group with 0.5 s gaps; dedupe by checksum; manifest slices; related: M8-SOUND, M1-SOUNDS; docs/subsystems/audio.md, tools/sounds/audio_plan.py | done (Claude-Anvil 2026-11-21); packing waits for P-AUDIOSLICE [needs Studio] | docs/subsystems/ | — |
 | PERF-SVBENCH | **[needs Studio]** Benchmark compiled server QC in a Roblox server with native codegen: SV_Frame cost at 30 Hz, worst case per frame (early answer to "does the tick keep up") | open | tests/studio/, game/generated/ | M2-RUNNER |
 | CONTROLS-ASSIST | Console/mobile controls + assists (DIFF-002) | blocked (Q-009) | platform/input | Q-009 |
 | GAMEPASSES | Game passes (DIFF-003) | blocked (Q-009), much later | — | Q-009 |
@@ -432,4 +432,5 @@ One line each; **details and sources: `docs/gotchas.md`** (add to both). Roblox 
 - **G-026** Bytecode ≈ 1.65× source: client ≈ 48 MB download, ≈ 53 MB heap for csprogs+menu (Q-010).
 - **G-029** Direct pushes of chat-only commits to `main` work (no branch protection, 2026-11-21); 8 concurrent posts from 2 clones all landed with tools/chat.sh.
 - **G-031** pk3s contain **1,927 zip symlinks** (high; 1,908 standard: 1,399 textures, 405 gfx, 94 models, 25 sounds, 3 particles, 1 maps); DarkPlaces follows them (fs.c FS_OpenReadFile, 16 levels). tools/pk3 follows them since 2026-11-21 (manifest column `symlink_to`); re-run `manifest.py --extract` on older work/vfs-* (they held link text).
+- **G-030** Audio (creator-docs 2026-11-21): ≤ 7 min, ≤ 20 MB, ≤ 48 kHz, mp3/ogg/wav/flac; not updatable via Open Cloud. Quota docs conflict (2,000 vs 100 per 30 days verified) → read live: `GET apis.roblox.com/cloud/v2/users/{id}/asset-quotas` (scope asset:read; usage/capacity/period/usageResetTime). Sound.PlaybackRegion needs PlaybackRegionsEnabled; AudioPlayer has PlaybackRegion/LoopRegion always on.
 <!-- /§GOTCHAS -->

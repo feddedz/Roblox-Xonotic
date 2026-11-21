@@ -15,6 +15,8 @@ Nothing here is part of the game.
    - **2**: ViewportFrame fidelity: left real render, right ViewportFrame (`v2-viewport.png`)
    - **3**: 170° wide-FOV stitch from three ViewportFrames (`v3-widefov.png`)
    - **4**: premultiplied-lightmap capacity; prints surfaces + FPS after ~3 s (`v4-premultiply.png`)
+   - **5**: audio slices P-AUDIOSLICE (needs the uploaded test pack, see docs/subsystems/audio.md; set the
+     number attribute `AudioSliceAssetId` on StarterPlayerScripts.StudioTestsClient first). Listen as well.
    - **0**: print all results again.
 5. Repeat step 3 on each real device you care about (phone, laptop) with Roblox graphics quality at max:
    NearPlaneZ and budgets differ per device.
@@ -31,6 +33,7 @@ Nothing here is part of the game.
 | V1 | how Roblox roughness/metalness highlights look under one point light | VIS-SPECCAL |
 | V2 | what ViewportFrame rendering loses | scripted reflections, FOV stitching |
 | V3 | how a stitched 170° view compares with one projection | FOV > 133° (§DIFFS candidate) |
+| P-AUDIOSLICE | one packed asset plays as independent, overlapping slices without delay/bleed | AUDIO-PLAN packing (rule 8) |
 | V4 | how many unique premultiplied surfaces fit, and FPS | lightmap blend (1,139 `filter` stages) |
 
 Image-size test with uploaded assets (Q-002) needs uploads first (M1-UPLOAD).
