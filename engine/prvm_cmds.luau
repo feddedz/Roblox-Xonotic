@@ -748,6 +748,66 @@ function prvm_cmds.VM_uri_unescape(prog: any)
 	SET_G_INT(prog, OFS_RETURN, prvm_edict.PRVM_SetTempString(prog, table.concat(out)))
 end
 
+-- port: prvm_cmds.c VM_vlen L492-496 @xonotic-v0.8.6 (VectorLength: float DotProduct, sqrt in double)
+function prvm_cmds.VM_vlen(prog: any)
+	SAFEPARMCOUNT(prog, 1, "VM_vlen")
+	local x, y, z = G_FLOAT(prog, OFS_PARM0), G_FLOAT(prog, OFS_PARM0 + 1), G_FLOAT(prog, OFS_PARM0 + 2)
+	local d = f32.add(f32.add(f32.mul(x, x), f32.mul(y, y)), f32.mul(z, z))
+	SET_G_FLOAT(prog, OFS_RETURN, math.sqrt(d))
+end
+
+-- port: prvm_cmds.c VM_rint L1414-1424 @xonotic-v0.8.6
+function prvm_cmds.VM_rint(prog: any)
+	SAFEPARMCOUNT(prog, 1, "VM_rint")
+	local f = G_FLOAT(prog, OFS_PARM0)
+	if f > 0 then
+		SET_G_FLOAT(prog, OFS_RETURN, math.floor(f + 0.5))
+	else
+		SET_G_FLOAT(prog, OFS_RETURN, math.ceil(f - 0.5))
+	end
+end
+
+-- port: prvm_cmds.c VM_numentityfields L2021-2024 @xonotic-v0.8.6
+function prvm_cmds.VM_numentityfields(prog: any)
+	SET_G_FLOAT(prog, OFS_RETURN, #prog.fielddefs)
+end
+
+-- glibc strcasecmp/strncasecmp result: difference of the first differing tolower()ed bytes
+local function casecmp(a: string, b: string, n: number): number
+	local i = 1
+	while i <= n do
+		local x, y = string.byte(a, i) or 0, string.byte(b, i) or 0
+		if x >= 65 and x <= 90 then
+			x += 32
+		end
+		if y >= 65 and y <= 90 then
+			y += 32
+		end
+		if x ~= y then
+			return x - y
+		end
+		if x == 0 then
+			return 0
+		end
+		i += 1
+	end
+	return 0
+end
+
+-- port: prvm_cmds.c VM_strncasecmp L5916-5930 @xonotic-v0.8.6
+function prvm_cmds.VM_strncasecmp(prog: any)
+	SAFEPARMCOUNTRANGE(prog, 2, 3, "VM_strncasecmp")
+	local s1 = libc.cstr(G_STRING(prog, OFS_PARM0))
+	local s2 = libc.cstr(G_STRING(prog, OFS_PARM0 + 3))
+	if prog.argc > 2 then
+		local n = G_FLOAT(prog, OFS_PARM0 + 6)
+		n = if n < 0 then math.huge else math.floor(n)
+		SET_G_FLOAT(prog, OFS_RETURN, casecmp(s1, s2, n))
+	else
+		SET_G_FLOAT(prog, OFS_RETURN, casecmp(s1, s2, math.huge))
+	end
+end
+
 -- C name -> builtin, for the vm_*_builtins tables
 prvm_cmds.BUILTINS = {
 	VM_cvar = prvm_cmds.VM_cvar,
@@ -776,6 +836,10 @@ prvm_cmds.BUILTINS = {
 	VM_etof = prvm_cmds.VM_etof,
 	VM_bound = prvm_cmds.VM_bound,
 	VM_localcmd = prvm_cmds.VM_localcmd,
+	VM_vlen = prvm_cmds.VM_vlen,
+	VM_rint = prvm_cmds.VM_rint,
+	VM_numentityfields = prvm_cmds.VM_numentityfields,
+	VM_strncasecmp = prvm_cmds.VM_strncasecmp,
 	VM_min = prvm_cmds.VM_min,
 	VM_max = prvm_cmds.VM_max,
 	VM_strreplace = prvm_cmds.VM_strreplace,

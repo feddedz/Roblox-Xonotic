@@ -63,6 +63,12 @@ with logged `NOT YET PORTED` messages.
   strtoupper/lower, strreplace, crc16, infoget/add, uri_(un)escape, strstrofs, max, tokenizebyseparator, ...);
   the full list prints in tests/integration/sv_config_worldspawn.
 
+- (later) localcmd, min, max, strreplace, strstrofs, crc16, uri_escape/unescape, vlen, rint, strncasecmp,
+  numentityfields: 31 distinct stubs left. Self-contained next: sprintf, digest_hex, infoget/infoadd,
+  tokenize_console / tokenizebyseparator, strtoupper/lower (u8 case tables), fopen/fgets/fclose + search_*
+  (fs.c read side), changelevel, strftime. Need M3: setmodel, precache_model, tracebox, gettagindex,
+  frameduration; need M4: setorigin, setsize, lightstyle.
+
 ## Next steps, in order
 1. Still open from the settings work: PRVM_FindOffsets + the PROGHEADER_CRC branch of SV_VM_Setup (engine
    field offsets from entvars_t, progs crc 5927), .po translation when prvm_language is set (default "").
