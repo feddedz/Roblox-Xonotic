@@ -73,6 +73,9 @@ export type Prog = {
 	stringssize: number,
 	-- edicts
 	max_edicts: number,
+	num_edicts: number,
+	reserved_edicts: number,
+	limit_edicts: number,
 	entityfieldsarea: number,
 	edictsfields: buffer,
 	-- strings created at runtime
@@ -307,6 +310,9 @@ function prvm_edict.NewProg(name: string): Prog
 		strings = "",
 		stringssize = 0,
 		max_edicts = 0,
+		num_edicts = 0,
+		reserved_edicts = 0,
+		limit_edicts = 32768, -- MAX_EDICTS (quakedef.h); each VM sets its own before PRVM_Prog_Load
 		entityfieldsarea = 0,
 		edictsfields = buffer.create(0),
 		tempstringsbuf = { data = buffer.create(65536), cursize = 0, maxsize = 65536 },
@@ -346,6 +352,136 @@ function prvm_edict.SetMaxEdicts(prog: Prog, max_edicts: number)
 	local new = buffer.create(prog.entityfieldsarea * 4)
 	buffer.copy(new, 0, old, 0, math.min(buffer.len(old), buffer.len(new)))
 	prog.edictsfields = new
+end
+
+-- realtime (host.c, double) as the edict code reads it; host sets it every frame.
+prvm_edict.realtime = 0
+
+local function cvarval(name: string, default: number): number
+	local v = cvar.Cvar_FindVar(name)
+	return if v then v.value else default
+end
+local function cvarint(name: string, default: number): number
+	local v = cvar.Cvar_FindVar(name)
+	return if v then v.integer else default
+end
+
+-- Edict private data (prvm_edict_private_t): prog.ed_free[n], prog.ed_freetime[n] (n = edict number).
+-- port: prvm_edict.c PRVM_MEM_Alloc L59-87 @xonotic-v0.8.6
+function prvm_edict.PRVM_MEM_Alloc(prog: Prog)
+	local p = prog :: any
+	-- reserve space for the null entity aka world; check bound of max_edicts
+	prog.max_edicts = math.clamp(prog.max_edicts, 1 + p.reserved_edicts, p.limit_edicts)
+	p.num_edicts = math.clamp(p.num_edicts or 0, 1 + p.reserved_edicts, prog.max_edicts)
+	p.ed_free, p.ed_freetime = {}, {}
+	for i = 0, prog.max_edicts - 1 do
+		p.ed_free[i], p.ed_freetime[i] = false, 0
+	end
+	prog.entityfieldsarea = prog.entityfields * prog.max_edicts
+	prog.edictsfields = buffer.create(prog.entityfieldsarea * 4)
+end
+
+-- port: prvm_edict.c PRVM_MEM_IncreaseEdicts L94-118 @xonotic-v0.8.6
+function prvm_edict.PRVM_MEM_IncreaseEdicts(prog: Prog)
+	local p = prog :: any
+	if prog.max_edicts >= p.limit_edicts then
+		return
+	end
+	if p.begin_increase_edicts then
+		p.begin_increase_edicts(prog)
+	end
+	local oldmax = prog.max_edicts
+	prog.max_edicts = math.min(prog.max_edicts + 256, p.limit_edicts)
+	prvm_edict.SetMaxEdicts(prog, prog.max_edicts)
+	for i = oldmax, prog.max_edicts - 1 do
+		p.ed_free[i], p.ed_freetime[i] = false, 0
+	end
+	if p.end_increase_edicts then
+		p.end_increase_edicts(prog)
+	end
+end
+
+-- Field offset by name, as PRVM_FindOffsets / PRVM_ED_FindFieldOffset compute it (cached per prog).
+function prvm_edict.FieldOfs(prog: Prog, name: string): number
+	local p = prog :: any
+	p.fieldofs_cache = p.fieldofs_cache or {}
+	local o = p.fieldofs_cache[name]
+	if o == nil then
+		local d = prvm_edict.PRVM_ED_FindField(prog, name)
+		o = if d then d.ofs else -1
+		p.fieldofs_cache[name] = o
+	end
+	return o
+end
+
+-- port: prvm_edict.c PRVM_ED_ClearEdict L199-210 @xonotic-v0.8.6 (allocation_origin is leak-test bookkeeping)
+function prvm_edict.PRVM_ED_ClearEdict(prog: Prog, e: number)
+	local p = prog :: any
+	buffer.fill(prog.edictsfields, e * prog.entityfields * 4, 0, prog.entityfields * 4)
+	p.ed_free[e] = false
+	p.ed_freetime[e] = prvm_edict.realtime
+	if p.init_edict then
+		p.init_edict(prog, e)
+	end
+end
+
+local prvm_reuseedicts_always_allow = 0 -- prvm_edict.c L48 (set by PRVM_ED_LoadFromFile, not ported yet)
+
+-- port: prvm_edict.c PRVM_ED_CanAlloc L231-244 @xonotic-v0.8.6
+function prvm_edict.PRVM_ED_CanAlloc(prog: Prog, e: number): boolean
+	local p = prog :: any
+	local realtime = prvm_edict.realtime
+	if not p.ed_free[e] then
+		return false
+	end
+	if prvm_reuseedicts_always_allow == realtime then
+		return true
+	end
+	if realtime <= p.ed_freetime[e] + 0.1 and cvarint("prvm_reuseedicts_neverinsameframe", 1) ~= 0 then
+		return false -- never allow reuse in same frame (causes networking trouble)
+	end
+	if p.ed_freetime[e] < (p.starttime or 0) + f32round(cvarval("prvm_reuseedicts_startuptime", 2)) then
+		return true
+	end
+	if realtime > p.ed_freetime[e] + 1 then
+		return true
+	end
+	return false -- entity slot still blocked because the entity was freed less than one second ago
+end
+
+-- port: prvm_edict.c PRVM_ED_Alloc L257-288 @xonotic-v0.8.6 (returns the edict number)
+function prvm_edict.PRVM_ED_Alloc(prog: Prog): number
+	local p = prog :: any
+	local i = p.reserved_edicts + 1
+	while i < p.num_edicts do
+		if prvm_edict.PRVM_ED_CanAlloc(prog, i) then
+			prvm_edict.PRVM_ED_ClearEdict(prog, i)
+			return i
+		end
+		i += 1
+	end
+	if i == p.limit_edicts then
+		prog.error_cmd(string.format("%s: PRVM_ED_Alloc: no free edicts", prog.name))
+	end
+	p.num_edicts += 1
+	if p.num_edicts >= prog.max_edicts then
+		prvm_edict.PRVM_MEM_IncreaseEdicts(prog)
+	end
+	prvm_edict.PRVM_ED_ClearEdict(prog, i)
+	return i
+end
+
+-- port: prvm_edict.c PRVM_ED_Free L298-313 @xonotic-v0.8.6
+function prvm_edict.PRVM_ED_Free(prog: Prog, e: number)
+	local p = prog :: any
+	if e <= p.reserved_edicts then
+		return
+	end
+	if p.free_edict then
+		p.free_edict(prog, e)
+	end
+	p.ed_free[e] = true
+	p.ed_freetime[e] = prvm_edict.realtime
 end
 
 -- port: prvm_edict.c PRVM_Prog_Load L1916-2468 @xonotic-v0.8.6 (PARTIAL: header .. last-statement check, L1983-2276)
@@ -568,8 +704,10 @@ function prvm_edict.PRVM_Prog_Load(
 	prvm_edict.PRVM_Prog_Load_AutoCvars(prog)
 	prog.loaded = true
 	cvar.prvm_prog_list[prog.progindex] = prog
-	notPortedOnce("PRVM_FindOffsets (prvm_edict.c L1480-1560)")
-	prvm_edict.SetMaxEdicts(prog, math.max(prog.max_edicts, 1))
+	notPortedOnce("PRVM_FindOffsets (prvm_edict.c L1480-1560): fields are looked up by name (prvm_edict.FieldOfs)")
+	local pp: any = prog
+	pp.starttime = prvm_edict.realtime -- L1961
+	prvm_edict.PRVM_MEM_Alloc(prog)
 	return appendedGlobalNames
 end
 

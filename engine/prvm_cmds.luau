@@ -327,6 +327,67 @@ function prvm_cmds.VM_strncmp(prog: any)
 	end
 end
 
+local function RETURN_EDICT(prog: any, e: number)
+	buffer.writei32(prog.globals, OFS_RETURN * 4, e)
+end
+
+-- port: prvm_cmds.c VM_spawn L969-976 @xonotic-v0.8.6 (builtinsprofile counters: profiling only)
+function prvm_cmds.VM_spawn(prog: any)
+	SAFEPARMCOUNT(prog, 0, "VM_spawn")
+	RETURN_EDICT(prog, prvm_edict.PRVM_ED_Alloc(prog))
+end
+
+-- port: prvm_cmds.c VM_remove L986-1006 @xonotic-v0.8.6
+function prvm_cmds.VM_remove(prog: any)
+	SAFEPARMCOUNT(prog, 1, "VM_remove")
+	local e = buffer.readi32(prog.globals, OFS_PARM0 * 4)
+	local dev = cvar.Cvar_FindVar("developer")
+	if e <= prog.reserved_edicts then
+		if dev and dev.integer > 0 then
+			prvm_cmds.VM_Warning(prog, "VM_remove: tried to remove the null entity or a reserved entity!\n")
+		end
+	elseif prog.ed_free[e] then
+		if dev and dev.integer > 0 then
+			prvm_cmds.VM_Warning(prog, "VM_remove: tried to remove an already freed entity!\n")
+		end
+	else
+		prvm_edict.PRVM_ED_Free(prog, e)
+	end
+end
+
+-- port: prvm_cmds.c VM_nextent L1462-1486 @xonotic-v0.8.6
+function prvm_cmds.VM_nextent(prog: any)
+	SAFEPARMCOUNT(prog, 1, "VM_nextent")
+	local i = buffer.readi32(prog.globals, OFS_PARM0 * 4)
+	while true do
+		i += 1
+		if i == prog.num_edicts then
+			RETURN_EDICT(prog, 0)
+			return
+		end
+		if not prog.ed_free[i] then
+			RETURN_EDICT(prog, i)
+			return
+		end
+	end
+end
+
+-- port: prvm_cmds.c VM_ftoe L890-900 @xonotic-v0.8.6
+function prvm_cmds.VM_ftoe(prog: any)
+	SAFEPARMCOUNT(prog, 1, "VM_ftoe")
+	local ent = libc.toint(G_FLOAT(prog, OFS_PARM0))
+	if ent < 0 or ent >= prog.max_edicts or prog.ed_free[ent] then
+		ent = 0 -- return world instead of a free or invalid entity
+	end
+	SET_G_INT(prog, OFS_RETURN, ent)
+end
+
+-- port: prvm_cmds.c VM_etof L909-913 @xonotic-v0.8.6
+function prvm_cmds.VM_etof(prog: any)
+	SAFEPARMCOUNT(prog, 1, "VM_etof")
+	SET_G_FLOAT(prog, OFS_RETURN, buffer.readi32(prog.globals, OFS_PARM0 * 4))
+end
+
 -- C name -> builtin, for the vm_*_builtins tables
 prvm_cmds.BUILTINS = {
 	VM_cvar = prvm_cmds.VM_cvar,
@@ -348,6 +409,11 @@ prvm_cmds.BUILTINS = {
 	VM_strunzone = prvm_cmds.VM_strunzone,
 	VM_str2chr = prvm_cmds.VM_str2chr,
 	VM_strncmp = prvm_cmds.VM_strncmp,
+	VM_spawn = prvm_cmds.VM_spawn,
+	VM_remove = prvm_cmds.VM_remove,
+	VM_nextent = prvm_cmds.VM_nextent,
+	VM_ftoe = prvm_cmds.VM_ftoe,
+	VM_etof = prvm_cmds.VM_etof,
 } :: { [string]: (prog: any) -> () }
 
 return prvm_cmds

@@ -44,6 +44,15 @@ with logged `NOT YET PORTED` messages.
   buf_cvarlist, buf_getsize, buf_del, spawn, etof, bufstr_set/get, ftoe, digest_hex, SV_AddStat, SV_precache_model.
   strtoupper/strtolower need u8_tolower/u8_toupper tables (utf8lib.c).
 
+## Done 2026-11-21 (Claude-Anvil): edicts
+- PRVM_MEM_Alloc/IncreaseEdicts, ED_ClearEdict/CanAlloc/Alloc/Free (reuse rules with prvm_reuseedicts_*),
+  prvm_edict.FieldOfs (name lookup = PRVM_FindOffsets result for Xonotic), SVVM_init_edict / SVVM_free_edict
+  (world unlink, skeletons, ODE, csqc versions logged NOT YET PORTED), builtins spawn, remove, nextent, ftoe, etof
+  (tests/unit/edicts). Worldspawn: 12k stub calls, interp == AOT, stops at "NULL function in server" (a QC
+  callback not set because of the remaining stubs).
+- Remaining worldspawn stubs: fopen/fclose/fgets, changelevel, buf_create/cvarlist/getsize/del, SV_copyentity,
+  bufstr_set/get, digest_hex, SV_AddStat, SV_precache_model, bound.
+
 ## Next steps, in order
 1. Still open from the settings work: PRVM_FindOffsets + the PROGHEADER_CRC branch of SV_VM_Setup (engine
    field offsets from entvars_t, progs crc 5927), .po translation when prvm_language is set (default "").
