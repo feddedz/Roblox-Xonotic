@@ -16,19 +16,21 @@ Every section except §MAP and §DIFFS stays under ~60 lines; detail lives in `d
 | §GOTCHAS | Verified limits (with date) and hard-won lessons. |
 
 <!-- §STATUS -->
-## §STATUS (rewritten 2026-11-21, session 017gQiyN, finished)
-- **Milestone:** M0 done; M1 partly (VFS, manifests, shaders); M2: interpreter + AOT compiler done (all
-  25,509 QC functions identical compiled vs interpreted); M2-RUNNER partial (unclaimed): real progs.dat
-  loads via SV_VM_Setup, worldspawn runs identically on both with all builtins stubbed.
-- **Build:** `tools/build.sh` → game/generated (never committed, D-020); full place builds to 14 MB.
-- **Tests:** 6 Lune files (2 skip without game data), 15 Python tests; StyLua/Selene clean.
-- **In progress in other sessions (do not take):** REF-DP (session_017gQiyKAbN1VAofn9a3CDvm, branch
-  REF-DP-instrumented-build), M3-BSPLOAD (session_017gQiyJc8jR6adsLPSpNWp8, branch M3-BSPLOAD-collision).
-- **PR:** feddedz/Roblox-Xonotic#1 (this branch) must merge into `main` before the parallel PRs.
-- **Open owner points:** Q-007 gore (deferred), Q-009 define assists/game passes, Q-010 client code size
-  (≈48 MB); CHAT-SETUP / ROSTER / AUDIO-PLAN specs to restate.
-- **FPS / server tick:** not measurable yet; PERF-SVBENCH [needs Studio] is the early check.
-- **Next step:** M2-RUNNER steps 1-2 (cvar.c + config exec, rest of PRVM_Prog_Load): docs/subsystems/server-runner.md.
+## §STATUS (rewritten 2026-11-21, Claude-Anvil, finished)
+- **Milestone:** M0 done; M1 partly (VFS incl. pk3 symlinks G-031, manifests, shaders, audio plan); M2: interpreter +
+  AOT done; M2-RUNNER partial (unclaimed): a dedicated server's settings are complete — cvar.c/cmd.c ported,
+  488 engine cvars + 132 commands registered like Host_Init, real quake.rc chain (36 files, 6,075 cvars, 2 s),
+  all 3,308 autocvar globals equal their cvars, cvar builtins ported; worldspawn runs identically interp/AOT
+  until the first string builtin stub (`Bad string`).
+- **Coordination:** session chat + roster on `main` (docs/chat/, tools/chat.sh, WELCOME.md, D-021).
+- **Build:** `tools/build.sh` → game/generated (never committed, D-020).
+- **Tests:** 10 Lune files (4 need game data), 22 Python tests; StyLua/Selene clean; tools/engine/check_port_lines.py 0 wrong.
+- **In progress elsewhere (do not take):** REF-DP (branch REF-DP-instrumented-build), M3-BSPLOAD (branch M3-BSPLOAD-collision).
+- **PRs:** feddedz/Roblox-Xonotic#1 still open (not merged as of this session); this branch contains it.
+- **Open owner points:** Q-007 gore (deferred), Q-009 assists/game passes, Q-010 client code size, Q-011 server
+  settings, Q-012 Open Cloud key; P-AUDIOSLICE [needs Studio] before any packing.
+- **FPS / server tick:** not measurable yet (PERF-SVBENCH [needs Studio]).
+- **Next step:** M2-RUNNER string builtins + tempstrings/zone strings, then edicts (docs/subsystems/server-runner.md).
 <!-- /§STATUS -->
 
 <!-- §RULES -->
@@ -134,8 +136,9 @@ before working. One claimed task per subsystem at a time. Details per task in th
 | GAMEPASSES | Game passes (DIFF-003) | blocked (Q-009), much later | — | Q-009 |
 | M2-AOT-SHIP | Ship generated code: build step + Rojo mapping + 190k-char modules done (D-020); **[needs Studio]** confirm rojo serve/publish with 380 modules, client load time + memory | partial | tools/qcaot/, game/generated/ | M2-AOT |
 | M2-INTERP-DEBUG | Port tracing/profiling/coverage/watchpoints of prvm_exec.c (console commands use them) | open | engine/prvm_exec.luau | M2-INTERP | tools/qcaot/, game/generated/ | M2-PROGS |
-| M2-RUNNER | Headless runner: rest of PRVM_Prog_Load (required fields/globals of svvm, field lookup), edict alloc, strings, all builtins stubbed + logged; done = server QC runs worldspawn on a stock map | partial, claimed by Claude-Anvil 2026-11-21 (next steps: docs/subsystems/server-runner.md) | tests/, engine/prvm_*.luau, engine/sv_main.luau, engine/svvm_cmds.luau | M2-AOT, M2-INTERP |
+| M2-RUNNER | Headless runner: rest of PRVM_Prog_Load (required fields/globals of svvm, field lookup), edict alloc, strings, all builtins stubbed + logged; done = server QC runs worldspawn on a stock map | partial, unclaimed (Claude-Anvil 2026-11-21: settings done — cvar.c/cmd.c, dedicated Host_Init registrations, quake.rc chain, autocvars, cvar builtins; next: string builtins, edicts, docs/subsystems/server-runner.md) | tests/, engine/prvm_*.luau, engine/sv_main.luau, engine/svvm_cmds.luau | M2-AOT, M2-INTERP |
 | M2-DEBUG | Rebuild progs.dat from qcsrc with the pinned gmqcc; prove byte-identical; emit line-number debug info | open | tools/qcaot/ | M2-PROGS |
+| REF-CVARLIST | From REF-DP's dedicated server after startup: `cvarlist` (name/value/default/flags) and `cmdlist` → tests/reference/cvars/; diff against engine/host.luau's result (validates tools/engine/gen_cvars.py and the config chain) | open | tests/reference/cvars/, tests/integration/ | REF-DP, M2-RUNNER |
 | REF-DP | Instrumented DarkPlaces (from release source) that records traces, server frames, net messages, particles | open | tools/darkplaces-ref/ | M0-PIN |
 | M3-BSPLOAD | Port model_brush.c (Q3 BSP), model_shared.c, bih.c, collision.c; headless reads work/vfs-high (Roblox runtime loading needs M1-RTVFS later) | open | engine/ | M1-VFS |
 | M3-TRACEREF | Record ≥1000 traceline/tracebox per stock map from REF-DP | open | tests/reference/traces/ | REF-DP |
@@ -192,21 +195,21 @@ Source: `work/source/Xonotic/source/darkplaces/` (`tools/release/fetch.sh source
 | cl_video_jamdecode.c | 378 | needs §DIFFS | — | not started | — | video capture/cinematics: check use in Xonotic data before deciding |
 | cl_video_libavw.c | 386 | needs §DIFFS | — | not started | — | video capture/cinematics: check use in Xonotic data before deciding |
 | clvm_cmds.c | 4965 | engine port | engine/clvm_cmds.luau | not started | — |  |
-| cmd.c | 2235 | engine port | engine/cmd.luau | not started | — |  |
+| cmd.c | 2235 | engine port | engine/cmd.luau | partial | unit/cvar_cmd, integration/config_load | Cbuf/tokenizer/$-expansion/alias/exec/set/toggle/defer; client forwarding, csqc commands, completion not yet |
 | collision.c | 1952 | engine port | engine/collision.luau | not started | — |  |
-| common.c | 2312 | engine port | engine/common.luau | not started | — |  |
+| common.c | 2312 | engine port | engine/common.luau | partial | unit/cvar_cmd | COM_ParseToken_Console only |
 | conproc.c | 365 | n/a | — | not started | — | other OS backend |
-| console.c | 3035 | engine port | engine/console.luau | not started | — |  |
+| console.c | 3035 | engine port | engine/console.luau | partial | — | Con_Print/Printf/DPrint(f) to a line sink only |
 | crypto-keygen-standalone.c | 773 | needs §DIFFS | — | not started | — | d0_blind_id player keys → Roblox accounts (allowed diff: accounts) — log in §DIFFS |
 | crypto.c | 2628 | needs §DIFFS | — | not started | — | d0_blind_id player keys → Roblox accounts (allowed diff: accounts) — log in §DIFFS |
 | csprogs.c | 1260 | engine port | engine/csprogs.luau | not started | — |  |
 | curves.c | 440 | engine port | engine/curves.luau | not started | — |  |
-| cvar.c | 1070 | engine port | engine/cvar.luau | not started | — |  |
+| cvar.c | 1070 | engine port | engine/cvar.luau | partial | unit/cvar_cmd, integration/config_load | all of cvar.c; client hooks (CL_SetInfo, SV_BroadcastPrintf notify) log NOT YET PORTED |
 | dpsoftrast.c | 5690 | optional | — | not started | — | optional software-renderer comparison mode |
 | dpvsimpledecode.c | 656 | needs §DIFFS | — | not started | — | video capture/cinematics: check use in Xonotic data before deciding |
-| filematch.c | 223 | engine port | engine/filematch.luau | not started | — |  |
+| filematch.c | 223 | engine port | engine/filematch.luau | partial | unit/cvar_cmd | matchpattern, stringlistsort |
 | fractalnoise.c | 226 | engine port | engine/fractalnoise.luau | not started | — |  |
-| fs.c | 4160 | split | engine/fs.luau | not started | — | VFS order mirrored offline by tools/pk3/vfs.py; CPU logic → engine/, writes → platform/storage |
+| fs.c | 4160 | split | engine/fs.luau | partial | unit/cvar_cmd, integration/config_load | FS_LoadFile/FS_Search/FS_CheckNastyPath over a file provider (G-031 symlinks) |
 | ft2.c | 1693 | split | engine/ft2.luau | not started | — | CPU logic → engine/, GL/OS calls → platform/ |
 | gl_backend.c | 4914 | platform | platform/… | not started | — | → platform/render |
 | gl_draw.c | 2156 | split | engine/gl_draw.luau | not started | — | CPU logic → engine/, GL/OS calls → platform/ |
@@ -214,8 +217,8 @@ Source: `work/source/Xonotic/source/darkplaces/` (`tools/release/fetch.sh source
 | gl_rsurf.c | 1643 | split | engine/gl_rsurf.luau | not started | — | CPU logic → engine/, GL/OS calls → platform/ |
 | gl_textures.c | 3179 | platform | platform/… | not started | — | → platform/render |
 | hmac.c | 61 | needs §DIFFS | — | not started | — | d0_blind_id player keys → Roblox accounts (allowed diff: accounts) — log in §DIFFS |
-| host.c | 1468 | engine port | engine/host.luau | not started | — |  |
-| host_cmd.c | 3109 | engine port | engine/host_cmd.luau | not started | — |  |
+| host.c | 1468 | engine port | engine/host.luau | partial | integration/config_load | dedicated Host_Init registrations (engine/_port/sv_init_defs.luau, tools/engine/gen_cvars.py) + config chain |
+| host_cmd.c | 3109 | engine port | engine/host_cmd.luau | partial | integration/config_load | MaxPlayers_f; other commands are logging stubs |
 | image.c | 1649 | offline tool | — | not started | — | decode offline in tools/textures; runtime image API → platform/render |
 | image_png.c | 561 | offline tool | — | not started | — | decode offline in tools/textures; runtime image API → platform/render |
 | jpeg.c | 1114 | offline tool | — | not started | — | decode offline in tools/textures; runtime image API → platform/render |
@@ -240,7 +243,7 @@ Source: `work/source/Xonotic/source/darkplaces/` (`tools/release/fetch.sh source
 | polygon.c | 310 | engine port | engine/polygon.luau | not started | — |  |
 | portals.c | 480 | engine port | engine/portals.luau | not started | — |  |
 | protocol.c | 3418 | engine port | engine/protocol.luau | not started | — |  |
-| prvm_cmds.c | 7366 | engine port | engine/prvm_cmds.luau | not started | — |  |
+| prvm_cmds.c | 7366 | engine port | engine/prvm_cmds.luau | partial | integration/sv_config_worldspawn | cvar builtins (cvar, cvar_string/defstring/description/type, cvar_set, registercvar) |
 | prvm_edict.c | 3442 | engine port | engine/prvm_edict.luau | partial | tests/unit/prvm_exec.test.luau | PRVM_Prog_Load (to statement checks) + PRVM_GetString done; rest M2-RUNNER |
 | prvm_exec.c | 1054 | engine port | engine/prvm_exec.luau | partial | tests/unit/prvm_exec.test.luau, qcaot_* | Enter/Leave/ExecuteProgram + all opcodes done; debug/profiling not yet (M2-INTERP-DEBUG); docs/subsystems/qcvm.md |
 | r_explosion.c | 285 | engine port | engine/r_explosion.luau | not started | — |  |
@@ -395,6 +398,14 @@ Data pk3 sha256 (full table + sizes: `assets/manifest/pk3-{standard,high}.tsv`):
   this departs from "all QC compiled to Luau" for cold code, so it is your call; (d) sound dead-code
   elimination via call-graph reachability incl. name lookups (risky, likely small); (e) send client code
   after join (shorter join, same total). Default meanwhile: (a)+(b) next, then measure in Studio.
+- **Q-011 (2026-11-21, Claude-Anvil) Server settings on Roblox.** A real Xonotic dedicated server is started
+  with a command line and usually `+exec server.cfg` (hostname, player limit, map list, game type). The port
+  now loads exactly the stock chain (quake.rc → default.cfg → … → post-config.cfg) and nothing else; player
+  limit = DP default 8 at startup, and quake.rc's `maxplayers $menu_maxplayers` makes it 16 from the next map.
+  Which player limit and server.cfg should Roblox servers use? Default meanwhile: stock chain only.
+- **Q-012 (2026-11-21, Claude-Anvil) Roblox Open Cloud API key + user/group id for audio.** Needed to read the
+  30-day audio quota (scope asset:read) and later upload (asset:write). The key is entered through the
+  session's secure credential form (never in chat or the repo) when M1-SOUNDS starts.
 <!-- /§QUESTIONS -->
 
 <!-- §GOTCHAS -->
@@ -433,4 +444,7 @@ One line each; **details and sources: `docs/gotchas.md`** (add to both). Roblox 
 - **G-029** Direct pushes of chat-only commits to `main` work (no branch protection, 2026-11-21); 8 concurrent posts from 2 clones all landed with tools/chat.sh.
 - **G-031** pk3s contain **1,927 zip symlinks** (high; 1,908 standard: 1,399 textures, 405 gfx, 94 models, 25 sounds, 3 particles, 1 maps); DarkPlaces follows them (fs.c FS_OpenReadFile, 16 levels). tools/pk3 follows them since 2026-11-21 (manifest column `symlink_to`); re-run `manifest.py --extract` on older work/vfs-* (they held link text).
 - **G-030** Audio (creator-docs 2026-11-21): ≤ 7 min, ≤ 20 MB, ≤ 48 kHz, mp3/ogg/wav/flac; not updatable via Open Cloud. Quota docs conflict (2,000 vs 100 per 30 days verified) → read live: `GET apis.roblox.com/cloud/v2/users/{id}/asset-quotas` (scope asset:read; usage/capacity/period/usageResetTime). Sound.PlaybackRegion needs PlaybackRegionsEnabled; AudioPlayer has PlaybackRegion/LoopRegion always on.
+- **G-032** qsort is unstable: FS_Search results equal under strcasecmp (only case differs) have no defined order in DP; the port breaks ties by strcmp. No such pair exists in the 0.8.6 data.
+- **G-033** `stylua --check ... game` also scans git-ignored game/generated (AOT output, not formatted): check `game/*` minus `generated`.
+- **G-034** DP quirk kept: `exec dir/*.cfg` runs the matches in *reverse* sorted order (each Cmd_Exec inserts at the buffer front).
 <!-- /§GOTCHAS -->

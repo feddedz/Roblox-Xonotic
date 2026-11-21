@@ -18,13 +18,27 @@ with logged `NOT YET PORTED` messages.
   builtins stubbed (282,036 builtin calls, 68 distinct). Meaningless as gameplay (cvars all 0) but proves
   the pipeline.
 
+## Done 2026-11-21 (Claude-Anvil): settings
+- `engine/cvar.luau` (cvar.c), `engine/cmd.luau` (cmd.c), partial `fs.luau`, `filematch.luau`, `common.luau`,
+  `console.luau`, `host.luau`, `host_cmd.luau` (MaxPlayers_f), `prvm_cmds.luau` (cvar builtins),
+  `_port/libc.luau` (glibc atof/strtol/atoi/(int), vectors from real glibc: tools/testgen/libc_vectors.sh).
+- `tools/engine/gen_cvars.py` → `engine/_port/sv_init_defs.luau`: follows Host_Init's dedicated path through the
+  OBJ_SV sources (USEODE on, CONFIG_MENU/CONFIG_CD off) and lists every Cvar_RegisterVariable / Cmd_AddCommand
+  in order (488 cvars, 132 commands). Conditional registrations are printed for review (crypto_* need the
+  d0_blind_id library, present in release builds; net_tos_dscp; r_skeletal_use_sse). Validate with
+  REF-CVARLIST (real `cvarlist` dump).
+- `host.Host_Init_Dedicated()`: registrations, dedicated value changes (sv_public 1, deathmatch 1, fs_gamedir
+  "data", cmdline ""), Cmd_SaveInitState, Host_AddConfigText, Cbuf_Execute: the real quake.rc chain runs
+  (36 files, 6,075 cvars, ≈ 2 s in Lune). Unported engine commands are stubs logging `NOT YET PORTED: command`.
+- PRVM_Prog_Load tail: required funcs, PRVM_Init_Exec, autocvars both ways (all 3,308 match),
+  prog.loaded, prvm_prog_list; PRVM_SetTempString, PRVM_ChangeEngineString.
+- Tests: unit/libc, unit/cvar_cmd, integration/config_load, integration/sv_config_worldspawn (fresh engine per
+  run: interpreter and AOT identical incl. cvars afterwards).
+
 ## Next steps, in order
-1. **cvar.c** port (Cvar_Get/Set, flags, defaults) + **cmd.c** config execution (`exec` of the pinned
-   default.cfg → quake.rc → xonotic-*.cfg chain) reading from the VFS, so values match a real server.
-2. Rest of **PRVM_Prog_Load** (prvm_edict.c L2276-2468): autocvar_* globals initialised from cvars (L2380-2440,
-   uses PRVM_SetEngineString for strings), PRVM_Init_Exec, .po handling (prvm_language), field/global
-   offset lookup incl. the PROGHEADER_CRC branch of SV_VM_Setup (progs crc 5927 == PROGHEADER_CRC: engine
-   field offsets come from entvars_t).
+1. Still open from the settings work: PRVM_FindOffsets + the PROGHEADER_CRC branch of SV_VM_Setup (engine
+   field offsets from entvars_t, progs crc 5927), .po translation when prvm_language is set (default "").
+2. REF-CVARLIST once REF-DP exists.
 3. **Edicts**: PRVM_ED_Alloc / ED_Free / SVVM_init_edict / SVVM_free_edict (freetime reuse rules), world edict,
    reserved_edicts = maxclients.
 4. **Strings**: PRVM_SetTempString / tempstrings buffer (64 KiB, PRVM_ExecuteProgram restores cursize),

@@ -22,11 +22,19 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 	Storage layout (PRVM_64 off, D-004, docs/subsystems/qcvm.md): globals and edict fields are 4-byte
 	slots in buffers (globals: ofs*4; edictsfields: (edict*entityfields + field)*4), statements are
 	5 x i32 per statement (op, operand0, operand1, operand2, jumpabsolute) at index*20.
-	NOT YET PORTED: the rest of PRVM_Prog_Load after the statement loop (required functions check,
-	field/global offset lookup, PRVM_Init_Exec, ...), edict allocation, string allocation functions.
+	PRVM_Prog_Load after the statement loop: required functions, PRVM_Init_Exec, autocvar_* globals from
+	cvars (both ways, see engine/cvar.luau Cvar_UpdateAutoCvar), prog->loaded.
+	NOT YET PORTED: PRVM_LoadLNO (line numbers, debug), .po translation when prvm_language is set,
+	PRVM_FindOffsets (engine field/global/function offsets), PRVM_UpdateBreakpoints, edict allocation
+	(PRVM_MEM_Alloc beyond SetMaxEdicts), string allocation functions.
 ]]
 
+local cvar = require("./cvar")
+
 local prvm_edict = {}
+
+-- progsvm.h: PRVM_PROG_SERVER, PRVM_PROG_CLIENT, PRVM_PROG_MENU (index into prvm_prog_list)
+local PROGINDEX = { server = 0, client = 1, menu = 2 }
 
 export type Function = {
 	first_statement: number,
@@ -42,6 +50,9 @@ export type Function = {
 
 export type Prog = {
 	name: string,
+	progindex: number, -- PRVM_PROG_SERVER / CLIENT / MENU
+	loaded: boolean,
+	ChangeEngineString: (any, number, any) -> any,
 	-- loaded program
 	progs_version: number,
 	progs_crc: number,
@@ -99,8 +110,17 @@ export type Prog = {
 
 export type RequiredDef = { type: number, name: string }
 
-local ev_vector = 3
+local ev_string, ev_float, ev_vector = 1, 2, 3
 local DEF_SAVEGLOBAL = 0x8000
+local libc = require("./_port/libc")
+local f32round = require("./_port/f32").round
+local notPortedWarned: { [string]: boolean } = {}
+local function notPortedOnce(what: string)
+	if not notPortedWarned[what] then
+		notPortedWarned[what] = true
+		print("NOT YET PORTED: " .. what)
+	end
+end
 local PROG_VERSION = 6
 local PRVM_MAX_STACK_DEPTH = 1024 -- progsvm.h L268 (non-DP_SMALLMEMORY)
 local PRVM_LOCALSTACK_SIZE = 16384 -- progsvm.h L269
@@ -264,6 +284,11 @@ end
 function prvm_edict.NewProg(name: string): Prog
 	return {
 		name = name,
+		progindex = PROGINDEX[name] or 0,
+		loaded = false,
+		ChangeEngineString = function(prog: any, i: number, s: any)
+			return prvm_edict.PRVM_ChangeEngineString(prog, i, s)
+		end,
 		progs_version = 0,
 		progs_crc = 0,
 		progs_numstatements = 0,
@@ -328,7 +353,8 @@ function prvm_edict.PRVM_Prog_Load(
 	filename: string,
 	data: buffer,
 	required_fields: { RequiredDef }?,
-	required_globals: { RequiredDef }?
+	required_globals: { RequiredDef }?,
+	required_funcs: { string }?
 )
 	local filesize = buffer.len(data)
 	local function L(ofs: number): number
@@ -523,8 +549,181 @@ function prvm_edict.PRVM_Prog_Load(
 			)
 		end
 	end
+	-- check required functions
+	for _, fname in required_funcs or {} do
+		if prvm_edict.PRVM_ED_FindFunction(prog, fname) == nil then
+			prog.error_cmd(string.format("%s: %s not found in %s", prog.name, fname, filename))
+		end
+	end
+	notPortedOnce("PRVM_LoadLNO (prvm_edict.c, line-number debug info)")
+	-- PRVM_Init_Exec (prvm_exec.c L674-681)
+	prog.depth = 0
+	prog.localstack_used = 0
+	local lang = cvar.Cvar_FindVar("prvm_language")
+	if lang and lang.string.str ~= "" then
+		notPortedOnce("PRVM_PO_Load translations (prvm_language " .. lang.string.str .. ")")
+	end
+	prvm_edict.PRVM_Prog_Load_AutoCvars(prog)
+	prog.loaded = true
+	cvar.prvm_prog_list[prog.progindex] = prog
+	notPortedOnce("PRVM_FindOffsets (prvm_edict.c L1480-1560)")
 	prvm_edict.SetMaxEdicts(prog, math.max(prog.max_edicts, 1))
 	return appendedGlobalNames
+end
+
+-- port: prvm_edict.c PRVM_Prog_Load L1916-2468 @xonotic-v0.8.6 (autocvar part, L2357-2449)
+function prvm_edict.PRVM_Prog_Load_AutoCvars(prog: Prog)
+	local pi = (prog :: any).progindex
+	local v = cvar.cvar_vars
+	while v do
+		v.globaldefindex[pi] = -1
+		v = v.next
+	end
+	local function ws(c: number): boolean
+		return c == 0 or c == 32 or c == 9 or c == 13 or c == 10
+	end
+	for i, def in prog.globaldefs do
+		local gi = i - 1
+		local name = prvm_edict.PRVM_GetString(prog, def.s_name)
+		local n = #name
+		local last = string.sub(name, n, n)
+		if
+			string.sub(name, 1, 9) == "autocvar_"
+			and not (n > 1 and string.sub(name, n - 1, n - 1) == "_" and (last == "x" or last == "y" or last == "z"))
+		then
+			local ofs = def.ofs * 4
+			local t = bit32.band(def.type, bit32.bnot(DEF_SAVEGLOBAL))
+			local c = cvar.Cvar_FindVar(string.sub(name, 10))
+			if not c then
+				local value: string
+				if t == ev_float then
+					local f = buffer.readf32(prog.globals, ofs)
+					local fi = libc.toint(f)
+					if f32round(fi) == f then
+						value = string.format("%d", fi)
+					else
+						value = string.format("%.9g", f)
+					end
+				elseif t == ev_vector then
+					value = string.format(
+						"%.9g %.9g %.9g",
+						buffer.readf32(prog.globals, ofs),
+						buffer.readf32(prog.globals, ofs + 4),
+						buffer.readf32(prog.globals, ofs + 8)
+					)
+				elseif t == ev_string then
+					value = prvm_edict.PRVM_GetString(prog, buffer.readi32(prog.globals, ofs))
+				else
+					print(string.format("PRVM_LoadProgs: invalid type of autocvar global %s in %s", name, prog.name))
+					continue
+				end
+				local nc = cvar.Cvar_Get(string.sub(name, 10), value, 0, nil)
+				if not nc then
+					prog.error_cmd(
+						string.format(
+							"PRVM_LoadProgs: could not create cvar for autocvar global %s in %s",
+							name,
+							prog.name
+						)
+					)
+				end
+				local cc = nc :: cvar.Cvar
+				if t == ev_string then
+					local sn = prvm_edict.PRVM_SetEngineString(prog, cc.string)
+					buffer.writei32(prog.globals, ofs, sn)
+					cc.globaldefindex_stringno[pi] = sn
+				end
+				cc.globaldefindex[pi] = gi
+			elseif bit32.band(c.flags, cvar.CVAR_PRIVATE) == 0 then
+				-- MUST BE SYNCED WITH cvar.c Cvar_Set
+				if t == ev_float then
+					buffer.writef32(prog.globals, ofs, c.value)
+				elseif t == ev_vector then
+					local s = c.string.str
+					local vec = { 0, 0, 0 }
+					local p = 1
+					local function at(k: number): number
+						return string.byte(s, k) or 0
+					end
+					for j = 1, 3 do
+						while at(p) ~= 0 and ws(at(p)) do
+							p += 1
+						end
+						if at(p) == 0 then
+							break
+						end
+						vec[j] = libc.atof(string.sub(s, p))
+						while not ws(at(p)) do
+							p += 1
+						end
+						if at(p) == 0 then
+							break
+						end
+					end
+					for j = 1, 3 do
+						buffer.writef32(prog.globals, ofs + (j - 1) * 4, vec[j])
+					end
+				elseif t == ev_string then
+					local sn = prvm_edict.PRVM_SetEngineString(prog, c.string)
+					buffer.writei32(prog.globals, ofs, sn)
+					c.globaldefindex_stringno[pi] = sn
+				else
+					print(string.format("PRVM_LoadProgs: invalid type of autocvar global %s in %s", name, prog.name))
+					continue
+				end
+				c.globaldefindex[pi] = gi
+			else
+				print(string.format("PRVM_LoadProgs: private cvar for autocvar global %s in %s", name, prog.name))
+			end
+		end
+	end
+end
+
+-- port: prvm_edict.c PRVM_SetTempString L3083-3116 @xonotic-v0.8.6
+function prvm_edict.PRVM_SetTempString(prog: Prog, s: string?): number
+	if s == nil then
+		return 0
+	end
+	local str = libc.cstr(s :: string)
+	local size = #str + 1
+	local tb = prog.tempstringsbuf
+	if tb.maxsize < tb.cursize + size then
+		if tb.cursize + size >= bit32.lshift(1, 28) then
+			prog.error_cmd(
+				string.format(
+					"PRVM_SetTempString: ran out of tempstring memory!  (refusing to grow tempstring buffer over 256MB, cursize %i, size %i)\n",
+					tb.cursize,
+					size
+				)
+			)
+		end
+		local oldmax = tb.maxsize
+		tb.maxsize = math.max(tb.maxsize, 65536)
+		while tb.maxsize < tb.cursize + size do
+			tb.maxsize *= 2
+		end
+		if tb.maxsize ~= oldmax then
+			local nd = buffer.create(tb.maxsize)
+			buffer.copy(nd, 0, tb.data, 0, tb.cursize)
+			tb.data = nd
+		end
+	end
+	local ofs = tb.cursize
+	buffer.writestring(tb.data, ofs, str)
+	buffer.writeu8(tb.data, ofs + #str, 0)
+	tb.cursize += size
+	return prvm_edict.PRVM_SetEngineString(prog, { tempofs = ofs })
+end
+
+-- port: prvm_edict.c PRVM_ChangeEngineString L3012-3021 @xonotic-v0.8.6
+function prvm_edict.PRVM_ChangeEngineString(prog: Prog, i: number, s: any): any
+	i -= PRVM_KNOWNSTRINGBASE
+	if i < 0 or i >= prog.numknownstrings then
+		prog.error_cmd("PRVM_ChangeEngineString: s is not an engine string")
+	end
+	local old = prog.knownstrings[i + 1]
+	prog.knownstrings[i + 1] = s
+	return old
 end
 
 -- port: prvm_edict.c PRVM_GetString L2960-3010 @xonotic-v0.8.6

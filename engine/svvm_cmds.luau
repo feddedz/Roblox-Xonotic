@@ -13,7 +13,7 @@ local names = require("./_port/builtin_names")
 local svvm_cmds = {}
 
 -- C name -> implementation (prog) -> (); filled as builtins are ported.
-local PORTED: { [string]: (prog: any) -> () } = {}
+local PORTED: { [string]: (prog: any) -> () } = table.clone(require("./prvm_cmds").BUILTINS)
 svvm_cmds.PORTED = PORTED
 
 -- Builds prog.builtins / prog.numbuiltins like `prog->builtins = vm_sv_builtins` (sv_main.c SV_VM_Setup).

@@ -10,6 +10,8 @@ local prvm_exec = require("../../engine/prvm_exec")
 local prvm_offsets = require("../../engine/prvm_offsets")
 local qcrt = require("../../engine/_port/qcrt")
 local f32 = require("../../engine/_port/f32")
+local cvar = require("../../engine/cvar")
+local cmd = require("../../engine/cmd")
 
 return function(ctx: t.Ctx)
 	local dat, gen = "work/vfs-high/progs.dat", "game/generated/progs/init.luau"
@@ -76,7 +78,19 @@ return function(ctx: t.Ctx)
 	for _, p in progs do
 		buffer.writei32(p.globals, selfdef.ofs * 4, 0)
 	end
+	-- each run starts from the same (empty: no configs) cvar state; ported cvar builtins change it
+	local function fresh(p: any)
+		cvar.reset()
+		cmd.reset()
+		prvm_edict.PRVM_Prog_Load_AutoCvars(p)
+		p.loaded = true
+		cvar.prvm_prog_list[0] = p
+	end
+	local g0 = buffer.tostring(pI.globals)
+	fresh(pI)
 	local okI, errI = pcall(prvm_exec.PRVM_ExecuteProgram, pI, fnum, "worldspawn")
+	buffer.copy(pA.globals, 0, buffer.fromstring(g0))
+	fresh(pA)
 	local okA, errA = pcall(qcrt.ExecuteProgram, pA, fnum, "worldspawn")
 	t.eq(ctx, okA, okI, "worldspawn: same outcome")
 	t.eq(ctx, tostring(errA), tostring(errI), "worldspawn: same error")
