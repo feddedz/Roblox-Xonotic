@@ -415,6 +415,9 @@ Data pk3 sha256 (full table + sizes: `assets/manifest/pk3-{standard,high}.tsv`):
   never change content for policy on our own; re-uploading identical rejected audio risks account moderation).
   Your options: appeal in the Creator Dashboard / via Roblox support, or decide what the game should do
   with them (would be a §DIFFS entry). Until then those sounds have no usable asset (silent in game).
+  Update 2026-11-21 (owner asked to retry): recheck → 785 approved, 14 rejected (+ marine/coms/teamshoot3),
+  6 reviewing. One identical re-upload (robot needhelp2 → asset 120983016932971) was rejected instantly
+  (file recognised), so the other 13 were NOT retried. Remaining route: appeal or owner decision.
 <!-- /§QUESTIONS -->
 
 <!-- §GOTCHAS -->
