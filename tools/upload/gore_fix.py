@@ -213,13 +213,17 @@ def interp_profile(d: np.ndarray, cs: np.ndarray, ms: np.ndarray) -> np.ndarray:
 
 
 def new_blob(body: np.ndarray, text: np.ndarray, sigma: float, F: int) -> np.ndarray:
-    """Smooth, slightly irregular rounded blob from the main splatter body, at F x resolution."""
+    """Smooth, slightly irregular rounded blob from the main splatter body, at F x resolution.
+    A wide blur of the main body (droplets dropped) is thresholded so the blob keeps the body's area:
+    spikes and drips melt away, the large-scale lumps survive as an irregular, malformed circle."""
     main = fill_holes(largest_component(body))
     up = upscale(main, F).astype(np.float64)
-    sm = blur(up, sigma * F, False) > 0.5
+    soft = blur(up, sigma * F, False)
     keep = upscale(dilate(text, 4), F)  # the word must stay well inside the badge
-    sm = blur((sm | keep).astype(np.float64), 2.0 * F, False) > 0.5
-    return sm
+    thr = np.quantile(soft, 1 - up.mean())
+    sm = (soft > thr) | keep
+    sm = blur(sm.astype(np.float64), 2.0 * F, False) > 0.5
+    return fill_holes(largest_component(sm))
 
 
 def splat_badge(cv: str, av: str, mode: str, sigma: float = 11.0, F: int = 4):
@@ -236,9 +240,11 @@ def splat_badge(cv: str, av: str, mode: str, sigma: float = 11.0, F: int = 4):
     # colour profile ignores the leftover droplets: only pixels whose alpha fits the glow are used
     cs, ms = profile(d_old[sel], np.concatenate([a[sel][:, None], c[sel]], 1), -2.5, 60)
     # interior texture: original fill, text removed, extended over the new shape
-    known = erode(body, 4) & ~dilate(text, 2)
+    main = fill_holes(largest_component(body))
+    known = erode(main, 6) & ~dilate(text, 2)
     interior = fill(c, known, False)
-    interior = np.where(known[..., None], c, interior)
+    wk = blur(known.astype(np.float64), 1.5, False)[..., None] * known[..., None]
+    interior = interior * (1 - wk) + c * wk
     if mode == "neutral":
         y = lum(interior)[..., None]
         interior = 1.5 * y + 0.1 * (interior - y)
@@ -274,18 +280,14 @@ def luma_blob(cv: str, av: str, sigma: float = 9.0, F: int = 4, hue_shift: float
     a = load(av)
     body = a > 200
     d_old = sdist(body)
-    sel = (d_old > -2.5) & (d_old < 40)
-    cs, ms = profile(d_old[sel], np.concatenate([a[sel][:, None], c[sel]], 1), -2.5, 40)
-    # interior: radial-ish gradient of the original fill, extended
-    known = erode(body, 3)
-    interior = fill(c, known, False, sigmas=(3, 6, 12, 24, 48))
-    interior = np.where(known[..., None], c, interior)
+    # the luma fill is a pure edge-distance gradient (red rim -> salmon centre): rebuild all of it,
+    # inside and outside, from the original's own per-distance medians
+    sel = d_old < 40
+    cs, ms = profile(d_old[sel], np.concatenate([a[sel][:, None], c[sel]], 1), d_old.min(), 40)
     nb = new_blob(body, np.zeros_like(body), sigma, F)
     d_new = sdist(nb) / F
     prof = interp_profile(d_new, cs, ms)
-    up = lambda x: np.repeat(np.repeat(x, F, 0), F, 1)  # noqa: E731
-    t = np.clip((d_new + 3.0) / 3.0, 0, 1)[..., None]
-    col = downscale(up(interior) * (1 - t) + prof[..., 1:] * t, F)
+    col = downscale(prof[..., 1:], F)
     alpha = downscale(np.clip(prof[..., 0], 0, 255), F)
     inside = downscale(nb.astype(np.float64), F) > 0.999
     alpha = np.where(inside, 255, alpha)
