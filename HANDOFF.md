@@ -403,8 +403,9 @@ Data pk3 sha256 (full table + sizes: `assets/manifest/pk3-{standard,high}.tsv`):
   now loads exactly the stock chain (quake.rc → default.cfg → … → post-config.cfg) and nothing else; player
   limit = DP default 8 at startup, and quake.rc's `maxplayers $menu_maxplayers` makes it 16 from the next map.
   Which player limit and server.cfg should Roblox servers use? Default meanwhile: stock chain only.
-- **Q-012 (2026-11-21, Claude-Anvil) Roblox Open Cloud API key + user/group id for audio.** Needed to read the
-  30-day audio quota (scope asset:read) and later upload (asset:write). The key is entered through the
+- **Q-012 (2026-11-21, Claude-Anvil) Roblox Open Cloud API key + user/group id.** Scopes for the whole project
+  in G-035: assets Read+Write (quota, all uploads), universe-places Write (publish), Luau execution sessions
+  Read+Write (automated tests on real Roblox servers), optional asset-permissions Write. The key is entered through the
   session's secure credential form (never in chat or the repo) when M1-SOUNDS starts.
 <!-- /§QUESTIONS -->
 
@@ -447,4 +448,5 @@ One line each; **details and sources: `docs/gotchas.md`** (add to both). Roblox 
 - **G-032** qsort is unstable: FS_Search results equal under strcasecmp (only case differs) have no defined order in DP; the port breaks ties by strcmp. No such pair exists in the 0.8.6 data.
 - **G-033** `stylua --check ... game` also scans git-ignored game/generated (AOT output, not formatted): check `game/*` minus `generated`.
 - **G-034** DP quirk kept: `exec dir/*.cfg` runs the matches in *reverse* sorted order (each Cmd_Exec inserts at the buffer front).
+- **G-035** Open Cloud scopes (creator-docs openapi.json, 2026-11-21): assets upload/update/operations + quota read = `asset:write` / `asset:read`; place publish (`POST /universes/v1/{u}/places/{p}/versions`) = `universe-places:write`; run Luau on a Roblox server (`luau-execution-session-tasks`, headless [needs Studio]-style tests) = `universe.place.luau-execution-session:write` (+`:read` for results/logs); grant an asset to an experience = `asset-permissions:write`. Don't IP-restrict keys used from cloud sessions (changing IPs). Group-owned work: key on a dedicated alt account with minimal group role (docs' advice).
 <!-- /§GOTCHAS -->
