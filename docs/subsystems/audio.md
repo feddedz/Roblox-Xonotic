@@ -60,6 +60,9 @@ Cloud: a re-upload is a new asset (counts against the quota). `Sound.PlaybackReg
 - `sound/supernatural/*.mp3` (2 files): DarkPlaces 0.8.6 only loads .wav/.ogg (snd_mem.c L335-362), so
   the game never plays them; they are still listed (and uploaded) so nothing is dropped.
 
+- **Live quota (2026-11-21):** 2,000 per month, 30 used, 1,970 left → all 805 unique sounds go up as single
+  assets, no packs (G-036). P-AUDIOSLICE stays useful for later decisions but no longer blocks uploads.
+
 ## Not done yet (M1-SOUNDS)
 Uploader (Open Cloud `POST /assets/v1/assets`, `assetType: Audio`, needs an API key with `asset:write`)
 that fills `asset_id`, and the runtime lookup vpath → asset id (+ slice region).

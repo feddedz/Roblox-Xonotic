@@ -28,7 +28,7 @@ Every section except §MAP and §DIFFS stays under ~60 lines; detail lives in `d
 - **In progress elsewhere (do not take):** REF-DP (branch REF-DP-instrumented-build), M3-BSPLOAD (branch M3-BSPLOAD-collision).
 - **PRs:** feddedz/Roblox-Xonotic#1 still open (not merged as of this session); this branch contains it.
 - **Open owner points:** Q-007 gore (deferred), Q-009 assists/game passes, Q-010 client code size, Q-011 server
-  settings, Q-012 Open Cloud key; P-AUDIOSLICE [needs Studio] before any packing.
+  settings, Q-012 Open Cloud key (saved as env secret; account quota allows all 805 sounds unpacked, G-036).
 - **FPS / server tick:** not measurable yet (PERF-SVBENCH [needs Studio]).
 - **Next step:** M2-RUNNER string builtins + tempstrings/zone strings, then edicts (docs/subsystems/server-runner.md).
 <!-- /§STATUS -->
@@ -130,7 +130,7 @@ before working. One claimed task per subsystem at a time. Details per task in th
 | M2-AOT-STRUCT | Structured control flow for reducible CFGs (performance only; must pass qcaot_diff unchanged) | open | tools/qcaot/ | M2-AOT |
 | CHAT-SETUP | Shared session chat (docs/chat/, one append-only file per UTC day, posted to `main` by tools/chat.sh; D-021) | done (Claude-Anvil 2026-11-21) | — | — |
 | ROSTER | Session names Claude-<Word> (WELCOME.md list) + docs/chat/roster.md (name, start, task, status); D-021 | done (Claude-Anvil 2026-11-21) | — | — |
-| AUDIO-PLAN | Audio upload plan: one asset per sound; if over the 30-day quota pack short sounds by group with 0.5 s gaps; dedupe by checksum; manifest slices; related: M8-SOUND, M1-SOUNDS; docs/subsystems/audio.md, tools/sounds/audio_plan.py | done (Claude-Anvil 2026-11-21); packing waits for P-AUDIOSLICE [needs Studio] | docs/subsystems/ | — |
+| AUDIO-PLAN | Audio upload plan: one asset per sound; if over the 30-day quota pack short sounds by group with 0.5 s gaps; dedupe by checksum; manifest slices; related: M8-SOUND, M1-SOUNDS; docs/subsystems/audio.md, tools/sounds/audio_plan.py | done (Claude-Anvil 2026-11-21); no packing needed (G-036: 1,970 uploads left ≥ 805) | docs/subsystems/ | — |
 | PERF-SVBENCH | **[needs Studio]** Benchmark compiled server QC in a Roblox server with native codegen: SV_Frame cost at 30 Hz, worst case per frame (early answer to "does the tick keep up") | open | tests/studio/, game/generated/ | M2-RUNNER |
 | CONTROLS-ASSIST | Console/mobile controls + assists (DIFF-002) | blocked (Q-009) | platform/input | Q-009 |
 | GAMEPASSES | Game passes (DIFF-003) | blocked (Q-009), much later | — | Q-009 |
@@ -449,4 +449,5 @@ One line each; **details and sources: `docs/gotchas.md`** (add to both). Roblox 
 - **G-033** `stylua --check ... game` also scans git-ignored game/generated (AOT output, not formatted): check `game/*` minus `generated`.
 - **G-034** DP quirk kept: `exec dir/*.cfg` runs the matches in *reverse* sorted order (each Cmd_Exec inserts at the buffer front).
 - **G-035** Open Cloud scopes (creator-docs openapi.json, 2026-11-21): assets upload/update/operations + quota read = `asset:write` / `asset:read`; place publish (`POST /universes/v1/{u}/places/{p}/versions`) = `universe-places:write`; run Luau on a Roblox server (`luau-execution-session-tasks`, headless [needs Studio]-style tests) = `universe.place.luau-execution-session:write` (+`:read` for results/logs); grant an asset to an experience = `asset-permissions:write`. Don't IP-restrict keys used from cloud sessions (changing IPs). Group-owned work: key on a dedicated alt account with minimal group role (docs' advice).
+- **G-036** Live audio quota of the owner's account (2026-11-21, Open Cloud asset-quotas): capacity 2,000 per MONTH, 30 used → 1,970 left ≥ 805 unique sounds, so **every sound is uploaded as its own asset; no packing** (AUDIO-PLAN rule 4 not triggered). Key: environment network secret for apis.roblox.com (x-api-key), never in the repo; user id passed as an argument, not committed.
 <!-- /§GOTCHAS -->
