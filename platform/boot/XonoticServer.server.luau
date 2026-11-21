@@ -74,7 +74,7 @@ local ok, err = pcall(function()
 	local wok, werr = pcall(qcrt.ExecuteProgram, prog, fnum, "worldspawn")
 	line(
 		string.format(
-			"spawnfunc_worldspawn: %s in %.2f s (headless reference: stops at the first unported string builtin)",
+			"spawnfunc_worldspawn: %s in %.2f s (headless reference: completed, interpreter == AOT)",
 			if wok then "completed" else "stopped: " .. tostring(werr),
 			os.clock() - t3
 		)

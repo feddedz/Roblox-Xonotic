@@ -23,7 +23,7 @@ Xonotic is © Team Xonotic and contributors, licensed GPLv3+. This port is GPLv3
 4. Press **Play**. The server runs what is ported so far (settings, config files, game-code setup, world
    spawn) and prints a report between `===== BEGIN XONOTIC SERVER BOOT REPORT =====` and `===== END …`:
    copy that block (and any red errors) back to the session. Expected today: ≈ 6,000 cvars, ≈ 3,300 autocvar
-   globals, worldspawn "stopped" at an unported string builtin. `NOT YET PORTED: …` lines are expected.
+   globals, spawnfunc_worldspawn "completed". `NOT YET PORTED: …` lines (≈ 40 builtins) are expected.
    `HANDOFF.md` §STATUS says what currently works and what to test.
 
 Alternative without the plugin: `rojo build default.project.json -o xonotic.rbxl` and open the file.
