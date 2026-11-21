@@ -122,7 +122,7 @@ before working. One claimed task per subsystem at a time. Details per task in th
 | M1-LMAP | Lightmap + deluxemap extraction from Q3 BSP at full res | open | tools/bsp/ | M1-VFS |
 | M1-BSP | Q3 BSP → render meshes (split ≤20k tris/≤60k verts), per-surface material refs | open | tools/bsp/ | M1-VFS |
 | M1-MODELS | MD3/IQM/DPM/ZYM/OBJ/ASE/SP2 → meshes, skins, animations (framegroups) | open | tools/models/ | M1-VFS |
-| M1-SOUNDS | Sound pipeline: uploader for assets/manifest/audio-plan.tsv (rate, loop points, packs already planned: docs/subsystems/audio.md), fill asset_id, runtime vpath→asset lookup | open | tools/sounds/ | M1-VFS |
+| M1-SOUNDS | Sound pipeline: uploader for assets/manifest/audio-plan.tsv (rate, loop points, packs already planned: docs/subsystems/audio.md), fill asset_id, runtime vpath→asset lookup | claimed by Claude-Anvil 2026-11-21 (owner approved upload; user-owned) | tools/sounds/ | M1-VFS |
 | M1-UPLOAD | Open Cloud uploader + `assets/manifest/roblox-ids.tsv`; key via env var, never committed | open | tools/upload/ | M1-TEX, Q-004 |
 | M2-PROGS | progs.dat reader (all 3 .dat) + CFG/reducibility analysis | done | tools/qcaot/progs.py, cfg.py | M1-VFS |
 | M2-INTERP | Straight port of prvm_exec.c + prvm_execprogram.h (reference interpreter for AOT diffing) | done (29 semantic tests) | engine/prvm_exec.luau | M2-PROGS |
