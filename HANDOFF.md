@@ -318,6 +318,7 @@ If it isn't here, it isn't allowed.
 | DIFF-003 | **Planned, not built, much later.** Game passes | — (blocked: Q-009) | owner-approved | owner-approved planned difference (D-018) | — |
 | DIFF-004 | Roblox asset of `sound/misc/null.wav` and `sound/menu/close.ogg` (4 samples each, all silent) is a 16-bit WAV of exactly those samples padded with silence to 0.05 s | uploading the original files: rejected ("Audio duration too long", really a minimum length, G-037) | Roblox audio minimum length | proven platform limit | audibly identical; engine timing uses the original files' lengths (M8) |
 | DIFF-005 | 13 voice lines (Q-013 list) play with the profanity bleeped ("bitch", "retard", "pussy", "ass" → 1 kHz tone); timing/length identical | uploading the originals and one identical retry: rejected by Roblox moderation | Roblox Community Rules for audio | Roblox policy, owner decision D-022 | everything except the bleeped words is sample-identical |
+| DIFF-006 | soldier/coms/meet: besides the DIFF-005 bleep (wider: mid "your".."to"), pitch +3% (≈ half a semitone), same length | bleep only (2 versions): rejected | Roblox moderation (likely matched to the rejected recording) | Roblox policy, owner decision D-023 | slight pitch change; timing identical |
 (DIFF-001 withdrawn 2026-11-20, see D-015.)
 
 Candidates already known (become entries when the subsystem lands, after real attempts):
@@ -373,6 +374,8 @@ Data pk3 sha256 (full table + sizes: `assets/manifest/pk3-{standard,high}.tsv`):
 - **D-022** (owner, 2026-11-21) Voice lines rejected by Roblox moderation for profanity get the bad words bleeped
   (1 kHz tone over exactly the word, same length), everything else untouched; tools/sounds/censor_voice.py,
   DIFF-005. Applies to the 13 lines of Q-013; heavymetal.ogg (music, no profanity) stays original for an appeal.
+- **D-023** (owner, 2026-11-21) "Tweak a bit" to pass moderation without appeals: soldier/coms/meet = censored v2
+  + pitch +3% (rubberband, formants kept, same length) → approved; heavymetal.ogg pitch +3% → still rejected.
 <!-- /§DECISIONS -->
 
 <!-- §QUESTIONS -->
@@ -424,7 +427,8 @@ Data pk3 sha256 (full table + sizes: `assets/manifest/pk3-{standard,high}.tsv`):
   (file recognised), so the other 13 were NOT retried. **Owner decided (D-022): bleep the bad words**; the 13
   censored versions were uploaded: 12 approved. soldier/coms/meet ("get your ass to the waypoint") rejected
   again twice (word bleep, then mid "your"..mid "to" bleep): probably matched to the rejected recording;
-  stopped retrying (account strikes). Still open: meet.ogg and heavymetal.ogg (music) → appeal, or owner decides.
+  stopped retrying (account strikes). meet.ogg approved after pitch +3% (D-023, DIFF-006). Still open: heavymetal.ogg (instrumental, likely a false
+  copyright match; original + pitch +3% both rejected) → appeal, or owner decides on a bigger change.
 <!-- /§QUESTIONS -->
 
 <!-- §GOTCHAS -->
