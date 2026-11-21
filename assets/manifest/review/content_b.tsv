@@ -38,3 +38,14 @@ textures/evil2_basefloor/flr_b-w_drty_bld2.jpg	gore	high	126 44 83 145	blood spl
 textures/evil2_basefloor/flr_tmtl_drk_bld.jpg	gore	high	96 49 115 89	red blood splat on metal grate floor: recolor to dark oil/grime
 textures/evil2_basewall/cementwall_btm_gore.jpg	gore	high	11 164 216 84	blood smears at bottom of cement wall: recolor to grey/black grime
 textures/evil2_basewall/dirtybrick_faded_stn.jpg	gore	maybe	44 69 178 152	red smeared stain on brick reads as blood: desaturate to brown soot
+textures/evil2_misc/crate_drtycamo2.jpg	gore	high	0 150 256 106	blood splatter along bottom of crate: recolor to dark wood grime (crate_drtycamo.jpg is clean)
+textures/evil2_misc/crate_drtyow.jpg	gore	high	0 150 256 106	blood splatter at bottom of crate: recolor to dark wood grime
+textures/evil2_misc/crate_drtyow_sign.jpg	gore	high	0 150 256 106	blood splatter at bottom of crate (same base as crate_drtyow): recolor to grime
+textures/evil2_misc/ecrate_drty2.jpg	gore	high	0 150 256 106	blood splatter at bottom of crate: recolor to grime
+textures/evil2_misc/ecrate_drty3ow.jpg	gore	high	0 140 256 116	blood splatter at bottom of crate: recolor to grime
+textures/evil3_floors/bdirt_blood.jpg	gore	high	30 19 206 214	large blood pool on cracked dirt: recolor to dirt brown (bdirt.jpg is clean)
+textures/evil3_floors/cemdrk_oddtile_bld.jpg	gore	high	20 20 220 220	large blood pool on tiles: recolor to dark grime
+textures/evil3_floors/cemdrk_oddtile_bldb.jpg	gore	high	20 20 220 220	blood pool with a brain/flesh chunk (~83 55 51 56): remove chunk, recolor blood to grime
+textures/evil3_floors/wd_tile_drk_bld.jpg	gore	high	23 38 185 163	blood splatter on wood floor: recolor to dark wood stain
+textures/evil3_floors/woodvfloor3_brain.jpg	gore	high	40 10 200 230	brain chunk (~150 35 70 45) plus blood pools on wood floor: remove brain, recolor blood to grime
+textures/evil6_support/e6panelsym.jpg	phone	maybe	64 110 40 14	faint stencilled number '332-6x' at bottom could read as phone-number fragment; blur/smudge digits

@@ -21,10 +21,11 @@ CT = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".tga": 
 
 
 def upload(path, vpath, sha, user, atype):
-    name = "Xonotic " + vpath
-    name = name if len(name) <= 50 else "Xonotic …" + name[-41:]
+    # Neutral display name: Roblox also moderates names, and paths contain words like "blood"/"gore".
+    # The game finds assets by id (roblox-images.tsv), so the name has no effect in game.
+    name = f"Xonotic texture {sha[:12]}"
     meta = {"assetType": atype, "displayName": name,
-            "description": f"Xonotic 0.8.6 (xonotic.org, GPLv3+) file {vpath}, sha256 {sha[:16]}",
+            "description": f"Texture from the open-source game Xonotic 0.8.6 (GPLv3+), sha256 {sha[:16]}",
             "creationContext": {"creator": {"userId": user}, "expectedPrice": 0}}
     body, ctype = U.multipart({"request": (None, "application/json", json.dumps(meta).encode()),
                                "fileContent": (path.name, CT[path.suffix.lower()], path.read_bytes())})
