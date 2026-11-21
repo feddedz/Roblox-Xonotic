@@ -24,6 +24,10 @@ CHAT-SETUP, ROSTER, AUDIO-PLAN (owner specs of 2026-11-21), then M2-RUNNER (cvar
   prvm_cmds cvar builtins; PRVM_SetTempString. Worldspawn with real cvars: interpreter == AOT, stops at the
   first string-builtin stub ("Bad string").
 
+- Later (owner request): Open Cloud key as env network secret (pasted key: owner told to revoke); live quota
+  1,970 → no packing (G-036); M1-SOUNDS uploader; 805/805 uploaded; 2 silent 4-sample files padded (DIFF-004,
+  G-037); moderation: 756 approved, 36 reviewing, 13 rejected (Q-013).
+
 ## Files changed
 tools/chat.sh, docs/chat/README.md, WELCOME.md, CLAUDE.md, HANDOFF.md, .gitattributes, tools/pk3/*,
 assets/manifest/*, tools/sounds/*, docs/subsystems/audio.md, tests/studio/*, engine/*.luau,

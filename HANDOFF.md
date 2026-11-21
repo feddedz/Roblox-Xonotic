@@ -122,7 +122,7 @@ before working. One claimed task per subsystem at a time. Details per task in th
 | M1-LMAP | Lightmap + deluxemap extraction from Q3 BSP at full res | open | tools/bsp/ | M1-VFS |
 | M1-BSP | Q3 BSP → render meshes (split ≤20k tris/≤60k verts), per-surface material refs | open | tools/bsp/ | M1-VFS |
 | M1-MODELS | MD3/IQM/DPM/ZYM/OBJ/ASE/SP2 → meshes, skins, animations (framegroups) | open | tools/models/ | M1-VFS |
-| M1-SOUNDS | Sound pipeline: uploader for assets/manifest/audio-plan.tsv (rate, loop points, packs already planned: docs/subsystems/audio.md), fill asset_id, runtime vpath→asset lookup | claimed by Claude-Anvil 2026-11-21 (owner approved upload; user-owned) | tools/sounds/ | M1-VFS |
+| M1-SOUNDS | Sound pipeline: uploader for assets/manifest/audio-plan.tsv (rate, loop points, packs already planned: docs/subsystems/audio.md), fill asset_id, runtime vpath→asset lookup | partial (Claude-Anvil 2026-11-21): all 805 unique sounds uploaded (user-owned), ids in assets/manifest/roblox-audio.tsv, runtime table platform/sound/audio_assets.luau (851 vpaths); open: 13 rejected by moderation (Q-013), 36 still in review (re-run tools/sounds/check_moderation.py) | tools/sounds/ | M1-VFS |
 | M1-UPLOAD | Open Cloud uploader + `assets/manifest/roblox-ids.tsv`; key via env var, never committed | open | tools/upload/ | M1-TEX, Q-004 |
 | M2-PROGS | progs.dat reader (all 3 .dat) + CFG/reducibility analysis | done | tools/qcaot/progs.py, cfg.py | M1-VFS |
 | M2-INTERP | Straight port of prvm_exec.c + prvm_execprogram.h (reference interpreter for AOT diffing) | done (29 semantic tests) | engine/prvm_exec.luau | M2-PROGS |
@@ -316,6 +316,7 @@ If it isn't here, it isn't allowed.
 |---|---|---|---|---|---|
 | DIFF-002 | **Planned, not built.** Console (gamepad) and mobile (touch) controls with slight gameplay assists, for those inputs only; keyboard-and-mouse stays exactly Xonotic | — (blocked: Q-009) | owner-approved design difference, not a platform limit | owner-approved planned difference (D-018) | to be measured once defined |
 | DIFF-003 | **Planned, not built, much later.** Game passes | — (blocked: Q-009) | owner-approved | owner-approved planned difference (D-018) | — |
+| DIFF-004 | Roblox asset of `sound/misc/null.wav` and `sound/menu/close.ogg` (4 samples each, all silent) is a 16-bit WAV of exactly those samples padded with silence to 0.05 s | uploading the original files: rejected ("Audio duration too long", really a minimum length, G-037) | Roblox audio minimum length | proven platform limit | audibly identical; engine timing uses the original files' lengths (M8) |
 (DIFF-001 withdrawn 2026-11-20, see D-015.)
 
 Candidates already known (become entries when the subsystem lands, after real attempts):
@@ -407,6 +408,13 @@ Data pk3 sha256 (full table + sizes: `assets/manifest/pk3-{standard,high}.tsv`):
   in G-035: assets Read+Write (quota, all uploads), universe-places Write (publish), Luau execution sessions
   Read+Write (automated tests on real Roblox servers), optional asset-permissions Write. The key is entered through the
   session's secure credential form (never in chat or the repo) when M1-SOUNDS starts.
+- **Q-013 (2026-11-21, Claude-Anvil) 13 sounds rejected by Roblox moderation** (no reason given; list in
+  assets/manifest/roblox-audio-moderation.tsv): 12 voice-set taunts/team messages (carni-lycan needhelp2,
+  taunt1, teamshoot3; pyria-skadi taunt1, taunt5, teamshoot2; robot needhelp2; soldier meet, taunt2; specop
+  taunt1, taunt4, teamshoot2) and music track cdtracks/heavymetal.ogg. Not changed or re-uploaded (rules:
+  never change content for policy on our own; re-uploading identical rejected audio risks account moderation).
+  Your options: appeal in the Creator Dashboard / via Roblox support, or decide what the game should do
+  with them (would be a §DIFFS entry). Until then those sounds have no usable asset (silent in game).
 <!-- /§QUESTIONS -->
 
 <!-- §GOTCHAS -->
@@ -450,4 +458,5 @@ One line each; **details and sources: `docs/gotchas.md`** (add to both). Roblox 
 - **G-034** DP quirk kept: `exec dir/*.cfg` runs the matches in *reverse* sorted order (each Cmd_Exec inserts at the buffer front).
 - **G-035** Open Cloud scopes (creator-docs openapi.json, 2026-11-21): assets upload/update/operations + quota read = `asset:write` / `asset:read`; place publish (`POST /universes/v1/{u}/places/{p}/versions`) = `universe-places:write`; run Luau on a Roblox server (`luau-execution-session-tasks`, headless [needs Studio]-style tests) = `universe.place.luau-execution-session:write` (+`:read` for results/logs); grant an asset to an experience = `asset-permissions:write`. Don't IP-restrict keys used from cloud sessions (changing IPs). Group-owned work: key on a dedicated alt account with minimal group role (docs' advice).
 - **G-036** Live audio quota of the owner's account (2026-11-21, Open Cloud asset-quotas): capacity 2,000 per MONTH, 30 used → 1,970 left ≥ 805 unique sounds, so **every sound is uploaded as its own asset; no packing** (AUDIO-PLAN rule 4 not triggered). Key: environment network secret for apis.roblox.com (x-api-key), never in the repo; user id passed as an argument, not committed.
+- **G-037** Open Cloud audio upload rejects very short files (4 samples at 11 kHz) with `InvalidArgument: Audio duration too long` (misleading: a minimum length); 0.05 s is accepted (2026-11-21). New audio goes to moderation: `moderationState` Reviewing → Approved / Rejected, no reason given via API (tools/sounds/check_moderation.py).
 <!-- /§GOTCHAS -->

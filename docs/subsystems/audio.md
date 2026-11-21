@@ -63,6 +63,9 @@ Cloud: a re-upload is a new asset (counts against the quota). `Sound.PlaybackReg
 - **Live quota (2026-11-21):** 2,000 per month, 30 used, 1,970 left → all 805 unique sounds go up as single
   assets, no packs (G-036). P-AUDIOSLICE stays useful for later decisions but no longer blocks uploads.
 
+- **Uploaded (2026-11-21):** 805/805 unique files (tools/sounds/upload_audio.py, 4 parallel jobs, ≈ 30 min).
+  Two 4-sample silent files padded to 0.05 s (DIFF-004, G-037). Moderation after ≈ 1 h: 756 approved,
+  36 reviewing, 13 rejected (Q-013). Runtime lookup: platform/sound/audio_assets.luau.
+
 ## Not done yet (M1-SOUNDS)
-Uploader (Open Cloud `POST /assets/v1/assets`, `assetType: Audio`, needs an API key with `asset:write`)
-that fills `asset_id`, and the runtime lookup vpath → asset id (+ slice region).
+Rejected sounds (Q-013); playback itself is M8-SOUND.
