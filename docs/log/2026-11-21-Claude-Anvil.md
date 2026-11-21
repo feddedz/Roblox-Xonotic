@@ -28,6 +28,10 @@ CHAT-SETUP, ROSTER, AUDIO-PLAN (owner specs of 2026-11-21), then M2-RUNNER (cvar
   1,970 → no packing (G-036); M1-SOUNDS uploader; 805/805 uploaded; 2 silent 4-sample files padded (DIFF-004,
   G-037); moderation: 756 approved, 36 reviewing, 13 rejected (Q-013).
 
+- Late: texture uploader (byte-for-byte jpg, resumable, unattended runner); owner account warnings → gore list via
+  CLIP + visual review (98 incl. all splat kill-feed icons); account suspended 1 day (G-042), uploads stopped, appeal
+  texts given. Server boot for Studio: configs + progs.dat packed (tools/pk3/pack_runtime.py), XonoticServer report.
+
 ## Files changed
 tools/chat.sh, docs/chat/README.md, WELCOME.md, CLAUDE.md, HANDOFF.md, .gitattributes, tools/pk3/*,
 assets/manifest/*, tools/sounds/*, docs/subsystems/audio.md, tests/studio/*, engine/*.luau,
@@ -54,5 +58,5 @@ creator-docs site pages are JS-rendered; the OpenAPI JSON in Roblox/creator-docs
 quota endpoint.
 
 ## Next step
-M2-RUNNER: string builtins (strcat, ftos, stof, strzone/strunzone with PRVM_AllocString, substring, ...),
+Owner: Studio Play → BOOT REPORT. Uploads only after the review step and owner OK. M2-RUNNER: string builtins (strcat, ftos, stof, strzone/strunzone with PRVM_AllocString, substring, ...),
 then PRVM_FindOffsets/PROGHEADER_CRC branch and edicts (docs/subsystems/server-runner.md).

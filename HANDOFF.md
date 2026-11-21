@@ -16,21 +16,19 @@ Every section except §MAP and §DIFFS stays under ~60 lines; detail lives in `d
 | §GOTCHAS | Verified limits (with date) and hard-won lessons. |
 
 <!-- §STATUS -->
-## §STATUS (rewritten 2026-11-21, Claude-Anvil, finished)
-- **Milestone:** M0 done; M1 partly (VFS incl. pk3 symlinks G-031, manifests, shaders, audio plan); M2: interpreter +
-  AOT done; M2-RUNNER partial (unclaimed): a dedicated server's settings are complete — cvar.c/cmd.c ported,
-  488 engine cvars + 132 commands registered like Host_Init, real quake.rc chain (36 files, 6,075 cvars, 2 s),
-  all 3,308 autocvar globals equal their cvars, cvar builtins ported; worldspawn runs identically interp/AOT
-  until the first string builtin stub (`Bad string`).
-- **Coordination:** session chat + roster on `main` (docs/chat/, tools/chat.sh, WELCOME.md, D-021).
-- **Build:** `tools/build.sh` → game/generated (never committed, D-020).
-- **Tests:** 10 Lune files (4 need game data), 22 Python tests; StyLua/Selene clean; tools/engine/check_port_lines.py 0 wrong.
-- **In progress elsewhere (do not take):** REF-DP (branch REF-DP-instrumented-build), M3-BSPLOAD (branch M3-BSPLOAD-collision).
-- **PRs:** feddedz/Roblox-Xonotic#1 still open (not merged as of this session); this branch contains it.
-- **Open owner points:** Q-007 gore (deferred), Q-009 assists/game passes, Q-010 client code size, Q-011 server
-  settings, Q-012 Open Cloud key (saved as env secret; account quota allows all 805 sounds unpacked, G-036).
-- **FPS / server tick:** not measurable yet (PERF-SVBENCH [needs Studio]).
-- **Next step:** M2-RUNNER string builtins + tempstrings/zone strings, then edicts (docs/subsystems/server-runner.md).
+## §STATUS (rewritten 2026-11-21 late, Claude-Anvil)
+- **Owner's Roblox account suspended 1 day** (images: blood-splat HUD icon, "xonotic.org" in a menu skin; G-038..G-042);
+  appeal pending. **No uploads by any session** until the owner says so; plan: review step + owner sign-off (chat/HANDOFF).
+- **Assets on Roblox:** sounds 804/805 approved (13 bleeped D-022, meet pitch D-023, heavymetal appeal); textures
+  1,752 uploaded (43 of them on the gore list), 55 gore held back (assets/optional/gore/textures.tsv), 9,103 waiting.
+- **Studio-ready:** `tools/build.sh` + `rojo build` → 18 MB place; pressing Play runs Host_Init, the quake.rc config
+  chain (6,075 cvars), SV_VM_Setup + AOT QuakeC, worldspawn, and prints a BOOT REPORT (README step 4).
+- **M2-RUNNER (unclaimed):** settings complete (cvar.c/cmd.c, engine registrations, autocvars, cvar builtins);
+  next: string builtins/tempstrings/zone strings, PRVM_FindOffsets, edicts (docs/subsystems/server-runner.md).
+- **Tests:** 10 Lune files, 22 Python tests; StyLua/Selene clean; check_port_lines 0 wrong.
+- **Elsewhere (do not take):** REF-DP, M3-BSPLOAD. **PRs:** #1 (open), #2 (this branch, contains #1).
+- **Owner points:** Q-007 gore, Q-009, Q-010, Q-011 server settings, Q-012 key (saved), Q-013 heavymetal, gore/URL images.
+- **Next:** owner runs Studio Play and sends the BOOT REPORT; M2-RUNNER string builtins; image review step before uploads.
 <!-- /§STATUS -->
 
 <!-- §RULES -->
