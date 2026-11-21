@@ -112,7 +112,8 @@ def erode(m: np.ndarray, r: int) -> np.ndarray:
     return ~dilate(~m, r)
 
 
-def largest_component(m: np.ndarray) -> np.ndarray:
+def labels(m: np.ndarray) -> np.ndarray:
+    """4-connected component labels (0 = background)."""
     h, w = m.shape
     lab = np.where(m, np.arange(1, h * w + 1).reshape(h, w), 0)
     while True:
@@ -125,8 +126,19 @@ def largest_component(m: np.ndarray) -> np.ndarray:
         if np.array_equal(n, lab):
             break
         lab = n
+    return lab
+
+
+def largest_component(m: np.ndarray) -> np.ndarray:
+    lab = labels(m)
     ids, cnt = np.unique(lab[lab > 0], return_counts=True)
     return lab == ids[np.argmax(cnt)]
+
+
+def drop_small(m: np.ndarray, n: int) -> np.ndarray:
+    lab = labels(m)
+    ids, cnt = np.unique(lab[lab > 0], return_counts=True)
+    return np.isin(lab, ids[cnt >= n])
 
 
 def fill_holes(m: np.ndarray) -> np.ndarray:
@@ -235,8 +247,21 @@ def splat_badge(cv: str, av: str, mode: str, sigma: float = 11.0, F: int = 4):
     dark = body & (lum(c) < 140)
     fillreg = fill_holes(largest_component(dark))
     text = fillreg & ~dark & (lum(c) > 150)
-    textzone = dilate(text, 1) & body
+    # letters that touch the edge of the fill (T of TEAM, M of MELEE) are not enclosed: take bright pixels
+    # deeper than the ~5 px white outline, drop outline crumbs, then grow 2 px back into the bright stroke
     d_old = sdist(body)
+    bright = body & (lum(c) > 150)
+    deep = drop_small(bright & (d_old < -6), 15)
+    ys, xs = np.nonzero(text)  # restrict to the word's line (one letter width either side)
+    band = np.zeros_like(deep)
+    if len(ys):  # notify_death has no word
+        band[max(ys.min() - 2, 0):ys.max() + 3, max(xs.min() - 28, 0):xs.max() + 29] = True
+    deep = drop_small(deep & band, 50)  # a letter is >= ~100 px; outline crumbs in notches are smaller
+    for _ in range(2):
+        deep = dilate(deep, 1) & bright & (d_old < -3.5)
+    text |= deep
+    fillreg |= dilate(text, 1)
+    textzone = dilate(text, 1) & body
     # edge profile of the original (alpha and colour), outside the body and the first pixels inside
     sel = (d_old > -2.5) & (d_old < 60)
     # colour profile ignores the leftover droplets: only pixels whose alpha fits the glow are used

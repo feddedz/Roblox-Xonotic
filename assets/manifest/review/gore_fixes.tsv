@@ -1,0 +1,106 @@
+# vpath	what changed	method (tools/upload/gore_fix.py; output work/upload/fixed/<vpath>)
+gfx/hud/default/notify_death.jpg	blood-splatter badge reshaped into a smooth irregular rounded blob (droplets/drips removed), fill desaturated from blood red to dark warm grey; word, size, white outline/glow kept; _alpha rebuilt from the same shape	splat_badge(neutral)
+gfx/hud/default/notify_death_alpha.jpg	blood-splatter badge reshaped into a smooth irregular rounded blob (droplets/drips removed), fill desaturated from blood red to dark warm grey; word, size, white outline/glow kept; _alpha rebuilt from the same shape	splat_badge(neutral)
+gfx/hud/default/notify_fall.jpg	blood-splatter badge reshaped into a smooth irregular rounded blob (droplets/drips removed), fill desaturated from blood red to dark warm grey; word, size, white outline/glow kept; _alpha rebuilt from the same shape	splat_badge(neutral)
+gfx/hud/default/notify_headshot.jpg	blood-splatter badge reshaped into a smooth irregular rounded blob (droplets/drips removed), fill desaturated from blood red to dark warm grey; word, size, white outline/glow kept; _alpha rebuilt from the same shape	splat_badge(neutral)
+models/gibs/chunk.mdl_0.jpg	red flesh chunk skin recoloured to grey-brown rock (luminance kept)	debris
+models/turrets/basedestroyed_glow.jpg	glow map of a destroyed turret (sparks/embers), no blood -> unchanged	unchanged
+textures/bloodyskull.jpg	dark blood-red smears in sockets/mouth recoloured to dark brown-grey grime	skull
+textures/bloodyskull_pants.jpg	colormap mask (grayscale) -> unchanged	unchanged
+textures/decals/splatter01.jpg	dark blood-red splatter recoloured to dark sooty brown-grey (oil/scorch); shape, texture and _alpha unchanged	decal_recolor
+textures/decals/splatter01_alpha.jpg	alpha mask: shape kept (only the colour image was recoloured) -> unchanged	unchanged
+textures/decals/splatter02.jpg	dark blood-red splatter recoloured to dark sooty brown-grey (oil/scorch); shape, texture and _alpha unchanged	decal_recolor
+textures/decals/splatter02_alpha.jpg	alpha mask: shape kept (only the colour image was recoloured) -> unchanged	unchanged
+textures/decals/splatter03.jpg	dark blood-red splatter recoloured to dark sooty brown-grey (oil/scorch); shape, texture and _alpha unchanged	decal_recolor
+textures/decals/splatter03_alpha.jpg	alpha mask: shape kept (only the colour image was recoloured) -> unchanged	unchanged
+textures/decals/splatter04.jpg	dark blood-red splatter recoloured to dark sooty brown-grey (oil/scorch); shape, texture and _alpha unchanged	decal_recolor
+textures/decals/splatter04_alpha.jpg	alpha mask: shape kept (only the colour image was recoloured) -> unchanged	unchanged
+textures/decals/splatter05.jpg	dark blood-red splatter recoloured to dark sooty brown-grey (oil/scorch); shape, texture and _alpha unchanged	decal_recolor
+textures/decals/splatter05_alpha.jpg	alpha mask: shape kept (only the colour image was recoloured) -> unchanged	unchanged
+textures/evil1_floors/br_tiles_blood.jpg	blood stains recoloured to the surrounding surface colour (luminance detail kept, reads as dirt/grime); unstained pixels unchanged	stain
+textures/evil1_floors/br_tiles_blood_bump.jpg	bump/height map: encodes shape only, no blood colour; shape not changed -> unchanged	unchanged
+textures/evil1_floors/br_tiles_brkblood.jpg	blood stains recoloured to the surrounding surface colour (luminance detail kept, reads as dirt/grime); unstained pixels unchanged	stain
+textures/evil1_floors/br_tiles_brkblood_bump.jpg	bump/height map: encodes shape only, no blood colour; shape not changed -> unchanged	unchanged
+textures/evil1_floors/carpet_drty_blood.jpg	blood stains recoloured to the surrounding surface colour (luminance detail kept, reads as dirt/grime); unstained pixels unchanged	stain
+textures/evil1_floors/carpet_drty_blood2.jpg	blood stains recoloured to the surrounding surface colour (luminance detail kept, reads as dirt/grime); unstained pixels unchanged	stain
+textures/evil1_floors/carpet_drty_blood2_bump.jpg	bump/height map: encodes shape only, no blood colour; shape not changed -> unchanged	unchanged
+textures/evil1_floors/floortilebig2.jpg	blood stains recoloured to the surrounding surface colour (luminance detail kept, reads as dirt/grime); unstained pixels unchanged	stain
+textures/evil1_floors/floortilebig2_bump.jpg	bump/height map: encodes shape only, no blood colour; shape not changed -> unchanged	unchanged
+textures/evil2_basefloor/flr_b-w_drty_bbig.jpg	blood stains recoloured to the surrounding surface colour (luminance detail kept, reads as dirt/grime); unstained pixels unchanged	stain
+textures/evil2_basefloor/flr_b-w_drty_bld.jpg	blood stains recoloured to the surrounding surface colour (luminance detail kept, reads as dirt/grime); unstained pixels unchanged	stain
+textures/evil2_basefloor/flr_b-w_drty_bld2.jpg	blood stains recoloured to the surrounding surface colour (luminance detail kept, reads as dirt/grime); unstained pixels unchanged	stain
+textures/evil2_basefloor/flr_tmtl_drk_bld.jpg	blood stains recoloured to the surrounding surface colour (luminance detail kept, reads as dirt/grime); unstained pixels unchanged	stain
+textures/evil2_basewall/cementwall_btm_gore.jpg	blood stains recoloured to the surrounding surface colour (luminance detail kept, reads as dirt/grime); unstained pixels unchanged	stain
+textures/evil2_basewall/cementwall_btm_gore_bump.jpg	bump/height map: encodes shape only, no blood colour; shape not changed -> unchanged	unchanged
+textures/evil2_misc/crate_drtycamo2.jpg	blood stains recoloured to the surrounding surface colour (luminance detail kept, reads as dirt/grime); unstained pixels unchanged	stain
+textures/evil2_misc/crate_drtyow.jpg	blood stains recoloured to the surrounding surface colour (luminance detail kept, reads as dirt/grime); unstained pixels unchanged	stain
+textures/evil2_misc/ecrate_drty2.jpg	blood stains recoloured to the surrounding surface colour (luminance detail kept, reads as dirt/grime); unstained pixels unchanged	stain
+textures/evil2_misc/ecrate_drty3ow.jpg	blood stains recoloured to the surrounding surface colour (luminance detail kept, reads as dirt/grime); unstained pixels unchanged	stain
+textures/evil3_floors/bdirt_blood.jpg	blood stains recoloured to the surrounding surface colour (luminance detail kept, reads as dirt/grime); unstained pixels unchanged	stain
+textures/evil3_floors/cemdrk_oddtile_bld.jpg	blood stains recoloured to the surrounding surface colour (luminance detail kept, reads as dirt/grime); unstained pixels unchanged	stain
+textures/evil3_floors/cemdrk_oddtile_bld_bump.jpg	bump/height map: encodes shape only, no blood colour; shape not changed -> unchanged	unchanged
+textures/evil3_floors/cemdrk_oddtile_bld_gloss.jpg	gloss map (grayscale/specular), no blood colour; shape not changed -> unchanged	unchanged
+textures/evil3_floors/cemdrk_oddtile_bldb.jpg	blood stains recoloured to the surrounding surface colour (luminance detail kept, reads as dirt/grime); unstained pixels unchanged	stain
+textures/evil3_floors/cemdrk_oddtile_bldb_gloss.jpg	gloss map (grayscale/specular), no blood colour; shape not changed -> unchanged	unchanged
+textures/evil3_floors/wd_tile_drk_bld.jpg	blood stains recoloured to the surrounding surface colour (luminance detail kept, reads as dirt/grime); unstained pixels unchanged	stain
+textures/evil3_floors/woodvfloor3_brain.jpg	blood stains recoloured to the surrounding surface colour (luminance detail kept, reads as dirt/grime); unstained pixels unchanged	stain
+textures/eye.jpg	pink-red veins on the eyeball made pale grey (shape kept); iris unchanged	veins
+textures/final_rage/lava_glow.jpg	lava glow map (molten rock), no blood -> unchanged	unchanged
+textures/gib1.jpg	red flesh gib texture recoloured to grey-brown rock (luminance/structure kept)	debris
+textures/ignishead.jpg	bleeding cut/drip on the forehead painted over with the surrounding skin colour; rest unchanged	inpaint
+textures/ignishead_gloss.jpg	gloss map of the head (dim skin tint), no blood feature -> unchanged	unchanged
+textures/ignishead_glow.jpg	glow mask (white/grey) of the head, no blood -> unchanged	unchanged
+textures/ignishead_norm.jpg	normal map: shape only -> unchanged	unchanged
+textures/ignishead_reflect.jpg	reflection mask: shape only -> unchanged	unchanged
+textures/ignishead_shirt.jpg	colormap mask (grayscale) -> unchanged	unchanged
+textures/ignisheadfb.jpg	bleeding cut/drip on the forehead painted over with the surrounding skin colour; rest unchanged	inpaint
+textures/ignisheadfb_shirt.jpg	colormap mask (grayscale) -> unchanged	unchanged
+textures/techpanelx/panel/panel_tech2r_gloss.jpg	blood stains recoloured to the surrounding surface colour (luminance detail kept, reads as dirt/grime); unstained pixels unchanged	stain
+textures/trak4x/decal/decal_help.jpg	HELP written in dripping blood -> dark-grey spray paint, thin drips under the letters trimmed (same in _alpha)	decal_help
+textures/trak4x/decal/decal_help_alpha.jpg	HELP written in dripping blood -> dark-grey spray paint, thin drips under the letters trimmed (same in _alpha)	decal_help
+gfx/hud/default/notify_lava.jpg	lava icon, not gore -> unchanged	unchanged
+gfx/hud/default/notify_lava_alpha.jpg	lava icon mask -> unchanged	unchanged
+gfx/hud/default/notify_melee_laser.jpg	blood-splatter badge reshaped into a smooth irregular rounded blob (droplets/drips removed), fill desaturated from blood red to dark warm grey; word, size, white outline/glow kept; _alpha rebuilt from the same shape	splat_badge(neutral)
+gfx/hud/default/notify_melee_laser_alpha.jpg	blood-splatter badge reshaped into a smooth irregular rounded blob (droplets/drips removed), fill desaturated from blood red to dark warm grey; word, size, white outline/glow kept; _alpha rebuilt from the same shape	splat_badge(neutral)
+gfx/hud/default/notify_melee_shotgun.jpg	fish icon (melee shotgun), not gore -> unchanged	unchanged
+gfx/hud/default/notify_melee_shotgun_alpha.jpg	fish icon mask -> unchanged	unchanged
+gfx/hud/default/notify_outofammo.jpg	blood-splatter badge reshaped into a smooth irregular rounded blob (droplets/drips removed), fill desaturated from blood red to dark warm grey; word, size, white outline/glow kept; _alpha rebuilt from the same shape	splat_badge(neutral)
+gfx/hud/default/notify_selfkill.jpg	blood-splatter badge reshaped into a smooth irregular rounded blob (droplets/drips removed), fill desaturated from blood red to dark warm grey; word, size, white outline/glow kept; _alpha rebuilt from the same shape	splat_badge(neutral)
+gfx/hud/default/notify_slime.jpg	slime icon, not gore -> unchanged	unchanged
+gfx/hud/default/notify_slime_alpha.jpg	slime icon mask -> unchanged	unchanged
+gfx/hud/default/notify_teamkill_blue.jpg	team-coloured (blue) splatter badge reshaped into a smooth irregular rounded blob (droplets removed); team colour, word TEAM, outline/glow kept; _alpha rebuilt from the same shape	splat_badge(team)
+gfx/hud/default/notify_teamkill_blue_alpha.jpg	team-coloured (blue) splatter badge reshaped into a smooth irregular rounded blob (droplets removed); team colour, word TEAM, outline/glow kept; _alpha rebuilt from the same shape	splat_badge(team)
+gfx/hud/default/notify_teamkill_pink.jpg	team-coloured (pink) splatter badge reshaped into a smooth irregular rounded blob (droplets removed); team colour, word TEAM, outline/glow kept; _alpha rebuilt from the same shape	splat_badge(team)
+gfx/hud/default/notify_teamkill_red.jpg	team-coloured (red) splatter badge reshaped into a smooth irregular rounded blob (droplets removed); team colour, word TEAM, outline/glow kept; _alpha rebuilt from the same shape	splat_badge(team)
+gfx/hud/default/notify_teamkill_yellow.jpg	team-coloured (yellow) splatter badge reshaped into a smooth irregular rounded blob (droplets removed); team colour, word TEAM, outline/glow kept; _alpha rebuilt from the same shape	splat_badge(team)
+gfx/hud/default/notify_void.jpg	void (vortex) icon, not gore -> unchanged	unchanged
+gfx/hud/default/notify_void_alpha.jpg	void icon mask -> unchanged	unchanged
+gfx/hud/luma/notify_death.jpg	luma death icon is a stylised symbol (no blood splatter; team colour where teamkill) -> unchanged	unchanged
+gfx/hud/luma/notify_death_alpha.jpg	luma death icon is a stylised symbol (no blood splatter; team colour where teamkill) -> unchanged	unchanged
+gfx/hud/luma/notify_fall.jpg	luma splat (red, spiky) reshaped into a smooth irregular rounded blob and hue moved from red to amber; glow profile kept; _alpha rebuilt from the same shape	luma_blob
+gfx/hud/luma/notify_fall_alpha.jpg	luma splat (red, spiky) reshaped into a smooth irregular rounded blob and hue moved from red to amber; glow profile kept; _alpha rebuilt from the same shape	luma_blob
+gfx/hud/luma/notify_lava.jpg	luma lava icon is a stylised symbol (no blood splatter; team colour where teamkill) -> unchanged	unchanged
+gfx/hud/luma/notify_lava_alpha.jpg	luma lava icon is a stylised symbol (no blood splatter; team colour where teamkill) -> unchanged	unchanged
+gfx/hud/luma/notify_melee_shotgun.jpg	luma melee_shotgun icon is a stylised symbol (no blood splatter; team colour where teamkill) -> unchanged	unchanged
+gfx/hud/luma/notify_melee_shotgun_alpha.jpg	luma melee_shotgun icon is a stylised symbol (no blood splatter; team colour where teamkill) -> unchanged	unchanged
+gfx/hud/luma/notify_outofammo.jpg	luma outofammo icon is a stylised symbol (no blood splatter; team colour where teamkill) -> unchanged	unchanged
+gfx/hud/luma/notify_outofammo_alpha.jpg	luma outofammo icon is a stylised symbol (no blood splatter; team colour where teamkill) -> unchanged	unchanged
+gfx/hud/luma/notify_selfkill.jpg	luma selfkill icon is a stylised symbol (no blood splatter; team colour where teamkill) -> unchanged	unchanged
+gfx/hud/luma/notify_selfkill_alpha.jpg	luma selfkill icon is a stylised symbol (no blood splatter; team colour where teamkill) -> unchanged	unchanged
+gfx/hud/luma/notify_slime.jpg	luma slime icon is a stylised symbol (no blood splatter; team colour where teamkill) -> unchanged	unchanged
+gfx/hud/luma/notify_slime_alpha.jpg	luma slime icon is a stylised symbol (no blood splatter; team colour where teamkill) -> unchanged	unchanged
+gfx/hud/luma/notify_teamkill_blue.jpg	luma teamkill_blue icon is a stylised symbol (no blood splatter; team colour where teamkill) -> unchanged	unchanged
+gfx/hud/luma/notify_teamkill_blue_alpha.jpg	luma teamkill_blue icon is a stylised symbol (no blood splatter; team colour where teamkill) -> unchanged	unchanged
+gfx/hud/luma/notify_teamkill_neutral.jpg	luma teamkill_neutral icon is a stylised symbol (no blood splatter; team colour where teamkill) -> unchanged	unchanged
+gfx/hud/luma/notify_teamkill_pink.jpg	luma teamkill_pink icon is a stylised symbol (no blood splatter; team colour where teamkill) -> unchanged	unchanged
+gfx/hud/luma/notify_teamkill_red.jpg	luma teamkill_red icon is a stylised symbol (no blood splatter; team colour where teamkill) -> unchanged	unchanged
+gfx/hud/luma/notify_teamkill_yellow.jpg	luma teamkill_yellow icon is a stylised symbol (no blood splatter; team colour where teamkill) -> unchanged	unchanged
+gfx/hud/luma/notify_void.jpg	luma void icon is a stylised symbol (no blood splatter; team colour where teamkill) -> unchanged	unchanged
+gfx/hud/luma/notify_void_alpha.jpg	luma void icon is a stylised symbol (no blood splatter; team colour where teamkill) -> unchanged	unchanged
+gfx/hud/default/notify_fall_alpha.jpg	blood-splatter badge reshaped into a smooth irregular rounded blob (droplets/drips removed), fill desaturated from blood red to dark warm grey; word, size, white outline/glow kept; _alpha rebuilt from the same shape	splat_badge(neutral)
+gfx/hud/default/notify_headshot_alpha.jpg	blood-splatter badge reshaped into a smooth irregular rounded blob (droplets/drips removed), fill desaturated from blood red to dark warm grey; word, size, white outline/glow kept; _alpha rebuilt from the same shape	splat_badge(neutral)
+gfx/hud/default/notify_outofammo_alpha.jpg	blood-splatter badge reshaped into a smooth irregular rounded blob (droplets/drips removed), fill desaturated from blood red to dark warm grey; word, size, white outline/glow kept; _alpha rebuilt from the same shape	splat_badge(neutral)
+gfx/hud/default/notify_selfkill_alpha.jpg	blood-splatter badge reshaped into a smooth irregular rounded blob (droplets/drips removed), fill desaturated from blood red to dark warm grey; word, size, white outline/glow kept; _alpha rebuilt from the same shape	splat_badge(neutral)
+gfx/hud/default/notify_teamkill_pink_alpha.jpg	team-coloured (pink) splatter badge reshaped into a smooth irregular rounded blob (droplets removed); team colour, word TEAM, outline/glow kept; _alpha rebuilt from the same shape	splat_badge(team)
+gfx/hud/default/notify_teamkill_red_alpha.jpg	team-coloured (red) splatter badge reshaped into a smooth irregular rounded blob (droplets removed); team colour, word TEAM, outline/glow kept; _alpha rebuilt from the same shape	splat_badge(team)
+gfx/hud/default/notify_teamkill_yellow_alpha.jpg	team-coloured (yellow) splatter badge reshaped into a smooth irregular rounded blob (droplets removed); team colour, word TEAM, outline/glow kept; _alpha rebuilt from the same shape	splat_badge(team)
