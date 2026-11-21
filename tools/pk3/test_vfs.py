@@ -2,7 +2,7 @@ import sys, tempfile, unittest, zipfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from vfs import Vfs, kind_of, strcasecmp_key  # noqa: E402
+from vfs import Vfs, kind_of, merge_symlink, strcasecmp_key  # noqa: E402
 
 
 def mk(d: Path, name: str, files: dict) -> Path:
@@ -13,7 +13,42 @@ def mk(d: Path, name: str, files: dict) -> Path:
     return p
 
 
+def link(z: zipfile.ZipFile, name: str, target: str) -> None:
+    zi = zipfile.ZipInfo(name)
+    zi.create_system = 3  # UNIX_
+    zi.external_attr = (0o120777 << 16)
+    z.writestr(zi, target)
+
+
 class VfsTest(unittest.TestCase):
+    def test_symlinks_followed_like_fs_openreadfile(self):
+        with tempfile.TemporaryDirectory() as t:
+            p = Path(t) / "a.pk3"
+            with zipfile.ZipFile(p, "w") as z:
+                z.writestr("sound/ctf/yellow_capture.ogg", "Y")
+                link(z, "sound/ctf/capture.ogg", "yellow_capture.ogg")
+                link(z, "sound/keepaway/touch.ogg", "../ctf/capture.ogg")  # chain + ../
+                link(z, "sound/a/loop1.ogg", "loop2.ogg")
+                link(z, "sound/a/loop2.ogg", "loop1.ogg")
+                link(z, "sound/a/nasty.ogg", "../../../etc/passwd")
+                link(z, "top.cfg", "sound/ctf/yellow_capture.ogg")  # no slash: name replaced
+            v = Vfs([p])
+            self.assertEqual(v.read("sound/ctf/capture.ogg"), b"Y")
+            self.assertEqual(v.resolve("sound/keepaway/touch.ogg"), "sound/ctf/yellow_capture.ogg")
+            self.assertEqual(v.read("top.cfg"), b"Y")
+            with self.assertRaises(KeyError):
+                v.read("sound/a/loop1.ogg")  # too many levels
+            with self.assertRaises(KeyError):
+                v.read("sound/a/nasty.ogg")
+            self.assertEqual(v.read_raw("sound/ctf/capture.ogg"), b"yellow_capture.ogg")
+
+    def test_merge_symlink_edges(self):
+        self.assertEqual(merge_symlink("a/b/c.ogg", b"../../x.ogg"), "x.ogg")  # walked to the start
+        self.assertEqual(merge_symlink("a/b/c.ogg", b"d/../e"), None)  # nasty
+        self.assertIsNone(merge_symlink("a/" + "b" * 60 + "/c", b"y" * 70))  # >= MAX_QPATH
+        self.assertEqual(merge_symlink("a/c", b"x\0junk"), "a/x")
+
+
     def test_last_sorted_pk3_wins(self):
         with tempfile.TemporaryDirectory() as t:
             d = Path(t)

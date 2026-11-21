@@ -431,4 +431,5 @@ One line each; **details and sources: `docs/gotchas.md`** (add to both). Roblox 
 - **G-028** Xonotic progs crc 5927 == PROGHEADER_CRC, so SV_VM_Setup's entvars_t field-offset branch applies.
 - **G-026** Bytecode ≈ 1.65× source: client ≈ 48 MB download, ≈ 53 MB heap for csprogs+menu (Q-010).
 - **G-029** Direct pushes of chat-only commits to `main` work (no branch protection, 2026-11-21); 8 concurrent posts from 2 clones all landed with tools/chat.sh.
+- **G-031** pk3s contain **1,927 zip symlinks** (high; 1,908 standard: 1,399 textures, 405 gfx, 94 models, 25 sounds, 3 particles, 1 maps); DarkPlaces follows them (fs.c FS_OpenReadFile, 16 levels). tools/pk3 follows them since 2026-11-21 (manifest column `symlink_to`); re-run `manifest.py --extract` on older work/vfs-* (they held link text).
 <!-- /§GOTCHAS -->
