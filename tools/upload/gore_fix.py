@@ -227,7 +227,7 @@ def splat_badge(cv: str, av: str, mode: str, sigma: float = 7.0, F: int = 4):
     c = load(cv)
     a = load(av)
     body = a > 128
-    core = erode(body, 3)
+    core = erode(fill_holes(largest_component(body)), 3)
     text = core & (lum(c) > 150)
     textzone = dilate(text, 1) & body
     d_old = sdist(body)
@@ -236,7 +236,7 @@ def splat_badge(cv: str, av: str, mode: str, sigma: float = 7.0, F: int = 4):
     # colour profile ignores the leftover droplets: only pixels whose alpha fits the glow are used
     cs, ms = profile(d_old[sel], np.concatenate([a[sel][:, None], c[sel]], 1), -2.5, 60)
     # interior texture: original fill, text removed, extended over the new shape
-    known = erode(body, 2) & ~dilate(text, 2)
+    known = erode(body, 4) & ~dilate(text, 2)
     interior = fill(c, known, False)
     interior = np.where(known[..., None], c, interior)
     if mode == "neutral":

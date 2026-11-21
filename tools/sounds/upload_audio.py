@@ -84,8 +84,8 @@ def display_name(vpath: str) -> str:
 def upload(path: Path, vpath: str, sha: str, user_id: str) -> tuple[str, str, str, str]:
     meta = {
         "assetType": "Audio",
-        "displayName": display_name(vpath),
-        "description": f"Xonotic 0.8.6 (xonotic.org, GPLv3+) file {vpath}, sha256 {sha[:16]}",
+        "displayName": f"Xonotic sound {sha[:12]}",
+        "description": f"Sound from the open-source game Xonotic 0.8.6 (GPLv3+), sha256 {sha[:16]}",
         "creationContext": {"creator": {"userId": user_id}, "expectedPrice": 0},
     }
     body, ctype = multipart({
