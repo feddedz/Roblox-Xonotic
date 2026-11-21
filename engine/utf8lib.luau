@@ -155,6 +155,46 @@ function utf8lib.u8_bytelen(s: string, p0: number, n: number): number
 	return len
 end
 
+-- port: utf8lib.c u8_strnlen L257-298 @xonotic-v0.8.6
+function utf8lib.u8_strnlen(s: string, p0: number, n: number): number
+	local p = p0
+	if not enabled() then
+		local e = p
+		while at(s, e) ~= 0 do
+			e += 1
+		end
+		local len = e - p
+		return if len < n then len else n
+	end
+	local len = 0
+	while at(s, p) ~= 0 and n > 0 do
+		local c = at(s, p)
+		if c < 0x80 then
+			len += 1
+			p += 1
+			n -= 1
+			continue
+		end
+		if c < 0xC2 then
+			p += 1
+			n -= 1
+			continue
+		end
+		local ok, st, ln = u8_analyze(s, p, n)
+		if not ok then
+			break
+		end
+		-- valid character, see if it's still inside the range specified by n:
+		if n < st + ln then
+			return len
+		end
+		len += 1
+		n -= st + ln
+		p += st + ln
+	end
+	return len
+end
+
 -- port: utf8lib.c u8_byteofs L433-462 @xonotic-v0.8.6 (returns ofs, len; ofs -1 = not found)
 function utf8lib.u8_byteofs(s: string, i: number): (number, number)
 	if i < 0 then

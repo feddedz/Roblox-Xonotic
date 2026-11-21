@@ -15,6 +15,7 @@ local libc = require("./_port/libc")
 local prvm_edict = require("./prvm_edict")
 local utf8lib = require("./utf8lib")
 local filematch = require("./filematch")
+local common = require("./common")
 local f32 = require("./_port/f32")
 
 local prvm_cmds = {}
@@ -570,6 +571,183 @@ function prvm_cmds.VM_buf_cvarlist(prog: any)
 	sb.max_strings, sb.num_strings = count, count
 end
 
+-- port: prvm_cmds.c VM_localcmd L615-621 @xonotic-v0.8.6
+function prvm_cmds.VM_localcmd(prog: any)
+	SAFEPARMCOUNTRANGE(prog, 1, 8, "VM_localcmd")
+	cmd.Cbuf_AddText(prvm_cmds.VM_VarString(prog, 0, VM_STRINGTEMP_LENGTH))
+end
+
+-- port: prvm_cmds.c VM_min L1683-1698 @xonotic-v0.8.6
+function prvm_cmds.VM_min(prog: any)
+	SAFEPARMCOUNTRANGE(prog, 2, 8, "VM_min")
+	if prog.argc >= 3 then
+		local f = G_FLOAT(prog, OFS_PARM0)
+		for i = 1, prog.argc - 1 do
+			local x = G_FLOAT(prog, OFS_PARM0 + i * 3)
+			if f > x then
+				f = x
+			end
+		end
+		SET_G_FLOAT(prog, OFS_RETURN, f)
+	else
+		local a, b = G_FLOAT(prog, OFS_PARM0), G_FLOAT(prog, OFS_PARM0 + 3)
+		SET_G_FLOAT(prog, OFS_RETURN, if a < b then a else b)
+	end
+end
+
+-- port: prvm_cmds.c VM_max L1709-1724 @xonotic-v0.8.6
+function prvm_cmds.VM_max(prog: any)
+	SAFEPARMCOUNTRANGE(prog, 2, 8, "VM_max")
+	if prog.argc >= 3 then
+		local f = G_FLOAT(prog, OFS_PARM0)
+		for i = 1, prog.argc - 1 do
+			local x = G_FLOAT(prog, OFS_PARM0 + i * 3)
+			if f < x then
+				f = x
+			end
+		end
+		SET_G_FLOAT(prog, OFS_RETURN, f)
+	else
+		local a, b = G_FLOAT(prog, OFS_PARM0), G_FLOAT(prog, OFS_PARM0 + 3)
+		SET_G_FLOAT(prog, OFS_RETURN, if a > b then a else b)
+	end
+end
+
+-- port: prvm_cmds.c VM_strreplace L2369-2426 @xonotic-v0.8.6
+function prvm_cmds.VM_strreplace(prog: any)
+	SAFEPARMCOUNT(prog, 3, "VM_strreplace")
+	local search = libc.cstr(G_STRING(prog, OFS_PARM0))
+	local replace = libc.cstr(G_STRING(prog, OFS_PARM0 + 3))
+	local subject = libc.cstr(G_STRING(prog, OFS_PARM0 + 6))
+	local sl, rl, subl = #search, #replace, #subject
+	local out = {}
+	local si = 0
+	local cap = VM_STRINGTEMP_LENGTH - 1
+	local function put(ch: string)
+		if si < cap then
+			table.insert(out, ch)
+			si += 1
+		end
+	end
+	local i = 0
+	while i <= subl - sl do
+		local j = 0
+		while j < sl and string.byte(subject, i + j + 1) == string.byte(search, j + 1) do
+			j += 1
+		end
+		if j == sl then
+			for k = 1, rl do
+				if si >= cap then
+					break
+				end
+				put(string.sub(replace, k, k))
+			end
+			if sl > 0 then
+				i += sl - 1
+			else
+				put(string.sub(subject, i + 1, i + 1))
+			end
+		else
+			put(string.sub(subject, i + 1, i + 1))
+		end
+		i += 1
+	end
+	while i < subl do
+		put(string.sub(subject, i + 1, i + 1))
+		i += 1
+	end
+	SET_G_INT(prog, OFS_RETURN, prvm_edict.PRVM_SetTempString(prog, table.concat(out)))
+end
+
+-- port: prvm_cmds.c VM_strstrofs L5647-5668 @xonotic-v0.8.6
+function prvm_cmds.VM_strstrofs(prog: any)
+	SAFEPARMCOUNTRANGE(prog, 2, 3, "VM_strstrofs")
+	local instr = libc.cstr(G_STRING(prog, OFS_PARM0))
+	local match = libc.cstr(G_STRING(prog, OFS_PARM0 + 3))
+	local firstofs = if prog.argc > 2 then libc.toint(G_FLOAT(prog, OFS_PARM0 + 6)) else 0
+	firstofs = libc.toint(utf8lib.u8_bytelen(instr, 1, firstofs))
+	if firstofs ~= 0 and (firstofs < 0 or firstofs > #instr) then
+		SET_G_FLOAT(prog, OFS_RETURN, -1)
+		return
+	end
+	local at = string.find(instr, match, firstofs + 1, true)
+	if not at then
+		SET_G_FLOAT(prog, OFS_RETURN, -1)
+	else
+		SET_G_FLOAT(prog, OFS_RETURN, utf8lib.u8_strnlen(instr, 1, at - 1))
+	end
+end
+
+-- port: prvm_cmds.c VM_crc16 L5933-5941 @xonotic-v0.8.6
+function prvm_cmds.VM_crc16(prog: any)
+	SAFEPARMCOUNTRANGE(prog, 2, 8, "VM_crc16")
+	local insensitive = G_FLOAT(prog, OFS_PARM0)
+	local s = prvm_cmds.VM_VarString(prog, 1, VM_STRINGTEMP_LENGTH)
+	SET_G_FLOAT(prog, OFS_RETURN, if insensitive ~= 0 then common.CRC_Block_CaseInsensitive(s) else common.CRC_Block(s))
+end
+
+-- port: prvm_cmds.c VM_uri_escape L6054-6083 @xonotic-v0.8.6
+function prvm_cmds.VM_uri_escape(prog: any)
+	SAFEPARMCOUNTRANGE(prog, 1, 8, "VM_uri_escape")
+	local src = prvm_cmds.VM_VarString(prog, 0, VM_STRINGTEMP_LENGTH)
+	local hex = "0123456789ABCDEF"
+	local out = {}
+	local q = 0
+	for k = 1, #src do
+		if q >= VM_STRINGTEMP_LENGTH - 3 then
+			break
+		end
+		local c = string.sub(src, k, k)
+		if string.find(c, "^[A-Za-z0-9%-_%.!~'()]$") then
+			table.insert(out, c)
+			q += 1
+		else
+			local b = string.byte(c)
+			table.insert(
+				out,
+				"%" .. string.sub(hex, b // 16 + 1, b // 16 + 1) .. string.sub(hex, b % 16 + 1, b % 16 + 1)
+			)
+			q += 3
+		end
+	end
+	SET_G_INT(prog, OFS_RETURN, prvm_edict.PRVM_SetTempString(prog, table.concat(out)))
+end
+
+-- port: prvm_cmds.c VM_uri_unescape L6087-6130 @xonotic-v0.8.6
+function prvm_cmds.VM_uri_unescape(prog: any)
+	SAFEPARMCOUNTRANGE(prog, 1, 8, "VM_uri_unescape")
+	local src = prvm_cmds.VM_VarString(prog, 0, VM_STRINGTEMP_LENGTH)
+	local function hexv(c: number?): number?
+		if not c then
+			return nil
+		elseif c >= 48 and c <= 57 then
+			return c - 48
+		elseif c >= 97 and c <= 102 then
+			return c - 87
+		elseif c >= 65 and c <= 70 then
+			return c - 55
+		end
+		return nil
+	end
+	local out = {}
+	local p = 1
+	while p <= #src do
+		if string.byte(src, p) == 37 then -- '%'
+			local hi, lo = hexv(string.byte(src, p + 1)), hexv(string.byte(src, p + 2))
+			if hi and lo then
+				if hi ~= 0 or lo ~= 0 then -- don't unescape NUL bytes
+					table.insert(out, string.char(hi * 16 + lo))
+				end
+				p += 3
+				continue
+			end
+		end
+		table.insert(out, string.sub(src, p, p))
+		p += 1
+	end
+	SET_G_INT(prog, OFS_RETURN, prvm_edict.PRVM_SetTempString(prog, table.concat(out)))
+end
+
 -- C name -> builtin, for the vm_*_builtins tables
 prvm_cmds.BUILTINS = {
 	VM_cvar = prvm_cmds.VM_cvar,
@@ -597,6 +775,14 @@ prvm_cmds.BUILTINS = {
 	VM_ftoe = prvm_cmds.VM_ftoe,
 	VM_etof = prvm_cmds.VM_etof,
 	VM_bound = prvm_cmds.VM_bound,
+	VM_localcmd = prvm_cmds.VM_localcmd,
+	VM_min = prvm_cmds.VM_min,
+	VM_max = prvm_cmds.VM_max,
+	VM_strreplace = prvm_cmds.VM_strreplace,
+	VM_strstrofs = prvm_cmds.VM_strstrofs,
+	VM_crc16 = prvm_cmds.VM_crc16,
+	VM_uri_escape = prvm_cmds.VM_uri_escape,
+	VM_uri_unescape = prvm_cmds.VM_uri_unescape,
 	VM_buf_create = prvm_cmds.VM_buf_create,
 	VM_buf_del = prvm_cmds.VM_buf_del,
 	VM_buf_getsize = prvm_cmds.VM_buf_getsize,
