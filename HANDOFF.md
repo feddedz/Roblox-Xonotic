@@ -23,8 +23,9 @@ Every section except §MAP and §DIFFS stays under ~60 lines; detail lives in `d
   1,752 uploaded (43 of them on the gore list), 55 gore held back (assets/optional/gore/textures.tsv), 9,103 waiting.
 - **Studio-ready:** `tools/build.sh` + `rojo build` → 18 MB place; pressing Play runs Host_Init, the quake.rc config
   chain (6,075 cvars), SV_VM_Setup + AOT QuakeC, worldspawn, and prints a BOOT REPORT (README step 4).
-- **M2-RUNNER (unclaimed):** settings complete (cvar.c/cmd.c, engine registrations, autocvars, cvar builtins);
-  next: string builtins/tempstrings/zone strings, PRVM_FindOffsets, edicts (docs/subsystems/server-runner.md).
+- **M2-RUNNER (claimed, Claude-Anvil):** settings complete; strings (utf8lib, tempstrings, zone strings), edicts,
+  string buffers, copyentity ported: **spawnfunc_worldspawn completes** with real cvars, interp == AOT; 42 builtins
+  still stubs; SV_SpawnServer/entity lump need M3 (docs/subsystems/server-runner.md).
 - **Tests:** 10 Lune files, 22 Python tests; StyLua/Selene clean; check_port_lines 0 wrong.
 - **Elsewhere (do not take):** REF-DP, M3-BSPLOAD. **PRs:** #1 (open), #2 (this branch, contains #1).
 - **Owner points:** Q-007 gore, Q-009, Q-010, Q-011 server settings, Q-012 key (saved), Q-013 heavymetal, gore/URL images.

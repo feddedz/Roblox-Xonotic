@@ -57,6 +57,12 @@ with logged `NOT YET PORTED` messages.
   remaining stubs fopen/fclose/fgets, changelevel, SV_copyentity, digest_hex, SV_AddStat, sprintf, localcmd,
   SV_precache_model; still "NULL function in server".
 
+- **VM_SV_copyentity** (Xonotic's object system copies prototype entities): **spawnfunc_worldspawn now completes**
+  with the real config chain, interp == AOT (globals, 36,708-call stub sequence, all cvars). 42 distinct builtins
+  still stubbed (fopen/fgets, changelevel, digest_hex, SV_AddStat, sprintf, localcmd, precache_model,
+  strtoupper/lower, strreplace, crc16, infoget/add, uri_(un)escape, strstrofs, max, tokenizebyseparator, ...);
+  the full list prints in tests/integration/sv_config_worldspawn.
+
 ## Next steps, in order
 1. Still open from the settings work: PRVM_FindOffsets + the PROGHEADER_CRC branch of SV_VM_Setup (engine
    field offsets from entvars_t, progs crc 5927), .po translation when prvm_language is set (default "").

@@ -13,7 +13,56 @@ local names = require("./_port/builtin_names")
 local svvm_cmds = {}
 
 -- C name -> implementation (prog) -> (); filled as builtins are ported.
-local PORTED: { [string]: (prog: any) -> () } = table.clone(require("./prvm_cmds").BUILTINS)
+local prvm_cmds = require("./prvm_cmds")
+local prvm_edict = require("./prvm_edict")
+local PORTED: { [string]: (prog: any) -> () } = table.clone(prvm_cmds.BUILTINS)
+
+local warnedNP: { [string]: boolean } = {}
+local function notPorted(what: string)
+	if not warnedNP[what] then
+		warnedNP[what] = true
+		print("NOT YET PORTED: " .. what)
+	end
+end
+
+-- port: svvm_cmds.c VM_SV_copyentity L1748-1778 @xonotic-v0.8.6
+local function VM_SV_copyentity(prog: any)
+	if prog.argc ~= 2 then
+		prog.error_cmd(string.format("VM_SV_copyentity wrong parameter count %i (2 expected ) !", prog.argc))
+	end
+	local inn = buffer.readi32(prog.globals, 4 * 4)
+	if inn == 0 then
+		prvm_cmds.VM_Warning(prog, "copyentity: can not read world entity\n")
+		return
+	end
+	if prog.ed_free[inn] then
+		prvm_cmds.VM_Warning(prog, "copyentity: can not read free entity\n")
+		return
+	end
+	local out = buffer.readi32(prog.globals, 7 * 4)
+	if out == 0 then
+		prvm_cmds.VM_Warning(prog, "copyentity: can not modify world entity\n")
+		return
+	end
+	if prog.ed_free[out] then
+		prvm_cmds.VM_Warning(prog, "copyentity: can not modify free entity\n")
+		return
+	end
+	local n = prog.entityfields * 4
+	buffer.copy(prog.edictsfields, out * n, prog.edictsfields, inn * n, n)
+	local amin, amax = prvm_edict.FieldOfs(prog, "absmin"), prvm_edict.FieldOfs(prog, "absmax")
+	local f = prog.edictsfields
+	local base = out * prog.entityfields
+	if
+		buffer.readf32(f, (base + amin) * 4) == buffer.readf32(f, (base + amax) * 4)
+		and buffer.readf32(f, (base + amin + 1) * 4) == buffer.readf32(f, (base + amax + 1) * 4)
+		and buffer.readf32(f, (base + amin + 2) * 4) == buffer.readf32(f, (base + amax + 2) * 4)
+	then
+		return
+	end
+	notPorted("SV_LinkEdict (sv_phys.c) in copyentity")
+end
+PORTED.VM_SV_copyentity = VM_SV_copyentity
 svvm_cmds.PORTED = PORTED
 
 -- Builds prog.builtins / prog.numbuiltins like `prog->builtins = vm_sv_builtins` (sv_main.c SV_VM_Setup).
