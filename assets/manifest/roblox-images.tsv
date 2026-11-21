@@ -1806,3 +1806,8 @@ df5525541d16db2271f0a7a9bff0fccef7c99713a5f12214314922370be2d8c5	gfx/menu/lumino
 491c18ccb34304c53d995d8838d0d59c0e153a3ae9429c679e8ea03d2ea499c8	gfx/menu/wickedx/background_ingame.jpg	131537538930533	fe5cbab1-e241-411b-96c6-452639843527	ok	{"moderationState": "Reviewing"}
 f9b20420b0b3d91d6a2583b6412230c6c45ce1f3d49f59e1ed79c913595fa1d8	gfx/menu/wickedx/bigbutton_n.jpg			error	HTTP 403: {"errors":[{"code":0,"message":"User is moderated"}]} 
 b76d04f679aa39ab86205179ef3057097ebe9fb36fc420148719cfc3a8f0d942	gfx/menu/wickedx/bigbutton_f.jpg			error	HTTP 403: {"errors":[{"code":0,"message":"User is moderated"}]} 
+0487e78afe281558a7f557d86387695e05b192f928131f444571f68a10dd9f94	maps/_hudsetup/lm_0000.jpg	132366598542789	adbd1146-aeb2-4c79-9748-40e3cc1d42b5	ok	{"moderationState": "Reviewing"}
+186c73986523e2b7efeb80335da9116e29eba68750655b058edcbddf81dd2813	maps/_hudsetup.jpg	90150326952868	34597676-d0c2-43a1-af24-5c09e6b1babb	ok	{"moderationState": "Reviewing"}
+55484215e45c04ef51e920981754d5539ca87cb3c46a5ef7062eac1fbe507a11	maps/_hudsetup/lm_0002.jpg	135399037863856	514c7378-e632-41ba-970a-65afc414bead	ok	{"moderationState": "Reviewing"}
+63d90a3aa8698b115cacb6417f2b950225f8f73e9c75283a6aac4d0400c0929d	maps/_hudsetup/lm_0001.jpg	77954198575648	9ad4ba1a-2383-44dc-a68a-abdb09a6f537	ok	{"moderationState": "Reviewing"}
+a1b8aed129640389722d9b5c4494a1119a6982a3c2451e200dfcd4f352de8bf3	maps/_hudsetup/lm_0003.jpg	104187523713808	c847567d-372c-420c-b797-f74e0e363185	ok	{"moderationState": "Reviewing"}

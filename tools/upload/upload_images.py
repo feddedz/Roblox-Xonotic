@@ -49,6 +49,9 @@ def main():
     ap.add_argument("--jobs", type=int, default=8)
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--type", default="Image")
+    ap.add_argument("--tier", default="auto", help="only this tier of assets/manifest/texture-review.tsv (auto/review/approved)")
+    ap.add_argument("--batch", type=int, default=300, help="upload N, then wait until Roblox moderated all of them")
+    ap.add_argument("--max-batches", type=int, default=1000)
     a = ap.parse_args()
     done = set()
     if IDS.exists():
@@ -72,6 +75,13 @@ def main():
             continue
         seen.add(c[4])
         todo.append((c[0], c[4], p))
+    tiers = {}
+    tf = ROOT / "assets/manifest/texture-review.tsv"
+    for l in tf.read_text().splitlines():
+        if l and not l.startswith("#"):
+            v, k = l.split("\t")[:2]
+            tiers[v] = k
+    todo = [x for x in todo if tiers.get(x[0]) == a.tier]
     if a.limit:
         todo = todo[: a.limit]
     print(f"{len(done)} done, {len(todo)} to upload", flush=True)
@@ -91,8 +101,42 @@ def main():
             if res[2] != "ok" or n["i"] % 250 == 0:
                 print(f"[{n['i']}/{len(todo)}] {res[2]} {vpath} {res[0] or res[3][:150]}", flush=True)
 
-    with ThreadPoolExecutor(max_workers=a.jobs) as ex:
-        list(ex.map(one, todo))
+    def moderation_gate(ids):
+        """Wait until every asset of the batch is moderated; False if any is rejected or the account is moderated."""
+        pending = set(ids)
+        for _ in range(90):  # up to 45 min
+            for aid in list(pending):
+                try:
+                    r = U.request("GET", f"{U.API}/assets/{aid}?readMask=moderationResult")
+                except RuntimeError as e:
+                    print(f"gate: {e}", flush=True)
+                    return False
+                st = r.get("moderationResult", {}).get("moderationState", "")
+                if st == "Rejected":
+                    print(f"gate: asset {aid} REJECTED - stopping", flush=True)
+                    return False
+                if st == "Approved":
+                    pending.discard(aid)
+            if not pending:
+                return True
+            U.time.sleep(30)
+        print(f"gate: {len(pending)} still in review after 45 min - stopping to be safe", flush=True)
+        return False
+
+    for b in range(min(a.max_batches, (len(todo) + a.batch - 1) // a.batch)):
+        chunk = todo[b * a.batch:(b + 1) * a.batch]
+        before = n["ok"]
+        start = IDS.read_text().count("\n")
+        with ThreadPoolExecutor(max_workers=a.jobs) as ex:
+            list(ex.map(one, chunk))
+        new = [l.split("\t")[2] for l in IDS.read_text().splitlines()[start:] if "\tok\t" in l]
+        if n["err"] or n["ok"] == before:
+            print(f"batch {b + 1}: upload errors - stopping", flush=True)
+            break
+        print(f"batch {b + 1}: {len(new)} uploaded, waiting for moderation...", flush=True)
+        if not moderation_gate(new):
+            break
+        print(f"batch {b + 1}: all approved", flush=True)
     print(f"done: {n['ok']} ok, {n['err']} not ok", flush=True)
 
 
