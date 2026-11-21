@@ -19,7 +19,11 @@ OUT = ROOT / "assets/manifest/roblox-audio-moderation.tsv"
 
 def main() -> None:
     rows = [l.split("\t") for l in IDS.read_text().splitlines() if l and not l.startswith("#")]
-    rows = [r for r in rows if r[4] == "ok"]
+    latest = {}
+    for r in rows:
+        if r[4] == "ok":
+            latest[r[0]] = r  # a later upload for the same file (e.g. censored, D-022) replaces the earlier one
+    rows = list(latest.values())
 
     def one(r):
         try:

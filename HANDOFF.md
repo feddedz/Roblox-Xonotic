@@ -317,6 +317,7 @@ If it isn't here, it isn't allowed.
 | DIFF-002 | **Planned, not built.** Console (gamepad) and mobile (touch) controls with slight gameplay assists, for those inputs only; keyboard-and-mouse stays exactly Xonotic | — (blocked: Q-009) | owner-approved design difference, not a platform limit | owner-approved planned difference (D-018) | to be measured once defined |
 | DIFF-003 | **Planned, not built, much later.** Game passes | — (blocked: Q-009) | owner-approved | owner-approved planned difference (D-018) | — |
 | DIFF-004 | Roblox asset of `sound/misc/null.wav` and `sound/menu/close.ogg` (4 samples each, all silent) is a 16-bit WAV of exactly those samples padded with silence to 0.05 s | uploading the original files: rejected ("Audio duration too long", really a minimum length, G-037) | Roblox audio minimum length | proven platform limit | audibly identical; engine timing uses the original files' lengths (M8) |
+| DIFF-005 | 13 voice lines (Q-013 list) play with the profanity bleeped ("bitch", "retard", "pussy", "ass" → 1 kHz tone); timing/length identical | uploading the originals and one identical retry: rejected by Roblox moderation | Roblox Community Rules for audio | Roblox policy, owner decision D-022 | everything except the bleeped words is sample-identical |
 (DIFF-001 withdrawn 2026-11-20, see D-015.)
 
 Candidates already known (become entries when the subsystem lands, after real attempts):
@@ -369,6 +370,9 @@ Data pk3 sha256 (full table + sizes: `assets/manifest/pk3-{standard,high}.tsv`):
   D-011's session id. Chat = docs/chat/YYYY-MM-DD.md on `main`, append-only, posted by tools/chat.sh straight to
   `main` (chat-only commits; the only direct pushes to `main`), retried from the new main on rejection;
   `merge=union` for docs/chat/*.md. HANDOFF.md stays the record (docs/chat/README.md).
+- **D-022** (owner, 2026-11-21) Voice lines rejected by Roblox moderation for profanity get the bad words bleeped
+  (1 kHz tone over exactly the word, same length), everything else untouched; tools/sounds/censor_voice.py,
+  DIFF-005. Applies to the 13 lines of Q-013; heavymetal.ogg (music, no profanity) stays original for an appeal.
 <!-- /§DECISIONS -->
 
 <!-- §QUESTIONS -->
@@ -417,7 +421,8 @@ Data pk3 sha256 (full table + sizes: `assets/manifest/pk3-{standard,high}.tsv`):
   with them (would be a §DIFFS entry). Until then those sounds have no usable asset (silent in game).
   Update 2026-11-21 (owner asked to retry): recheck → 785 approved, 14 rejected (+ marine/coms/teamshoot3),
   6 reviewing. One identical re-upload (robot needhelp2 → asset 120983016932971) was rejected instantly
-  (file recognised), so the other 13 were NOT retried. Remaining route: appeal or owner decision.
+  (file recognised), so the other 13 were NOT retried. **Owner decided (D-022): bleep the bad words**; the 13
+  censored versions were uploaded (in review). Still open: heavymetal.ogg (music; appeal).
 <!-- /§QUESTIONS -->
 
 <!-- §GOTCHAS -->
