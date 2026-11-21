@@ -422,7 +422,9 @@ Data pk3 sha256 (full table + sizes: `assets/manifest/pk3-{standard,high}.tsv`):
   Update 2026-11-21 (owner asked to retry): recheck → 785 approved, 14 rejected (+ marine/coms/teamshoot3),
   6 reviewing. One identical re-upload (robot needhelp2 → asset 120983016932971) was rejected instantly
   (file recognised), so the other 13 were NOT retried. **Owner decided (D-022): bleep the bad words**; the 13
-  censored versions were uploaded (in review). Still open: heavymetal.ogg (music; appeal).
+  censored versions were uploaded: 12 approved. soldier/coms/meet ("get your ass to the waypoint") rejected
+  again twice (word bleep, then mid "your"..mid "to" bleep): probably matched to the rejected recording;
+  stopped retrying (account strikes). Still open: meet.ogg and heavymetal.ogg (music) → appeal, or owner decides.
 <!-- /§QUESTIONS -->
 
 <!-- §GOTCHAS -->

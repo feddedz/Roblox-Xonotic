@@ -595,7 +595,7 @@ return {
 	["sound/player/soldier/coms/freelance2.ogg"] = 123486578625747,
 	["sound/player/soldier/coms/getflag.ogg"] = 139696921118772,
 	["sound/player/soldier/coms/incoming.ogg"] = 120846987473445,
-	["sound/player/soldier/coms/meet.ogg"] = 122843929476543,
+	["sound/player/soldier/coms/meet.ogg"] = 119550120789860,
 	["sound/player/soldier/coms/needhelp1.ogg"] = 138372409138949,
 	["sound/player/soldier/coms/needhelp2.ogg"] = 113142889185077,
 	["sound/player/soldier/coms/seenflag.ogg"] = 72508960396168,

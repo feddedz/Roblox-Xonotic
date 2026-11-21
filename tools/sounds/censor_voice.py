@@ -58,6 +58,18 @@ for f, spans in plan.items():
                 s[k * ch + c] = v
     os.makedirs("work/audio/censored", exist_ok=True)
     out = "work/audio/censored/" + f[:-4] + ".flac"
+    if f == "player_soldier_coms_meet.ogg":
+        # v1 (word span) was still rejected by moderation; v2 bleeps mid "YOUR" .. mid "TO", 0.31-0.75 s, flat
+        s = list(struct.unpack("<%dh" % (n * ch), raw))
+        i0, i1 = int(0.31 * rate), int(0.75 * rate)
+        seg = s[i0 * ch:i1 * ch]
+        amp = min(20000, max(3000, math.sqrt(sum(x * x for x in seg) / len(seg)) * 1.2))
+        fade = int(0.005 * rate)
+        for k in range(i0, i1):
+            env = min(1, (k - i0) / fade, (i1 - 1 - k) / fade)
+            v = int(amp * env * math.sin(2 * math.pi * 1000 * (k - i0) / rate))
+            for c in range(ch):
+                s[k * ch + c] = v
     subprocess.run(["ffmpeg","-v","error","-y","-f","s16le","-ar",str(rate),"-ac",str(ch),"-i","-","-sample_fmt","s16",out],input=struct.pack("<%dh" % len(s), *s),check=True)
     # same length check
     m = int(subprocess.run(["ffprobe","-v","error","-count_packets","-show_entries","stream=duration_ts","-of","csv=p=0",out],capture_output=True,text=True).stdout.strip() or 0)
