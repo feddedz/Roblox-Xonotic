@@ -14,6 +14,7 @@ local console = require("./console")
 local libc = require("./_port/libc")
 local prvm_edict = require("./prvm_edict")
 local utf8lib = require("./utf8lib")
+local filematch = require("./filematch")
 local f32 = require("./_port/f32")
 
 local prvm_cmds = {}
@@ -388,6 +389,187 @@ function prvm_cmds.VM_etof(prog: any)
 	SET_G_FLOAT(prog, OFS_RETURN, buffer.readi32(prog.globals, OFS_PARM0 * 4))
 end
 
+-- port: prvm_cmds.c VM_bound L1735-1739 @xonotic-v0.8.6 (mathlib.h bound macro)
+function prvm_cmds.VM_bound(prog: any)
+	SAFEPARMCOUNT(prog, 3, "VM_bound")
+	local mn, num, mx = G_FLOAT(prog, OFS_PARM0), G_FLOAT(prog, OFS_PARM0 + 3), G_FLOAT(prog, OFS_PARM0 + 6)
+	SET_G_FLOAT(prog, OFS_RETURN, if num >= mn then (if num < mx then num else mx) else mn)
+end
+
+--[[ String buffers (prvm_stringbuffer_t in prog->stringbuffersarray). Mem_ExpandableArray hands out the
+lowest free record index, which is the buffer number QC sees; a record is
+{ strings = { [0..] = string|nil }, num_strings, max_strings, flags }. ]]
+local STRINGBUFFER_QCFLAGS = 1 -- progsvm.h L517
+
+local function buffers(prog: any): { [number]: any }
+	prog.stringbuffersarray = prog.stringbuffersarray or {}
+	return prog.stringbuffersarray
+end
+-- Mem_ExpandableArray_RecordAtIndex: nil for negative / unallocated indices
+local function RecordAtIndex(prog: any, i: number): any
+	if i < 0 then
+		return nil
+	end
+	return buffers(prog)[i]
+end
+
+-- port: prvm_cmds.c BufStr_Expand L4593-4607 @xonotic-v0.8.6
+local function BufStr_Expand(sb: any, strindex: number)
+	if sb.max_strings <= strindex then
+		sb.max_strings = math.max(sb.max_strings * 2, 128)
+		while sb.max_strings <= strindex do
+			sb.max_strings *= 2
+		end
+	end
+end
+
+-- port: prvm_cmds.c BufStr_Shrink L4609-4623 @xonotic-v0.8.6
+local function BufStr_Shrink(sb: any)
+	while sb.num_strings > 0 and sb.strings[sb.num_strings - 1] == nil do
+		sb.num_strings -= 1
+	end
+	if sb.num_strings == 0 then
+		sb.max_strings = 0
+		sb.strings = {}
+	end
+end
+
+-- port: prvm_cmds.c BufStr_Set L4680-4702 @xonotic-v0.8.6
+local function BufStr_Set(sb: any, strindex: number, str: string?)
+	if not sb or strindex < 0 then
+		return
+	end
+	BufStr_Expand(sb, strindex)
+	sb.num_strings = math.max(sb.num_strings, strindex + 1)
+	sb.strings[strindex] = if str then libc.cstr(str :: string) else nil
+	BufStr_Shrink(sb)
+end
+prvm_cmds.BufStr_Set = BufStr_Set
+
+-- port: prvm_cmds.c VM_buf_create L4742-4762 @xonotic-v0.8.6
+function prvm_cmds.VM_buf_create(prog: any)
+	SAFEPARMCOUNTRANGE(prog, 0, 2, "VM_buf_create")
+	if prog.argc >= 1 and G_STRING(prog, OFS_PARM0) ~= "string" then
+		SET_G_FLOAT(prog, OFS_RETURN, -1)
+		return
+	end
+	local arr = buffers(prog)
+	local i = 0
+	while arr[i] ~= nil do
+		i += 1
+	end
+	local sb = { strings = {}, num_strings = 0, max_strings = 0, flags = 0 }
+	arr[i] = sb
+	if prog.argc >= 2 then
+		sb.flags = bit32.band(libc.toint(G_FLOAT(prog, OFS_PARM0 + 3)), STRINGBUFFER_QCFLAGS)
+	end
+	SET_G_FLOAT(prog, OFS_RETURN, i)
+end
+
+-- port: prvm_cmds.c VM_buf_del L4773-4785 @xonotic-v0.8.6 (BufStr_Del L4704-4719)
+function prvm_cmds.VM_buf_del(prog: any)
+	SAFEPARMCOUNT(prog, 1, "VM_buf_del")
+	local n = libc.toint(G_FLOAT(prog, OFS_PARM0))
+	if RecordAtIndex(prog, n) then
+		buffers(prog)[n] = nil
+	else
+		prvm_cmds.VM_Warning(prog, "VM_buf_del: invalid buffer %i used in %s\n", n, prog.name)
+	end
+end
+
+-- port: prvm_cmds.c VM_buf_getsize L4794-4808 @xonotic-v0.8.6
+function prvm_cmds.VM_buf_getsize(prog: any)
+	SAFEPARMCOUNT(prog, 1, "VM_buf_getsize")
+	local n = libc.toint(G_FLOAT(prog, OFS_PARM0))
+	local sb = RecordAtIndex(prog, n)
+	if not sb then
+		SET_G_FLOAT(prog, OFS_RETURN, -1)
+		prvm_cmds.VM_Warning(prog, "VM_buf_getsize: invalid buffer %i used in %s\n", n, prog.name)
+	else
+		SET_G_FLOAT(prog, OFS_RETURN, sb.num_strings)
+	end
+end
+
+-- port: prvm_cmds.c VM_bufstr_get L4947-4968 @xonotic-v0.8.6
+function prvm_cmds.VM_bufstr_get(prog: any)
+	SAFEPARMCOUNT(prog, 2, "VM_bufstr_get")
+	SET_G_INT(prog, OFS_RETURN, 0) -- OFS_NULL
+	local n = libc.toint(G_FLOAT(prog, OFS_PARM0))
+	local sb = RecordAtIndex(prog, n)
+	if not sb then
+		prvm_cmds.VM_Warning(prog, "VM_bufstr_get: invalid buffer %i used in %s\n", n, prog.name)
+		return
+	end
+	local strindex = libc.toint(G_FLOAT(prog, OFS_PARM0 + 3))
+	if strindex < 0 then
+		return
+	end
+	if strindex < sb.num_strings and sb.strings[strindex] then
+		SET_G_INT(prog, OFS_RETURN, prvm_edict.PRVM_SetTempString(prog, sb.strings[strindex]))
+	end
+end
+
+-- port: prvm_cmds.c VM_bufstr_set L4977-5000 @xonotic-v0.8.6
+function prvm_cmds.VM_bufstr_set(prog: any)
+	SAFEPARMCOUNT(prog, 3, "VM_bufstr_set")
+	local n = libc.toint(G_FLOAT(prog, OFS_PARM0))
+	local sb = RecordAtIndex(prog, n)
+	if not sb then
+		prvm_cmds.VM_Warning(prog, "VM_bufstr_set: invalid buffer %i used in %s\n", n, prog.name)
+		return
+	end
+	local strindex = libc.toint(G_FLOAT(prog, OFS_PARM0 + 3))
+	if strindex < 0 or strindex >= 1000000 then -- huge number of strings
+		prvm_cmds.VM_Warning(prog, "VM_bufstr_set: invalid string index %i used in %s\n", strindex, prog.name)
+		return
+	end
+	BufStr_Set(sb, strindex, G_STRING(prog, OFS_PARM0 + 6))
+end
+
+-- port: prvm_cmds.c VM_buf_cvarlist L5434-5508 @xonotic-v0.8.6
+function prvm_cmds.VM_buf_cvarlist(prog: any)
+	SAFEPARMCOUNTRANGE(prog, 2, 3, "VM_buf_cvarlist")
+	local n = libc.toint(G_FLOAT(prog, OFS_PARM0))
+	local sb = RecordAtIndex(prog, n)
+	if not sb then
+		prvm_cmds.VM_Warning(prog, "VM_bufstr_free: invalid buffer %i used in %s\n", n, prog.name)
+		return
+	end
+	local partial = libc.cstr(G_STRING(prog, OFS_PARM0 + 3))
+	local len = #partial
+	local antipartial = if prog.argc == 3 then libc.cstr(G_STRING(prog, OFS_PARM0 + 6)) else nil
+	local antilen = if antipartial then #(antipartial :: string) else 0
+	local ispattern = string.find(partial, "[%*%?]") ~= nil
+	local antiispattern = antipartial ~= nil and string.find(antipartial :: string, "[%*%?]") ~= nil
+	local list = {}
+	local count = 0
+	local v = cvar.cvar_vars
+	while v do
+		local skip = false
+		if len > 0 then
+			if ispattern then
+				skip = not filematch.matchpattern_with_separator(v.name, partial, false, "", false)
+			else
+				skip = string.sub(v.name, 1, len) ~= partial
+			end
+		end
+		if not skip and antilen > 0 then
+			if antiispattern then
+				skip = filematch.matchpattern_with_separator(v.name, antipartial :: string, false, "", false)
+			else
+				skip = string.sub(v.name, 1, antilen) == antipartial
+			end
+		end
+		if not skip then
+			list[count] = v.name -- 0-based like the C array
+			count += 1
+		end
+		v = v.next
+	end
+	sb.strings = list
+	sb.max_strings, sb.num_strings = count, count
+end
+
 -- C name -> builtin, for the vm_*_builtins tables
 prvm_cmds.BUILTINS = {
 	VM_cvar = prvm_cmds.VM_cvar,
@@ -414,6 +596,13 @@ prvm_cmds.BUILTINS = {
 	VM_nextent = prvm_cmds.VM_nextent,
 	VM_ftoe = prvm_cmds.VM_ftoe,
 	VM_etof = prvm_cmds.VM_etof,
+	VM_bound = prvm_cmds.VM_bound,
+	VM_buf_create = prvm_cmds.VM_buf_create,
+	VM_buf_del = prvm_cmds.VM_buf_del,
+	VM_buf_getsize = prvm_cmds.VM_buf_getsize,
+	VM_bufstr_get = prvm_cmds.VM_bufstr_get,
+	VM_bufstr_set = prvm_cmds.VM_bufstr_set,
+	VM_buf_cvarlist = prvm_cmds.VM_buf_cvarlist,
 } :: { [string]: (prog: any) -> () }
 
 return prvm_cmds

@@ -94,5 +94,45 @@ return function(ctx: t.Ctx)
 	setf(0, -1.5)
 	prvm_cmds.VM_floor(prog)
 	t.eq(ctx, retf(), -2)
+	-- string buffers
+	prog.argc = 0
+	prvm_cmds.VM_buf_create(prog)
+	local b0 = retf()
+	prvm_cmds.VM_buf_create(prog)
+	t.eq(ctx, retf(), b0 + 1, "second buffer gets the next index")
+	prog.argc = 3
+	setf(0, b0)
+	setf(1, 4)
+	setstr(2, "four")
+	prvm_cmds.VM_bufstr_set(prog)
+	prog.argc = 1
+	prvm_cmds.VM_buf_getsize(prog)
+	t.eq(ctx, retf(), 5, "num_strings = highest index + 1")
+	prog.argc = 2
+	setf(1, 4)
+	prvm_cmds.VM_bufstr_get(prog)
+	t.eq(ctx, rets(), "four")
+	setf(1, 2)
+	prvm_cmds.VM_bufstr_get(prog)
+	t.eq(ctx, buffer.readi32(prog.globals, 4), 0, "unset slot -> null string")
+	prog.argc = 2
+	setstr(1, "utf8")
+	prvm_cmds.VM_buf_cvarlist(prog)
+	prog.argc = 1
+	prvm_cmds.VM_buf_getsize(prog)
+	t.eq(ctx, retf(), 1, "cvarlist matched utf8_enable")
+	prvm_cmds.VM_buf_del(prog)
+	prvm_cmds.VM_buf_getsize(prog)
+	t.eq(ctx, retf(), -1, "deleted buffer is invalid")
+	prog.argc = 3
+	setf(0, 1)
+	setf(1, 5)
+	setf(2, 3)
+	prvm_cmds.VM_bound(prog)
+	t.eq(ctx, retf(), 3, "bound(min, num, max)")
+	setf(0, 5)
+	setf(1, 1)
+	prvm_cmds.VM_bound(prog)
+	t.eq(ctx, retf(), 5, "below min -> min (mathlib.h macro order)")
 	cvar.reset()
 end

@@ -53,6 +53,10 @@ with logged `NOT YET PORTED` messages.
 - Remaining worldspawn stubs: fopen/fclose/fgets, changelevel, buf_create/cvarlist/getsize/del, SV_copyentity,
   bufstr_set/get, digest_hex, SV_AddStat, SV_precache_model, bound.
 
+- (later the same day) bound, buf_create/del/getsize, bufstr_get/set, buf_cvarlist: worldspawn 2,334 stub calls,
+  remaining stubs fopen/fclose/fgets, changelevel, SV_copyentity, digest_hex, SV_AddStat, sprintf, localcmd,
+  SV_precache_model; still "NULL function in server".
+
 ## Next steps, in order
 1. Still open from the settings work: PRVM_FindOffsets + the PROGHEADER_CRC branch of SV_VM_Setup (engine
    field offsets from entvars_t, progs crc 5927), .po translation when prvm_language is set (default "").
