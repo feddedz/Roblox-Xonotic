@@ -58,10 +58,14 @@ def main():
                 done.add(c[0])
     else:
         IDS.write_text("# sha256\tvpath\tasset_id\toperation\tstatus\tdetail\n")
+    gore = set()
+    gf = ROOT / "assets/optional/gore/textures.tsv"  # GORE-ASSETS: never uploaded to the main account
+    if gf.exists():
+        gore = {l.split("\t")[0] for l in gf.read_text().splitlines() if l and not l.startswith("#")}
     todo, seen = [], set()
     for l in (ROOT / "assets/manifest/vfs-high.tsv").read_text().splitlines():
         c = l.split("\t")
-        if l.startswith("#") or c[1] != "texture" or c[4] in done or c[4] in seen:
+        if l.startswith("#") or c[1] != "texture" or c[4] in done or c[4] in seen or c[0] in gore:
             continue
         p = ROOT / "work/vfs-high" / c[0]
         if p.suffix.lower() not in CT:

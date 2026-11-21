@@ -723,3 +723,4 @@ e4477b0d9167e119d8195ece8ad662d208c0b2de42b65c349f0cd09b3ddfb8e6	gfx/hud/default
 dd5bdf7998ac1ae9f23b90df0b3ead4b7a236d5f21ab1dfbf4a0efff8f3546ca	gfx/hud/default/notify_telefrag_alpha.jpg			error	HTTP 403: {"errors":[{"code":0,"message":"User is moderated"}]} 
 0c4fe7a309ba3e707a0f489eea048f49d31619ce1f5e2eb1d63e492099fad33a	gfx/hud/default/notify_telefrag.jpg			error	HTTP 403: {"errors":[{"code":0,"message":"User is moderated"}]} 
 ece71ac708b3e62aad1025eeeaaaf34fdabed28e15d9166b57cbee5349a10f85	gfx/hud/default/notify_void.jpg			error	HTTP 403: {"errors":[{"code":0,"message":"User is moderated"}]} 
+f012becbe2e8dae9cfdc2c4682db2e159fa5cd438bdeaa8eda660e743efc5a66	gfx/hud/default/notify_teamkill_blue.jpg	133512703796161	b16f2837-a0b1-4e2d-b7c0-771caea99968	ok	{"moderationState": "Approved"}
