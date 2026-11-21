@@ -17,8 +17,8 @@ Every section except §MAP and §DIFFS stays under ~60 lines; detail lives in `d
 
 <!-- §STATUS -->
 ## §STATUS (rewritten 2026-11-21 late, Claude-Anvil)
-- **Owner's Roblox account suspended 1 day** (images: blood-splat HUD icon, "xonotic.org" in a menu skin; G-038..G-042);
-  appeal pending. **No uploads by any session** until the owner says so; plan: review step + owner sign-off (chat/HANDOFF).
+- **Owner's account: appeal succeeded** (G-043; the suspension asset is now Approved). **Uploads still paused** until the
+  review step exists and the owner signs off risky categories (G-042).
 - **Assets on Roblox:** sounds 804/805 approved (13 bleeped D-022, meet pitch D-023, heavymetal appeal); textures
   1,752 uploaded (43 of them on the gore list), 55 gore held back (assets/optional/gore/textures.tsv), 9,103 waiting.
 - **Studio-ready:** `tools/build.sh` + `rojo build` → 18 MB place; pressing Play runs Host_Init, the quake.rc config
@@ -477,4 +477,5 @@ One line each; **details and sources: `docs/gotchas.md`** (add to both). Roblox 
 - **G-040** The 403 (G-039) was a **Warning** for gfx/hud/default/notify_headshot.jpg ("Violent Content and Gore"); after the owner acknowledged it, uploads work again. Gore filter: CLIP ViT-B/32 zero-shot score + visual review of 198 candidates → 59 textures in assets/optional/gore/textures.tsv, skipped by tools/upload/upload_images.py. Images cannot be archived via Open Cloud ("not an archivable asset type"): already-uploaded notify_death(+_alpha)/notify_fall must be removed by the owner in the Creator Dashboard.
 - **G-041** 2026-11-21: second moderation after 1,752 textures (gore filter of G-040 active): 403 "User is moderated" again; watcher stopped the run. Unknown which image (owner to check roblox.com/report-appeals). **Do not upload more to the owner's personal account**; next uploads need a dedicated account/group (owner decision) and a stricter content review.
 - **G-042** 2026-11-21: third and fourth strikes → **owner suspended for 1 day**: gfx/menu/wickedx/background_ingame.jpg ("Directing users off-platform": tiny engraved "XONOTIC.org"; Tesseract OCR cannot read it) and gfx/hud/default/notify_selfkill.jpg (blood-splat kill-feed icon, CLIP gore score only 0.06, uploaded before the filter). Gore list now 98 (all notify_* splat icons of every HUD skin). Lessons: CLIP misses small stylised blood; URLs hide in menu skins/logos; **no further uploads to the owner's personal account** — a dedicated account/group + human review of every image category first.
+- **G-043** 2026-11-21 07:05 UTC: owner's appeal succeeded: account no longer moderated and asset 85776129881684 (notify_selfkill.jpg) is now `Approved`. Still: no uploads until the review step exists and the owner OKs each risky category (G-042).
 <!-- /§GOTCHAS -->
