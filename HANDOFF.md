@@ -1,6 +1,6 @@
 # HANDOFF — Xonotic → Roblox one-to-one port
 
-Single source of project state. **Do not read this whole file.** Print one section with
+Single source of project state (project overview for people: `WELCOME.md`). **Do not read this whole file.** Print one section with
 `tools/handoff.sh STATUS` (or find its unique marker line `<!-- §NAME -->`; it ends at `<!-- /§NAME -->`).
 Every section except §MAP and §DIFFS stays under ~60 lines; detail lives in `docs/subsystems/`.
 
@@ -16,16 +16,19 @@ Every section except §MAP and §DIFFS stays under ~60 lines; detail lives in `d
 | §GOTCHAS | Verified limits (with date) and hard-won lessons. |
 
 <!-- §STATUS -->
-## §STATUS (rewritten 2026-11-20, session 017gQiyN)
-- **Milestone:** M0 done. M1: VFS/manifests + shader parser done. M2: progs.dat reader + CFG analysis done.
-- **Works:** toolchain bootstrap; pinned release fetch (sha512); DarkPlaces-exact VFS + manifests (both
-  builds); shader table (2,447 shaders); reader for all 3 .dat validated like PRVM_Prog_Load; f32 helper
-  verified bit-exact; Lune runner; CI; Rojo build. Tests: Lune 17,050 checks pass, 15 Python tests pass.
-- **Not yet:** no engine module ported; no texture/model/BSP/sound converters; Studio shows only two
-  `NOT YET PORTED` warnings (expected).
-- **FPS / server tick:** not measurable yet.
-- **Next step:** M2-INTERP + M2-AOT (plan in docs/subsystems/qcvm.md). Independent, parallel-safe:
-  M1-TEX, M1-BSP, REF-DP, M1-RTVFS.
+## §STATUS (rewritten 2026-11-21, session 017gQiyN, finished)
+- **Milestone:** M0 done; M1 partly (VFS, manifests, shaders); M2: interpreter + AOT compiler done (all
+  25,509 QC functions identical compiled vs interpreted); M2-RUNNER partial (unclaimed): real progs.dat
+  loads via SV_VM_Setup, worldspawn runs identically on both with all builtins stubbed.
+- **Build:** `tools/build.sh` → game/generated (never committed, D-020); full place builds to 14 MB.
+- **Tests:** 6 Lune files (2 skip without game data), 15 Python tests; StyLua/Selene clean.
+- **In progress in other sessions (do not take):** REF-DP (session_017gQiyKAbN1VAofn9a3CDvm, branch
+  REF-DP-instrumented-build), M3-BSPLOAD (session_017gQiyJc8jR6adsLPSpNWp8, branch M3-BSPLOAD-collision).
+- **PR:** feddedz/Roblox-Xonotic#1 (this branch) must merge into `main` before the parallel PRs.
+- **Open owner points:** Q-007 gore (deferred), Q-009 define assists/game passes, Q-010 client code size
+  (≈48 MB); CHAT-SETUP / ROSTER / AUDIO-PLAN specs to restate.
+- **FPS / server tick:** not measurable yet; PERF-SVBENCH [needs Studio] is the early check.
+- **Next step:** M2-RUNNER steps 1-2 (cvar.c + config exec, rest of PRVM_Prog_Load): docs/subsystems/server-runner.md.
 <!-- /§STATUS -->
 
 <!-- §RULES -->
@@ -81,7 +84,9 @@ and behave like the original; DarkPlaces message protocol kept byte-exact, only 
 RemoteEvents (UnreliableRemoteEvent where DP is unreliable). Proven-impossible platform limits, only
 after every technique was tried (log tries + closeness); settings may hide options that control nothing,
 if logged. Roblox policy requirements — **never change content for policy on your own**: put the exact
-guideline in §QUESTIONS and wait.
+guideline in §QUESTIONS and wait. **Owner-approved planned differences (D-018; do not build until the
+owner defines them, Q-009):** own controls for console (gamepad) and mobile (touch) players with *slight*
+gameplay assists for those inputs only; game passes, much later. Keyboard-and-mouse gameplay stays exactly Xonotic.
 
 **Performance.** Server tick keeps up with Xonotic's tick rate (D-005): non-negotiable. Client playable,
 fidelity first: `--!native`/`--!strict` where they help (verify codegen), no hot-path allocations, `buffer`
@@ -99,7 +104,8 @@ Particles: diff sim state vs instrumented DP. Visuals: screenshot process. Data 
 <!-- §TASKS -->
 ## §TASKS
 
-Status: `open` · `claimed by <session> <date>` · `done` · `blocked (<why>)`. Claim = edit + commit + push
+Status: `open` · `claimed by <session> <date>` · `done` · `blocked (<why>)`. **[needs Studio]** = can only be
+checked in Roblox Studio (nobody has it now): prefer headless tasks. Claim = edit + commit + push
 before working. One claimed task per subsystem at a time. Details per task in the linked subsystem doc.
 
 | ID | Title | Status | Files | Deps |
@@ -117,23 +123,38 @@ before working. One claimed task per subsystem at a time. Details per task in th
 | M1-SOUNDS | Sound pipeline: ogg/wav metadata (rate, loop points), upload-ready files | open | tools/sounds/ | M1-VFS |
 | M1-UPLOAD | Open Cloud uploader + `assets/manifest/roblox-ids.tsv`; key via env var, never committed | open | tools/upload/ | M1-TEX, Q-004 |
 | M2-PROGS | progs.dat reader (all 3 .dat) + CFG/reducibility analysis | done | tools/qcaot/progs.py, cfg.py | M1-VFS |
-| M2-INTERP | Straight port of prvm_exec.c + prvm_execprogram.h (reference interpreter for AOT diffing) | open | engine/prvm_exec.luau | M2-PROGS |
-| M2-AOT | QC bytecode → Luau AOT compiler (f32 globals/fields in buffers, one Luau fn per QC fn); plan in docs/subsystems/qcvm.md | open | tools/qcaot/, game/generated/ | M2-PROGS |
-| M2-RUNNER | Headless runner, all builtins stubbed + logged; done = server QC runs worldspawn on a stock map | open | tests/, engine/prvm_*.luau | M2-AOT, M2-INTERP |
+| M2-INTERP | Straight port of prvm_exec.c + prvm_execprogram.h (reference interpreter for AOT diffing) | done (29 semantic tests) | engine/prvm_exec.luau | M2-PROGS |
+| M2-AOT | QC bytecode → Luau AOT compiler (f32 globals/fields in buffers, one Luau fn per QC fn); docs/subsystems/qcvm.md | done v1 (all 25,509 functions == interpreter) |
+| M2-AOT-STRUCT | Structured control flow for reducible CFGs (performance only; must pass qcaot_diff unchanged) | open | tools/qcaot/ | M2-AOT |
+| CHAT-SETUP | Shared session chat requested by the owner; **spec not received by session 017gQiyN, owner to restate** | open | — | — |
+| ROSTER | Session roster (who is working on what, finished flags) requested by the owner; **spec not received by 017gQiyN, owner to restate** | open | — | — |
+| AUDIO-PLAN | Audio plan requested by the owner; **spec not received by 017gQiyN, owner to restate**; related: M8-SOUND | open | docs/subsystems/ | — |
+| PERF-SVBENCH | **[needs Studio]** Benchmark compiled server QC in a Roblox server with native codegen: SV_Frame cost at 30 Hz, worst case per frame (early answer to "does the tick keep up") | open | tests/studio/, game/generated/ | M2-RUNNER |
+| CONTROLS-ASSIST | Console/mobile controls + assists (DIFF-002) | blocked (Q-009) | platform/input | Q-009 |
+| GAMEPASSES | Game passes (DIFF-003) | blocked (Q-009), much later | — | Q-009 |
+| M2-AOT-SHIP | Ship generated code: build step + Rojo mapping + 190k-char modules done (D-020); **[needs Studio]** confirm rojo serve/publish with 380 modules, client load time + memory | partial | tools/qcaot/, game/generated/ | M2-AOT |
+| M2-INTERP-DEBUG | Port tracing/profiling/coverage/watchpoints of prvm_exec.c (console commands use them) | open | engine/prvm_exec.luau | M2-INTERP | tools/qcaot/, game/generated/ | M2-PROGS |
+| M2-RUNNER | Headless runner: rest of PRVM_Prog_Load (required fields/globals of svvm, field lookup), edict alloc, strings, all builtins stubbed + logged; done = server QC runs worldspawn on a stock map | partial, unclaimed (next steps: docs/subsystems/server-runner.md) | tests/, engine/prvm_*.luau, engine/sv_main.luau, engine/svvm_cmds.luau | M2-AOT, M2-INTERP |
 | M2-DEBUG | Rebuild progs.dat from qcsrc with the pinned gmqcc; prove byte-identical; emit line-number debug info | open | tools/qcaot/ | M2-PROGS |
 | REF-DP | Instrumented DarkPlaces (from release source) that records traces, server frames, net messages, particles | open | tools/darkplaces-ref/ | M0-PIN |
-| M3-BSPLOAD | Port model_brush.c (Q3 BSP), model_shared.c, bih.c, collision.c | open | engine/ | M1-RTVFS |
+| M3-BSPLOAD | Port model_brush.c (Q3 BSP), model_shared.c, bih.c, collision.c; headless reads work/vfs-high (Roblox runtime loading needs M1-RTVFS later) | open | engine/ | M1-VFS |
 | M3-TRACEREF | Record ≥1000 traceline/tracebox per stock map from REF-DP | open | tests/reference/traces/ | REF-DP |
 | M3-TRACE | Port world.c/sv traces; bit-identical vs M3-TRACEREF on all stock maps | open | engine/ | M3-BSPLOAD, M3-TRACEREF |
 | M4-* | Server: sv_phys/sv_main/sv_user/sv_move, prvm_*, svvm_cmds builtins, host loop; bot match frame-diff | open (split when M3 done) | engine/ | M2-RUNNER, M3-TRACE |
-| M5-* | Client: map render, models, input, CSQC + prediction, camera/viewmodel | open (split later) | engine/, platform/render, platform/input | M1-*, M4 |
+| M5-* | Client: map render, models, input, CSQC + prediction, camera/viewmodel (CPU logic headless; visual check **[needs Studio]**) | open (split later) | engine/, platform/render, platform/input | M1-*, M4 |
 | M6-NET | DarkPlaces message layer on RemoteEvents, fragmentation, byte-match | open | engine/netconn, platform/net | M4 |
 | M7-* | 2D draw builtins, menu.dat, fonts, DataStore persistence, Credits & License entry | open | engine/, platform/ | M2, M5 |
 | M8-SOUND | Channels, attenuation, spatialisation, timing | open | engine/snd_main, platform/sound | M1-SOUNDS |
-| M9-* | Dlights, shader stages, particles/decals/beams, post-processing, screenshot passes | open | platform/render | M5 |
+| M9-* | Dlights, shader stages, particles/decals/beams, post-processing (sims headless; screenshot passes **[needs Studio]**) | open | platform/render | M5 |
 | TOOL-SHOTDIFF | Screenshot diff tool + camera position list per map + effect scenes | open | tools/shotdiff/, tests/reference/screens/ | — |
 | REF-SHOTS | Capture Ultra reference screenshots from real Xonotic 0.8.6-high | open | tests/reference/screens/ | TOOL-SHOTDIFF |
-| POLICY-1 | Content-ratings questionnaire & asset moderation for blood/gibs (owner decision) | blocked (Q-003) | — | — |
+| POLICY-1 | Content-ratings questionnaire (owner, from docs/policy/gentle-mode.md) | deferred by owner (Q-007) | docs/policy/ | — |
+| CONTENT-POLICY | Switch module (done) + wiring: locked cvars after config load, VFS placeholders, gore-group loader | partial (module done) | platform/contentpolicy, engine/fs, engine/cvar | M1-RTVFS, M7-* |
+| GORE-ASSETS | Classify gore-only assets (gib models+skins, gore sounds, gore-only particle-atlas tiles, stains, damage flash) → `assets/optional/gore/manifest.tsv`; same-name placeholder models/sounds for `removed` (D-019): identical load/precache order and index numbers, no server missing-model error | open | tools/, assets/optional/gore/ | M1-VFS |
+| GORE-MODE-TESTS | Server frame-diff + net byte tests identical in all 3 modes; `removed` runs with zero missing-asset errors | open | tests/ | M4, CONTENT-POLICY, GORE-ASSETS |
+| GENTLE-TESTS | Differential tests for both paths: gib/blood messages and effects with cl_gentle 0 and 1 match real DP | open | tests/ | M4, M9 |
+| STUDIO-TESTS | **[needs Studio]** Run the Studio test place (tests/studio/README.md), results → §GOTCHAS | open (place built) | tests/studio/, studio-tests.project.json | — |
+| VIS-SPECCAL | **[needs Studio]** Specular calibration per texture against Ultra screenshots (docs/subsystems/specular-calibration.md) | open | tools/, assets/data/ | STUDIO-TESTS, REF-SHOTS, M1-TEX |
 | M10/M11 | Full content pass; performance pass | open (later) | — | M9 |
 <!-- /§TASKS -->
 
@@ -220,8 +241,8 @@ Source: `work/source/Xonotic/source/darkplaces/` (`tools/release/fetch.sh source
 | portals.c | 480 | engine port | engine/portals.luau | not started | — |  |
 | protocol.c | 3418 | engine port | engine/protocol.luau | not started | — |  |
 | prvm_cmds.c | 7366 | engine port | engine/prvm_cmds.luau | not started | — |  |
-| prvm_edict.c | 3442 | engine port | engine/prvm_edict.luau | not started | — | progs loading/strings/edicts; reader prototype tools/qcaot/progs.py |
-| prvm_exec.c | 1054 | engine port | engine/prvm_exec.luau | not started | — | reference interpreter (M2-INTERP); AOT replaces the hot path; docs/subsystems/qcvm.md |
+| prvm_edict.c | 3442 | engine port | engine/prvm_edict.luau | partial | tests/unit/prvm_exec.test.luau | PRVM_Prog_Load (to statement checks) + PRVM_GetString done; rest M2-RUNNER |
+| prvm_exec.c | 1054 | engine port | engine/prvm_exec.luau | partial | tests/unit/prvm_exec.test.luau, qcaot_* | Enter/Leave/ExecuteProgram + all opcodes done; debug/profiling not yet (M2-INTERP-DEBUG); docs/subsystems/qcvm.md |
 | r_explosion.c | 285 | engine port | engine/r_explosion.luau | not started | — |  |
 | r_lerpanim.c | 0 | engine port | engine/r_lerpanim.luau | not started | — |  |
 | r_lightning.c | 196 | engine port | engine/r_lightning.luau | not started | — |  |
@@ -244,12 +265,12 @@ Source: `work/source/Xonotic/source/darkplaces/` (`tools/release/fetch.sh source
 | snd_wav.c | 348 | offline tool | — | not started | — | decode offline in tools/sounds; sample metadata kept for engine |
 | snd_win.c | 897 | n/a | — | not started | — | other OS backend |
 | sv_demo.c | 99 | engine port | engine/sv_demo.luau | not started | — |  |
-| sv_main.c | 4089 | engine port | engine/sv_main.luau | not started | — |  |
+| sv_main.c | 4089 | engine port | engine/sv_main.luau | partial | tests/integration/sv_vm_setup.test.luau | SV_VM_Setup up to Prog_Load; docs/subsystems/server-runner.md |
 | sv_move.c | 448 | engine port | engine/sv_move.luau | not started | — |  |
 | sv_phys.c | 3232 | engine port | engine/sv_phys.luau | not started | — |  |
 | sv_user.c | 975 | engine port | engine/sv_user.luau | not started | — |  |
 | svbsp.c | 453 | engine port | engine/svbsp.luau | not started | — |  |
-| svvm_cmds.c | 3862 | engine port | engine/svvm_cmds.luau | not started | — |  |
+| svvm_cmds.c | 3862 | engine port | engine/svvm_cmds.luau | partial | tests/integration/sv_vm_setup.test.luau | builtin table (generated names) + logging stubs; no builtin ported yet |
 | sys_linux.c | 184 | n/a | — | not started | — | other OS backend |
 | sys_sdl.c | 262 | platform | platform/… | not started | — | → platform/boot (time, main loop) |
 | sys_shared.c | 652 | engine port | engine/sys_shared.luau | not started | — |  |
@@ -275,6 +296,9 @@ Source: `work/source/Xonotic/source/darkplaces/` (`tools/release/fetch.sh source
 | platform/net | — | platform | platform/net/init.luau | not started | — | lhnet → RemoteEvent / UnreliableRemoteEvent |
 | platform/input | — | platform | platform/input/init.luau | not started | — | SDL input → UserInputService |
 | platform/storage | — | platform | platform/storage/init.luau | not started | — | fs writes → DataStores |
+| platform/contentpolicy + assets/optional/gore | — | platform | platform/contentpolicy/init.luau | partial | tests/unit/contentpolicy.test.luau | gore isolation switch + separate gore asset group (D-016) |
+| prvm_offsets.h + builtin tables | — | port support | engine/prvm_offsets.luau, engine/_port/builtin_names.luau | done (generated) | tests/integration/sv_vm_setup.test.luau | tools/engine/gen_tables.py from the pinned source |
+| engine/_port/qcrt | — | port support | engine/_port/qcrt.luau | verified vs interpreter | tests/integration/qcaot_diff.test.luau, tests/unit/qcaot_synth.test.luau | AOT runtime (calls, returns, edict access, runaway counter) |
 | engine/_port/f32 | — | port support | engine/_port/f32.luau | verified | tests/unit/f32.test.luau | docs/subsystems/float32.md |
 <!-- /§MAP -->
 
@@ -287,7 +311,9 @@ If it isn't here, it isn't allowed.
 
 | ID | What differs | Tried | Why impossible | Category | Closeness |
 |---|---|---|---|---|---|
-| (none yet) | | | | | |
+| DIFF-002 | **Planned, not built.** Console (gamepad) and mobile (touch) controls with slight gameplay assists, for those inputs only; keyboard-and-mouse stays exactly Xonotic | — (blocked: Q-009) | owner-approved design difference, not a platform limit | owner-approved planned difference (D-018) | to be measured once defined |
+| DIFF-003 | **Planned, not built, much later.** Game passes | — (blocked: Q-009) | owner-approved | owner-approved planned difference (D-018) | — |
+(DIFF-001 withdrawn 2026-11-20, see D-015.)
 
 Candidates already known (become entries when the subsystem lands, after real attempts):
 - FOV above ~133.4° (4:3 horizontal) — Roblox `Camera.FieldOfView` is vertical, clamped 1–120 (G-006).
@@ -297,6 +323,8 @@ Candidates already known (become entries when the subsystem lands, after real at
 
 <!-- §DECISIONS -->
 ## §DECISIONS
+
+One line each; **full text: `docs/decisions.md`** (add new decisions to both). Never contradict; supersede.
 
 **D-001 (2026-11-20) Version pin: Xonotic 0.8.6.** Latest stable per gitlab.com/xonotic tags and
 dl.xonotic.org (checked 2026-11-20; no newer tag). Tags `xonotic-v0.8.6`: xonotic `0100f2c8d794`,
@@ -313,113 +341,88 @@ Data pk3 sha256 (full table + sizes: `assets/manifest/pk3-{standard,high}.tsv`):
 - QuakeC (identical in both builds): progs.dat `e6f5c70b8e0e5f329531ce53ac982eb698a12660a1b45622a900a7bc3bb87a62`,
   csprogs.dat `7d7807166d38521aadb8109830b69580596be4c05924d1b1fd8b71c31d4def13`, menu.dat `dc75076060bac00aacdcd58d6a216cfb33f7a4665a18a622ff970bc73869bbb8`
 
-**D-002 (2026-11-20) Two builds, one version; textures come from `-high`.** Verified: all 3 `.dat` files
-and every non-texture file are byte-identical between `xonotic-0.8.6.zip` and `-high.zip`; only texture
-encoding differs (standard: S3TC DDS; high: original JPEGs + `_alpha` JPEGs). The Ultra preset
-(`effects-ultra.cfg`) sets `r_texture_dds_load 0`, `gl_texturecompression_2d 0`, `gl_picmip -1`, i.e. it
-loads uncompressed originals at full resolution, which exist only in `-high`. So textures come from
-`work/vfs-high/`, everything else may come from either. Reference screenshots: `-high` at Ultra. (Q-001)
-
-**D-003 (2026-11-20) Engine source of truth** = `Xonotic/source/darkplaces/` in the release zip, verified
-byte-identical to darkplaces tag `xonotic-v0.8.6`; `source/qcsrc` identical to xonotic-data tag. Line
-numbers in `-- port:` comments refer to these files.
-
-**D-004 (2026-11-20) Float32 approach.** Luau numbers are doubles. Rules: (a) round to f32 after every C
-float operation (+,−,×,÷,sqrt): one IEEE op in double then one rounding equals the float op exactly
-(binary64 has ≥2·24+2 bits); multi-op expressions round after each op in C evaluation order; (b) every
-store into a float variable/field/global rounds — QC globals and entity fields live in `buffer` f32 slots,
-which round on write; (c) C `double` values (realtime, sv.time, cl.time…) are not rounded; (d) the
-reference build is x86-64 SSE without FMA contraction, so never fuse multiply-add. Helper
-`engine/_port/f32.luau` (`f32.round` = `buffer.writef32/readf32`); `vector.create(x,0,0).x` is equivalent
-(Luau vector components are float32 and vector `+ - *` are computed in float). Both verified bit-exact
-against numpy float32 on 12,025 vectors. Details: `docs/subsystems/float32.md`.
-
-**D-005 (2026-11-20) Tick rate.** `sys_ticrate 0.0333333` (30 Hz; `xonotic-common.cfg` L81 overrides the
-engine default). Client: `cl_netfps 60`, `cl_movement 1` (prediction, server runs player physics per input
-packet), `cl_maxfps 250` (`xonotic-client.cfg`). The Roblox server must sustain 30 Hz SV_Frame plus
-per-move player physics.
-
-**D-006 (2026-11-20) Tooling.** Lune 0.11.1, Rojo 7.7.1, StyLua 2.6.0, Selene 0.31.0 (`rokit.toml`,
-`tools/bootstrap.sh`); offline converters in Python 3 (`tools/requirements.txt`); Selene std `xonotic_std.yml`.
-
-**D-007 (2026-11-20) Requires** use relative string paths only (`./`, `../`, `@self/`), no aliases — same
-resolution in Lune and in Roblox's require-by-string (verified: Roblox docs + Lune test).
-
-**D-008 (2026-11-20) Units.** The engine works in Quake units, unchanged. Conversion to studs happens only
-in `platform/render` through one constant, chosen in M5 after Studio tests of near-plane and light range
-(G-007, G-009, Q-005).
-
-**D-009 (2026-11-20) Visual reference** = Ultra preset exactly as `effects-ultra.cfg` in the pinned data
-(cvar list in `docs/subsystems/visual-reference.md`), on the `-high` build, defaults otherwise.
-
-**D-010 (2026-11-20) Data locations.** Downloads and extracted pk3 contents live in `work/` (gitignored,
-regenerate with `tools/release/fetch.sh` + `tools/pk3/manifest.py --build <b> --extract`). Manifests,
-generated tables and test vectors are committed.
-
-**D-011 (2026-11-20) Session id** = first 8 characters of the Claude session id (e.g. `017gQiyN`). If the
-environment assigns a git branch, use it instead of `<task-id>-<short-name>` and name the task in the PR.
+- **D-002** Two builds of 0.8.6 with identical code and non-texture data; textures from `-high` (Ultra loads uncompressed originals).
+- **D-003** Engine source of truth: `source/darkplaces` in the release = darkplaces tag xonotic-v0.8.6 (byte-identical).
+- **D-004** Float32: round after every C float op and on every float store (buffer f32 slots); doubles stay double; no FMA. `engine/_port/f32.luau`.
+- **D-005** Tick: `sys_ticrate 0.0333333` (30 Hz); client `cl_netfps 60`, `cl_movement 1`, `cl_maxfps 250`.
+- **D-006** Tooling: Lune 0.11.1, Rojo 7.7.1, StyLua 2.6.0, Selene 0.31.0; Python 3 converters; Selene std `xonotic_std.yml`.
+- **D-007** Relative string requires only (same in Lune and Roblox).
+- **D-008** Engine in Quake units; studs only in `platform/render` via one constant (M5).
+- **D-009** Visual reference: `-high` build, Ultra preset (docs/subsystems/visual-reference.md).
+- **D-010** Downloads/extracted data in `work/` (gitignored); manifests, tables, test vectors committed.
+- **D-011** Session id = first 8 chars of the Claude session id; an assigned branch replaces `<task-id>-<name>`.
+- **D-012** `main` is the integration branch; sessions PR into it.
+- **D-013** Owner confirmed D-002.
+- **D-014** (superseded by D-015) gentle mode on by default.
+- **D-015** Blood/gore policy deferred by owner until before publishing (Q-007); `cl_gentle` exactly as Xonotic.
+- **D-016** Gore ported fully but isolated: separate asset group + one `platform/contentpolicy` switch (3 modes); QuakeC never edited.
+- **D-017** (refined by D-020) generated QuakeC not committed.
+- **D-018** Owner-approved planned differences: console/mobile controls with slight assists (those inputs only), game passes later; not built until Q-009; keyboard-and-mouse exact.
+- **D-019** Gore `removed` mode approved: same-name placeholder models/sounds; identical precache order and indices; no server missing-model error.
+- **D-020** Generated QuakeC = reproducible build step (`tools/build.sh`); progs → ServerScriptService, csprogs/menu → ReplicatedStorage; modules ≤ 190k chars.
 <!-- /§DECISIONS -->
 
 <!-- §QUESTIONS -->
 ## §QUESTIONS
 
-- **Q-001 (2026-11-20) Which build is "real Xonotic"?** Ultra disables DDS, and only the `-high` build
-  ships the uncompressed textures it loads. Default taken: textures from `-high` (D-002). Please confirm,
-  and take reference screenshots with the `-high` build.
-- **Q-002 (2026-11-20) Max image size.** Roblox docs conflict: "up to 4096×4096" vs "up to 1024×1024 pixel
+- **Q-002 (2026-11-20, owner: will test later; [needs Studio]) Max image size.** Roblox docs conflict: "up to 4096×4096" vs "up to 1024×1024 pixel
   spaces for texture maps" (G-004). Default taken: tile anything > 1024 (lossless either way). Please test
   in Studio: upload one 2048² and one 4096² image and check whether they display at full resolution.
-- **Q-003 (2026-11-20) Content ratings for blood/gibs.** Roblox requires the IARC content-ratings
-  questionnaire, which asks about violence, blood and gore (create.roblox.com/docs/production/promotion/content-ratings,
-  section "Violence, blood, or gory images", read 2026-11-20). It also says: "Realistic or excessive
-  depictions of violence, blood, crude humor, or romantic themes may be moderated regardless of your game's
-  content ratings" (for uploaded assets). Xonotic has blood particles, decals and gibs. Nothing is changed;
-  you decide how to answer the questionnaire and whether to accept the moderation risk.
-- **Q-004 (2026-11-20) Open Cloud API key** for uploading assets (M1-UPLOAD): needs Assets read+write
+- **Q-007 (2026-11-20) Blood/gore policy: deferred by owner until before publishing.** Covers the content-
+  ratings questionnaire, any gentle-mode default and locking. Until decided: `cl_gentle` exactly as in
+  Xonotic; gore isolated per D-016 so any choice is a one-line `platform/contentpolicy` change. Facts for
+  the questionnaire (both states, and that players can untick gentle mode): docs/policy/gentle-mode.md.
+- **Q-004 (2026-11-20, owner: will provide later) Open Cloud API key** for uploading assets (M1-UPLOAD): needs Assets read+write
   for your account or group. Provide it as a session network secret or local env var, never in the repo.
   Also: upload to your user or a group?
-- **Q-005 (2026-11-20) Studio measurements needed** (cannot be done headless): `Camera.NearPlaneZ` on your
+- **Q-005 (2026-11-20, owner: will test later; [needs Studio]) Studio measurements needed** (cannot be done headless): `Camera.NearPlaneZ` on your
   devices, and the maximum `PointLight.Range` Studio accepts (docs give none). These set the stud scale (D-008).
-- **Q-006 (2026-11-20) Default branch.** The repo was empty, so the first session branch
-  `claude/xonotic-roblox-setup-gb3pjp` became the only (default) branch and no PR could be opened. Please
-  rename it to `main` in GitHub (Settings → Branches) or allow a session to create `main`. Until then,
-  sessions branch from `claude/xonotic-roblox-setup-gb3pjp`. CI runs on PRs and pushes to `main`.
+- **Q-009 (2026-11-20) Define the console/mobile assists and the game passes exactly** (D-018). Needed before
+  any work: which inputs get assists (gamepad, touch), what each assist does (e.g. aim slowdown/magnetism,
+  movement help), its strength and limits, whether it applies in every mode and against keyboard-and-mouse
+  players, and how it is shown. For game passes: what each grants, and confirmation that none changes
+  gameplay balance. Until defined: neither is built; all inputs play exactly like Xonotic.
+- **Q-010 (2026-11-20) Client code size.** Every player would download ≈ 48 MB of bytecode and hold ≈ 53 MB
+  heap for csprogs+menu (G-026; Studio numbers still needed). Options, none changing behaviour (qcaot_diff
+  must stay at zero): (a) structured control flow (removes the ≈ 30% scaffolding; task M2-AOT-STRUCT);
+  (b) compact code generation (shorter emitted forms, shared helpers); (c) hybrid: ship csprogs.dat/menu.dat
+  (≈ 6 MB) and run cold functions on the reference interpreter, compile only hot ones (profile-guided);
+  this departs from "all QC compiled to Luau" for cold code, so it is your call; (d) sound dead-code
+  elimination via call-graph reachability incl. name lookups (risky, likely small); (e) send client code
+  after join (shorter join, same total). Default meanwhile: (a)+(b) next, then measure in Studio.
 <!-- /§QUESTIONS -->
 
 <!-- §GOTCHAS -->
 ## §GOTCHAS
 
-Roblox facts are from create.roblox.com / github.com/Roblox/creator-docs, read 2026-11-20, unless noted.
-- **G-001** EditableImage max size 1024×1024; strict client memory budget (server/Studio unlimited).
-- **G-002** EditableMesh: max 60,000 vertices and 20,000 triangles (quad = 2). Imported mesh assets: max
-  20,000 triangles each (art/modeling/specifications).
-- **G-003** UnreliableRemoteEvent payload > 1000 bytes is dropped. RemoteEvent + UnreliableRemoteEvent
-  share ~500 requests/s per client (client→server). Non-string table keys are converted to strings.
-- **G-004** Image size docs conflict: texture-specifications says "up to 4096×4096", same page's UV
-  section says "up to 1024×1024 pixel spaces". Formats: png, jpg, bmp, tga. (Q-002)
-- **G-005** `Lighting.Technology`: Future is the most advanced selectable; `Unified`, `Compatibility`,
-  `Legacy` are deprecated and cannot be selected.
-- **G-006** `Camera.FieldOfView` is vertical, clamped 1–120°. `FieldOfViewMode` (Vertical/Diagonal/…)
-  decides what stays fixed on resize. DarkPlaces horizontal FOV f on a 4:3 basis gives vertical
-  2·atan(tan(f/2)·3/4), so fov > ~133.4 cannot be shown.
-- **G-007** `Camera.NearPlaneZ` is read-only and "currently always between -0.1 and -0.5" studs, varying by
-  platform. DarkPlaces `r_nearclip` default is 1 qu.
-- **G-008** BasePart Size per axis: 0.001–2048 studs.
-- **G-009** PointLight/SpotLight `Range` has no documented maximum in the API reference (Q-005).
-- **G-010** DataStore: 4,194,304 characters per key value; per-server request limits and queues of 30.
-- **G-011** require-by-string: `./` = script.Parent, `../` = script.Parent.Parent, `@self/` = script,
-  `@game/` = game; non-blocking (no WaitForChild). Lune 0.11 resolves identically (init.luau = folder).
-- **G-012** Selene `generate-roblox-std` fails in cloud sessions (GitHub raw over its own TLS roots), so we use
-  `xonotic_std.yml`. Rokit needs the GitHub API, which is scoped in cloud sessions, so use `tools/bootstrap.sh`.
-- **G-013** Cloud network: dl.xonotic.org, create.roblox.com and github.com release downloads need the
-  "Roblox-Xonotic" environment allowlist; gitlab.com, PyPI, npm and crates are reachable by default.
-  `github.com/<repo>/releases/latest` pages are blocked; only `/releases/download/` works.
-- **G-014** Standard-build map textures exist only as `dds/…dds`, sometimes twice (`dds/x.dds` and
-  `dds/textures/x.dds`). DarkPlaces' image loader has no DDS fallback; DDS loads only via `r_texture_dds_load`.
-- **G-015** DarkPlaces VFS: pk3s sorted with strcasecmp, each prepended → alphabetically last pk3 wins;
-  lookups inside pk3 are case-sensitive. 8 paths are shadowed in 0.8.6 (see manifests' last column).
-- **G-016** JPEG has no alpha: DarkPlaces loads `<name>_alpha.jpg` as the alpha channel (image.c
-  loadimagepixelsbgra). The `-high` build has 2,326 such files; converters must merge them.
-- **G-017** Roblox content ratings: an IARC-based questionnaire; uploaded assets with realistic or excessive
-  blood can be moderated regardless of rating (Q-003).
+One line each; **details and sources: `docs/gotchas.md`** (add to both). Roblox facts read 2026-11-20.
+
+- **G-001** EditableImage max 1024×1024; strict client memory budget.
+- **G-002** EditableMesh ≤ 60,000 vertices / 20,000 triangles; mesh assets ≤ 20,000 triangles.
+- **G-003** UnreliableRemoteEvent payload > 1000 bytes dropped; ~500 remote requests/s per client.
+- **G-004** Image size docs conflict (4096² vs 1024²) → tile at 1024 (Q-002).
+- **G-005** Lighting: Future is the best selectable technology.
+- **G-006** Camera.FieldOfView is vertical, 1–120° → DP fov > ~133.4° not showable.
+- **G-007** Camera.NearPlaneZ read-only, -0.1 to -0.5 studs by platform.
+- **G-008** Part size 0.001–2048 studs per axis.
+- **G-009** Light Range maximum undocumented (Q-005).
+- **G-010** DataStore value ≤ 4,194,304 chars per key; request queues of 30.
+- **G-011** require-by-string semantics (`./`, `../`, `@self/`, `@game/`), non-blocking.
+- **G-012** Selene std generation and Rokit don't work in cloud sessions → `xonotic_std.yml`, `tools/bootstrap.sh`.
+- **G-013** Cloud network needs the "Roblox-Xonotic" environment (dl.xonotic.org, create.roblox.com, GitHub releases).
+- **G-014** Standard-build map textures are DDS-only; DP image loader has no DDS fallback.
+- **G-015** DP VFS: alphabetically last pk3 wins; pk3 lookups case-sensitive.
+- **G-016** JPEG alpha comes from `<name>_alpha.jpg` (2,326 such files in -high).
+- **G-017** Content ratings: IARC questionnaire; realistic blood in assets may be moderated.
+- **G-018** SurfaceAppearance maps only via `AssetService:CreateSurfaceAppearanceAsync` (client-side for EditableImages).
+- **G-019** `Lighting.Technology` only settable in the place file (Rojo `$properties`).
+- **G-020** ViewportFrame: no shadows, no post-processing.
+- **G-021** Runtime mesh route: CreateEditableMesh → CreateMeshPartAsync; CreateEditableImage returns nil when out of budget.
+- **G-022** Lune: relative requires only, no Roblox `Random`; loads all 65 MB of generated QC fine.
+- **G-023** Place ≤ 100 MB; full place with generated QC = 14 MB .rbxl.
+- **G-024** No documented script size limit; DevForum: 200,000 chars via plugin `Source` → modules ≤ 190k chars ([needs Studio] confirm).
+- **G-025** ReplicatedStorage replicates to all clients (bytecode even if unused); server code in ServerScriptService.
+- **G-027** progs.dat declares 3 builtins that are NULL in vm_sv_builtins (#352, #566, #608): keep NULL; real DP errors only if called.
+- **G-028** Xonotic progs crc 5927 == PROGHEADER_CRC, so SV_VM_Setup's entvars_t field-offset branch applies.
+- **G-026** Bytecode ≈ 1.65× source: client ≈ 48 MB download, ≈ 53 MB heap for csprogs+menu (Q-010).
 <!-- /§GOTCHAS -->
