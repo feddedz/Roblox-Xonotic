@@ -16,16 +16,19 @@ Every section except §MAP and §DIFFS stays under ~60 lines; detail lives in `d
 | §GOTCHAS | Verified limits (with date) and hard-won lessons. |
 
 <!-- §STATUS -->
-## §STATUS (rewritten 2026-11-20, session 017gQiyN)
+## §STATUS (rewritten 2026-11-21, session 017gQiyN, finished)
 - **Milestone:** M0 done; M1 partly (VFS, manifests, shaders); M2: interpreter + AOT compiler done (all
-  25,509 QC functions identical compiled vs interpreted); M2-RUNNER partial: real progs.dat loads through
-  SV_VM_Setup and worldspawn runs identically on both with all builtins stubbed.
-- **Build:** `tools/build.sh` → game/generated (never committed, D-020); place builds to 14 MB.
+  25,509 QC functions identical compiled vs interpreted); M2-RUNNER partial (unclaimed): real progs.dat
+  loads via SV_VM_Setup, worldspawn runs identically on both with all builtins stubbed.
+- **Build:** `tools/build.sh` → game/generated (never committed, D-020); full place builds to 14 MB.
 - **Tests:** 6 Lune files (2 skip without game data), 15 Python tests; StyLua/Selene clean.
-- **Parallel sessions running:** REF-DP (session_017gQiyKAbN1VAofn9a3CDvm), M3-BSPLOAD (session_017gQiyJc8jR6adsLPSpNWp8).
-- **Open owner points:** Q-007 gore (deferred), Q-009 define assists/game passes, Q-010 client code size (≈48 MB).
+- **In progress in other sessions (do not take):** REF-DP (session_017gQiyKAbN1VAofn9a3CDvm, branch
+  REF-DP-instrumented-build), M3-BSPLOAD (session_017gQiyJc8jR6adsLPSpNWp8, branch M3-BSPLOAD-collision).
+- **PR:** feddedz/Roblox-Xonotic#1 (this branch) must merge into `main` before the parallel PRs.
+- **Open owner points:** Q-007 gore (deferred), Q-009 define assists/game passes, Q-010 client code size
+  (≈48 MB); CHAT-SETUP / ROSTER / AUDIO-PLAN specs to restate.
 - **FPS / server tick:** not measurable yet; PERF-SVBENCH [needs Studio] is the early check.
-- **Next step:** M2-RUNNER steps 1-2 (cvar.c + config exec, rest of PRVM_Prog_Load), see docs/subsystems/server-runner.md.
+- **Next step:** M2-RUNNER steps 1-2 (cvar.c + config exec, rest of PRVM_Prog_Load): docs/subsystems/server-runner.md.
 <!-- /§STATUS -->
 
 <!-- §RULES -->
@@ -123,6 +126,9 @@ before working. One claimed task per subsystem at a time. Details per task in th
 | M2-INTERP | Straight port of prvm_exec.c + prvm_execprogram.h (reference interpreter for AOT diffing) | done (29 semantic tests) | engine/prvm_exec.luau | M2-PROGS |
 | M2-AOT | QC bytecode → Luau AOT compiler (f32 globals/fields in buffers, one Luau fn per QC fn); docs/subsystems/qcvm.md | done v1 (all 25,509 functions == interpreter) |
 | M2-AOT-STRUCT | Structured control flow for reducible CFGs (performance only; must pass qcaot_diff unchanged) | open | tools/qcaot/ | M2-AOT |
+| CHAT-SETUP | Shared session chat requested by the owner; **spec not received by session 017gQiyN, owner to restate** | open | — | — |
+| ROSTER | Session roster (who is working on what, finished flags) requested by the owner; **spec not received by 017gQiyN, owner to restate** | open | — | — |
+| AUDIO-PLAN | Audio plan requested by the owner; **spec not received by 017gQiyN, owner to restate**; related: M8-SOUND | open | docs/subsystems/ | — |
 | PERF-SVBENCH | **[needs Studio]** Benchmark compiled server QC in a Roblox server with native codegen: SV_Frame cost at 30 Hz, worst case per frame (early answer to "does the tick keep up") | open | tests/studio/, game/generated/ | M2-RUNNER |
 | CONTROLS-ASSIST | Console/mobile controls + assists (DIFF-002) | blocked (Q-009) | platform/input | Q-009 |
 | GAMEPASSES | Game passes (DIFF-003) | blocked (Q-009), much later | — | Q-009 |
