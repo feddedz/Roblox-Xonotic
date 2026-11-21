@@ -231,8 +231,10 @@ def splat_badge(cv: str, av: str, mode: str, sigma: float = 11.0, F: int = 4):
     c = load(cv)
     a = load(av)
     body = a > 128
-    core = erode(fill_holes(largest_component(body)), 3)
-    text = core & (lum(c) > 150)
+    # the word = bright pixels enclosed by the main dark fill (the white outline sits outside the fill)
+    dark = body & (lum(c) < 140)
+    fillreg = fill_holes(largest_component(dark))
+    text = fillreg & ~dark & (lum(c) > 150)
     textzone = dilate(text, 1) & body
     d_old = sdist(body)
     # edge profile of the original (alpha and colour), outside the body and the first pixels inside
@@ -240,8 +242,7 @@ def splat_badge(cv: str, av: str, mode: str, sigma: float = 11.0, F: int = 4):
     # colour profile ignores the leftover droplets: only pixels whose alpha fits the glow are used
     cs, ms = profile(d_old[sel], np.concatenate([a[sel][:, None], c[sel]], 1), -2.5, 60)
     # interior texture: original fill, text removed, extended over the new shape
-    main = fill_holes(largest_component(body))
-    known = erode(main, 6) & ~dilate(text, 2)
+    known = erode(fillreg, 3) & ~dilate(text, 2)
     interior = fill(c, known, False)
     wk = blur(known.astype(np.float64), 1.5, False)[..., None] * known[..., None]
     interior = interior * (1 - wk) + c * wk
@@ -274,7 +275,7 @@ def _neutral_text(c: np.ndarray) -> np.ndarray:
     return np.clip(np.where(y > 150, c, 1.5 * y + 0.1 * (c - y)), 0, 255)
 
 
-def luma_blob(cv: str, av: str, sigma: float = 9.0, F: int = 4, hue_shift: float = 18 / 360):
+def luma_blob(cv: str, av: str, sigma: float = 12.0, F: int = 4, hue_shift: float = 18 / 360):
     """Luma theme: the fall splat (salmon fill, red glow) -> smooth blob, hue moved from red to amber."""
     c = load(cv)
     a = load(av)
@@ -459,6 +460,7 @@ UNCHANGED = {
     "_reflect.jpg": "reflection mask: shape only -> unchanged",
     "_shirt.jpg": "colormap mask (grayscale) -> unchanged",
     "_pants.jpg": "colormap mask (grayscale) -> unchanged",
+    "_alpha.jpg": "alpha mask: shape kept (only the colour image was recoloured) -> unchanged",
 }
 UNCHANGED_FILES = {
     "models/turrets/basedestroyed_glow.jpg": "glow map of a destroyed turret (sparks/embers), no blood -> unchanged",
