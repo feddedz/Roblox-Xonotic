@@ -87,12 +87,18 @@ def main():
     print(f"{len(done)} done, {len(todo)} to upload", flush=True)
     lock, n = threading.Lock(), {"ok": 0, "err": 0, "i": 0}
 
+    stop = threading.Event()
+
     def one(t):
         vpath, sha, p = t
+        if stop.is_set():
+            return
         try:
             res = upload(p, vpath, sha, a.user_id, a.type)
         except RuntimeError as e:
             res = ("", "", "error", str(e)[:300])
+        if "moderated" in res[3] or "403" in res[3]:
+            stop.set()  # account blocked (unacknowledged warning / suspension): stop everything at once
         with lock:
             with open(IDS, "a") as f:
                 f.write("\t".join([sha, vpath, *res[:3], res[3].replace("\t", " ").replace("\n", " ")]) + "\n")
