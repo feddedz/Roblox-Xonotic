@@ -1,6 +1,6 @@
 # HANDOFF — Xonotic → Roblox one-to-one port
 
-Single source of project state. **Do not read this whole file.** Print one section with
+Single source of project state (project overview for people: `WELCOME.md`). **Do not read this whole file.** Print one section with
 `tools/handoff.sh STATUS` (or find its unique marker line `<!-- §NAME -->`; it ends at `<!-- /§NAME -->`).
 Every section except §MAP and §DIFFS stays under ~60 lines; detail lives in `docs/subsystems/`.
 
@@ -16,16 +16,21 @@ Every section except §MAP and §DIFFS stays under ~60 lines; detail lives in `d
 | §GOTCHAS | Verified limits (with date) and hard-won lessons. |
 
 <!-- §STATUS -->
-## §STATUS (rewritten 2026-11-20, session 017gQiyN)
-- **Milestone:** M0 done. M1: VFS/manifests + shader parser done. M2: progs.dat reader + CFG analysis done.
-- **Works:** toolchain bootstrap; pinned release fetch (sha512); DarkPlaces-exact VFS + manifests (both
-  builds); shader table (2,447 shaders); reader for all 3 .dat validated like PRVM_Prog_Load; f32 helper
-  verified bit-exact; Lune runner; CI; Rojo build. Tests: Lune 17,050 checks pass, 15 Python tests pass.
-- **Not yet:** no engine module ported; no texture/model/BSP/sound converters; Studio shows only two
-  `NOT YET PORTED` warnings (expected).
-- **FPS / server tick:** not measurable yet.
-- **Next step:** M2-INTERP + M2-AOT (plan in docs/subsystems/qcvm.md). Independent, parallel-safe:
-  M1-TEX, M1-BSP, REF-DP, M1-RTVFS.
+## §STATUS (rewritten 2026-11-21 late, Claude-Anvil)
+- **Owner's account: 2nd 1-day suspension (G-045).** Ready for after it: every texture reviewed + fixed (D-025/DIFF-008),
+  `assets/manifest/upload-ready.tsv`; order: (1) tools/upload/patch_metadata.py (G-047), (2) owner archives the old
+  assets in assets/manifest/replace-after-review.tsv, (3) gated upload `tools/upload/run_unattended.sh` (8,537 files).
+- **Assets on Roblox:** sounds 804/805 approved (13 bleeped D-022, meet pitch D-023, heavymetal appeal); textures
+  1,752 uploaded (43 of them on the gore list), 55 gore held back (assets/optional/gore/textures.tsv), 9,103 waiting.
+- **Studio-ready:** `tools/build.sh` + `rojo build` → 18 MB place; pressing Play runs Host_Init, the quake.rc config
+  chain (6,075 cvars), SV_VM_Setup + AOT QuakeC, worldspawn, and prints a BOOT REPORT (README step 4).
+- **M2-RUNNER (claimed, Claude-Anvil):** settings complete; strings (utf8lib, tempstrings, zone strings), edicts,
+  string buffers, copyentity ported: **spawnfunc_worldspawn completes** with real cvars, interp == AOT; 42 builtins
+  still stubs; SV_SpawnServer/entity lump need M3 (docs/subsystems/server-runner.md).
+- **Tests:** 10 Lune files, 22 Python tests; StyLua/Selene clean; check_port_lines 0 wrong.
+- **Elsewhere (do not take):** REF-DP, M3-BSPLOAD. **PRs:** #1 (open), #2 (this branch, contains #1).
+- **Owner points:** Q-007 gore, Q-009, Q-010, Q-011 server settings, Q-012 key (saved), Q-013 heavymetal, gore/URL images.
+- **Next:** owner runs Studio Play and sends the BOOT REPORT; M2-RUNNER string builtins; image review step before uploads.
 <!-- /§STATUS -->
 
 <!-- §RULES -->
@@ -81,7 +86,9 @@ and behave like the original; DarkPlaces message protocol kept byte-exact, only 
 RemoteEvents (UnreliableRemoteEvent where DP is unreliable). Proven-impossible platform limits, only
 after every technique was tried (log tries + closeness); settings may hide options that control nothing,
 if logged. Roblox policy requirements — **never change content for policy on your own**: put the exact
-guideline in §QUESTIONS and wait.
+guideline in §QUESTIONS and wait. **Owner-approved planned differences (D-018; do not build until the
+owner defines them, Q-009):** own controls for console (gamepad) and mobile (touch) players with *slight*
+gameplay assists for those inputs only; game passes, much later. Keyboard-and-mouse gameplay stays exactly Xonotic.
 
 **Performance.** Server tick keeps up with Xonotic's tick rate (D-005): non-negotiable. Client playable,
 fidelity first: `--!native`/`--!strict` where they help (verify codegen), no hot-path allocations, `buffer`
@@ -99,7 +106,8 @@ Particles: diff sim state vs instrumented DP. Visuals: screenshot process. Data 
 <!-- §TASKS -->
 ## §TASKS
 
-Status: `open` · `claimed by <session> <date>` · `done` · `blocked (<why>)`. Claim = edit + commit + push
+Status: `open` · `claimed by <session> <date>` · `done` · `blocked (<why>)`. **[needs Studio]** = can only be
+checked in Roblox Studio (nobody has it now): prefer headless tasks. Claim = edit + commit + push
 before working. One claimed task per subsystem at a time. Details per task in the linked subsystem doc.
 
 | ID | Title | Status | Files | Deps |
@@ -109,31 +117,47 @@ before working. One claimed task per subsystem at a time. Details per task in th
 | M0-PIN | Version pin + checksums + tick rate | done | §DECISIONS, tools/release/ | — |
 | M1-VFS | pk3 VFS resolution (fs.c order) + manifests for both builds | done | tools/pk3/, assets/manifest/ | M0-PIN |
 | M1-SHADERS | Parse every shader script → structured table + docs/shaders.md | done | tools/shaders/, assets/data/shaders.json | M1-VFS |
-| M1-RTVFS | Runtime VFS on Roblox: ship engine-read files (bsp, cfg, txt, shader, progs data) as Rojo-syncable chunks; verify script/string size limits | open | tools/pk3/, platform/storage, engine/fs.luau | M1-VFS |
+| M1-RTVFS | (partial 2026-11-21: configs + progs.dat packed by tools/pk3/pack_runtime.py → game/generated/vfs, server provider; Claude-Anvil) Runtime VFS on Roblox: ship engine-read files (bsp, cfg, txt, shader, progs data) as Rojo-syncable chunks; verify script/string size limits | open | tools/pk3/, platform/storage, engine/fs.luau | M1-VFS |
 | M1-TEX | Texture converter: jpg/tga/png + `_alpha` merge exactly as image.c; tile > max size; never downscale | open | tools/textures/ | M1-VFS, Q-002 |
 | M1-LMAP | Lightmap + deluxemap extraction from Q3 BSP at full res | open | tools/bsp/ | M1-VFS |
 | M1-BSP | Q3 BSP → render meshes (split ≤20k tris/≤60k verts), per-surface material refs | open | tools/bsp/ | M1-VFS |
 | M1-MODELS | MD3/IQM/DPM/ZYM/OBJ/ASE/SP2 → meshes, skins, animations (framegroups) | open | tools/models/ | M1-VFS |
-| M1-SOUNDS | Sound pipeline: ogg/wav metadata (rate, loop points), upload-ready files | open | tools/sounds/ | M1-VFS |
+| M1-SOUNDS | Sound pipeline: uploader for assets/manifest/audio-plan.tsv (rate, loop points, packs already planned: docs/subsystems/audio.md), fill asset_id, runtime vpath→asset lookup | partial (Claude-Anvil 2026-11-21): all 805 unique sounds uploaded (user-owned), ids in assets/manifest/roblox-audio.tsv, runtime table platform/sound/audio_assets.luau (851 vpaths); open: 13 rejected by moderation (Q-013), 36 still in review (re-run tools/sounds/check_moderation.py) | tools/sounds/ | M1-VFS |
 | M1-UPLOAD | Open Cloud uploader + `assets/manifest/roblox-ids.tsv`; key via env var, never committed | open | tools/upload/ | M1-TEX, Q-004 |
 | M2-PROGS | progs.dat reader (all 3 .dat) + CFG/reducibility analysis | done | tools/qcaot/progs.py, cfg.py | M1-VFS |
-| M2-INTERP | Straight port of prvm_exec.c + prvm_execprogram.h (reference interpreter for AOT diffing) | open | engine/prvm_exec.luau | M2-PROGS |
-| M2-AOT | QC bytecode → Luau AOT compiler (f32 globals/fields in buffers, one Luau fn per QC fn); plan in docs/subsystems/qcvm.md | open | tools/qcaot/, game/generated/ | M2-PROGS |
-| M2-RUNNER | Headless runner, all builtins stubbed + logged; done = server QC runs worldspawn on a stock map | open | tests/, engine/prvm_*.luau | M2-AOT, M2-INTERP |
+| M2-INTERP | Straight port of prvm_exec.c + prvm_execprogram.h (reference interpreter for AOT diffing) | done (29 semantic tests) | engine/prvm_exec.luau | M2-PROGS |
+| M2-AOT | QC bytecode → Luau AOT compiler (f32 globals/fields in buffers, one Luau fn per QC fn); docs/subsystems/qcvm.md | done v1 (all 25,509 functions == interpreter) |
+| M2-AOT-STRUCT | Structured control flow for reducible CFGs (performance only; must pass qcaot_diff unchanged) | open | tools/qcaot/ | M2-AOT |
+| CHAT-SETUP | Shared session chat (docs/chat/, one append-only file per UTC day, posted to `main` by tools/chat.sh; D-021) | done (Claude-Anvil 2026-11-21) | — | — |
+| ROSTER | Session names Claude-<Word> (WELCOME.md list) + docs/chat/roster.md (name, start, task, status); D-021 | done (Claude-Anvil 2026-11-21) | — | — |
+| AUDIO-PLAN | Audio upload plan: one asset per sound; if over the 30-day quota pack short sounds by group with 0.5 s gaps; dedupe by checksum; manifest slices; related: M8-SOUND, M1-SOUNDS; docs/subsystems/audio.md, tools/sounds/audio_plan.py | done (Claude-Anvil 2026-11-21); no packing needed (G-036: 1,970 uploads left ≥ 805) | docs/subsystems/ | — |
+| PERF-SVBENCH | **[needs Studio]** Benchmark compiled server QC in a Roblox server with native codegen: SV_Frame cost at 30 Hz, worst case per frame (early answer to "does the tick keep up") | open | tests/studio/, game/generated/ | M2-RUNNER |
+| CONTROLS-ASSIST | Console/mobile controls + assists (DIFF-002) | blocked (Q-009) | platform/input | Q-009 |
+| GAMEPASSES | Game passes (DIFF-003) | blocked (Q-009), much later | — | Q-009 |
+| M2-AOT-SHIP | Ship generated code: build step + Rojo mapping + 190k-char modules done (D-020); **[needs Studio]** confirm rojo serve/publish with 380 modules, client load time + memory | partial | tools/qcaot/, game/generated/ | M2-AOT |
+| M2-INTERP-DEBUG | Port tracing/profiling/coverage/watchpoints of prvm_exec.c (console commands use them) | open | engine/prvm_exec.luau | M2-INTERP | tools/qcaot/, game/generated/ | M2-PROGS |
+| M2-RUNNER | Headless runner: rest of PRVM_Prog_Load (required fields/globals of svvm, field lookup), edict alloc, strings, all builtins stubbed + logged; done = server QC runs worldspawn on a stock map | partial, claimed by Claude-Anvil 2026-11-21 (string builtins next; settings done — cvar.c/cmd.c, dedicated Host_Init registrations, quake.rc chain, autocvars, cvar builtins; next: string builtins, edicts, docs/subsystems/server-runner.md) | tests/, engine/prvm_*.luau, engine/sv_main.luau, engine/svvm_cmds.luau | M2-AOT, M2-INTERP |
 | M2-DEBUG | Rebuild progs.dat from qcsrc with the pinned gmqcc; prove byte-identical; emit line-number debug info | open | tools/qcaot/ | M2-PROGS |
+| REF-CVARLIST | From REF-DP's dedicated server after startup: `cvarlist` (name/value/default/flags) and `cmdlist` → tests/reference/cvars/; diff against engine/host.luau's result (validates tools/engine/gen_cvars.py and the config chain) | open | tests/reference/cvars/, tests/integration/ | REF-DP, M2-RUNNER |
 | REF-DP | Instrumented DarkPlaces (from release source) that records traces, server frames, net messages, particles | open | tools/darkplaces-ref/ | M0-PIN |
-| M3-BSPLOAD | Port model_brush.c (Q3 BSP), model_shared.c, bih.c, collision.c | open | engine/ | M1-RTVFS |
+| M3-BSPLOAD | Port model_brush.c (Q3 BSP), model_shared.c, bih.c, collision.c; headless reads work/vfs-high (Roblox runtime loading needs M1-RTVFS later) | open | engine/ | M1-VFS |
 | M3-TRACEREF | Record ≥1000 traceline/tracebox per stock map from REF-DP | open | tests/reference/traces/ | REF-DP |
 | M3-TRACE | Port world.c/sv traces; bit-identical vs M3-TRACEREF on all stock maps | open | engine/ | M3-BSPLOAD, M3-TRACEREF |
 | M4-* | Server: sv_phys/sv_main/sv_user/sv_move, prvm_*, svvm_cmds builtins, host loop; bot match frame-diff | open (split when M3 done) | engine/ | M2-RUNNER, M3-TRACE |
-| M5-* | Client: map render, models, input, CSQC + prediction, camera/viewmodel | open (split later) | engine/, platform/render, platform/input | M1-*, M4 |
+| M5-* | Client: map render, models, input, CSQC + prediction, camera/viewmodel (CPU logic headless; visual check **[needs Studio]**) | open (split later) | engine/, platform/render, platform/input | M1-*, M4 |
 | M6-NET | DarkPlaces message layer on RemoteEvents, fragmentation, byte-match | open | engine/netconn, platform/net | M4 |
 | M7-* | 2D draw builtins, menu.dat, fonts, DataStore persistence, Credits & License entry | open | engine/, platform/ | M2, M5 |
 | M8-SOUND | Channels, attenuation, spatialisation, timing | open | engine/snd_main, platform/sound | M1-SOUNDS |
-| M9-* | Dlights, shader stages, particles/decals/beams, post-processing, screenshot passes | open | platform/render | M5 |
+| M9-* | Dlights, shader stages, particles/decals/beams, post-processing (sims headless; screenshot passes **[needs Studio]**) | open | platform/render | M5 |
 | TOOL-SHOTDIFF | Screenshot diff tool + camera position list per map + effect scenes | open | tools/shotdiff/, tests/reference/screens/ | — |
 | REF-SHOTS | Capture Ultra reference screenshots from real Xonotic 0.8.6-high | open | tests/reference/screens/ | TOOL-SHOTDIFF |
-| POLICY-1 | Content-ratings questionnaire & asset moderation for blood/gibs (owner decision) | blocked (Q-003) | — | — |
+| POLICY-1 | Content-ratings questionnaire (owner, from docs/policy/gentle-mode.md) | deferred by owner (Q-007) | docs/policy/ | — |
+| CONTENT-POLICY | Switch module (done) + wiring: locked cvars after config load, VFS placeholders, gore-group loader | partial (module done) | platform/contentpolicy, engine/fs, engine/cvar | M1-RTVFS, M7-* |
+| GORE-ASSETS | (partial 2026-11-21: 59 textures in assets/optional/gore/textures.tsv, Claude-Anvil) Classify gore-only assets (gib models+skins, gore sounds, gore-only particle-atlas tiles, stains, damage flash) → `assets/optional/gore/manifest.tsv`; same-name placeholder models/sounds for `removed` (D-019): identical load/precache order and index numbers, no server missing-model error | open | tools/, assets/optional/gore/ | M1-VFS |
+| GORE-MODE-TESTS | Server frame-diff + net byte tests identical in all 3 modes; `removed` runs with zero missing-asset errors | open | tests/ | M4, CONTENT-POLICY, GORE-ASSETS |
+| GENTLE-TESTS | Differential tests for both paths: gib/blood messages and effects with cl_gentle 0 and 1 match real DP | open | tests/ | M4, M9 |
+| STUDIO-TESTS | **[needs Studio]** Run the Studio test place (tests/studio/README.md), results → §GOTCHAS | open (place built) | tests/studio/, studio-tests.project.json | — |
+| VIS-SPECCAL | **[needs Studio]** Specular calibration per texture against Ultra screenshots (docs/subsystems/specular-calibration.md) | open | tools/, assets/data/ | STUDIO-TESTS, REF-SHOTS, M1-TEX |
 | M10/M11 | Full content pass; performance pass | open (later) | — | M9 |
 <!-- /§TASKS -->
 
@@ -171,21 +195,21 @@ Source: `work/source/Xonotic/source/darkplaces/` (`tools/release/fetch.sh source
 | cl_video_jamdecode.c | 378 | needs §DIFFS | — | not started | — | video capture/cinematics: check use in Xonotic data before deciding |
 | cl_video_libavw.c | 386 | needs §DIFFS | — | not started | — | video capture/cinematics: check use in Xonotic data before deciding |
 | clvm_cmds.c | 4965 | engine port | engine/clvm_cmds.luau | not started | — |  |
-| cmd.c | 2235 | engine port | engine/cmd.luau | not started | — |  |
+| cmd.c | 2235 | engine port | engine/cmd.luau | partial | unit/cvar_cmd, integration/config_load | Cbuf/tokenizer/$-expansion/alias/exec/set/toggle/defer; client forwarding, csqc commands, completion not yet |
 | collision.c | 1952 | engine port | engine/collision.luau | not started | — |  |
-| common.c | 2312 | engine port | engine/common.luau | not started | — |  |
+| common.c | 2312 | engine port | engine/common.luau | partial | unit/cvar_cmd | COM_ParseToken_Console only |
 | conproc.c | 365 | n/a | — | not started | — | other OS backend |
-| console.c | 3035 | engine port | engine/console.luau | not started | — |  |
+| console.c | 3035 | engine port | engine/console.luau | partial | — | Con_Print/Printf/DPrint(f) to a line sink only |
 | crypto-keygen-standalone.c | 773 | needs §DIFFS | — | not started | — | d0_blind_id player keys → Roblox accounts (allowed diff: accounts) — log in §DIFFS |
 | crypto.c | 2628 | needs §DIFFS | — | not started | — | d0_blind_id player keys → Roblox accounts (allowed diff: accounts) — log in §DIFFS |
 | csprogs.c | 1260 | engine port | engine/csprogs.luau | not started | — |  |
 | curves.c | 440 | engine port | engine/curves.luau | not started | — |  |
-| cvar.c | 1070 | engine port | engine/cvar.luau | not started | — |  |
+| cvar.c | 1070 | engine port | engine/cvar.luau | partial | unit/cvar_cmd, integration/config_load | all of cvar.c; client hooks (CL_SetInfo, SV_BroadcastPrintf notify) log NOT YET PORTED |
 | dpsoftrast.c | 5690 | optional | — | not started | — | optional software-renderer comparison mode |
 | dpvsimpledecode.c | 656 | needs §DIFFS | — | not started | — | video capture/cinematics: check use in Xonotic data before deciding |
-| filematch.c | 223 | engine port | engine/filematch.luau | not started | — |  |
+| filematch.c | 223 | engine port | engine/filematch.luau | partial | unit/cvar_cmd | matchpattern, stringlistsort |
 | fractalnoise.c | 226 | engine port | engine/fractalnoise.luau | not started | — |  |
-| fs.c | 4160 | split | engine/fs.luau | not started | — | VFS order mirrored offline by tools/pk3/vfs.py; CPU logic → engine/, writes → platform/storage |
+| fs.c | 4160 | split | engine/fs.luau | partial | unit/cvar_cmd, integration/config_load | FS_LoadFile/FS_Search/FS_CheckNastyPath over a file provider (G-031 symlinks) |
 | ft2.c | 1693 | split | engine/ft2.luau | not started | — | CPU logic → engine/, GL/OS calls → platform/ |
 | gl_backend.c | 4914 | platform | platform/… | not started | — | → platform/render |
 | gl_draw.c | 2156 | split | engine/gl_draw.luau | not started | — | CPU logic → engine/, GL/OS calls → platform/ |
@@ -193,8 +217,8 @@ Source: `work/source/Xonotic/source/darkplaces/` (`tools/release/fetch.sh source
 | gl_rsurf.c | 1643 | split | engine/gl_rsurf.luau | not started | — | CPU logic → engine/, GL/OS calls → platform/ |
 | gl_textures.c | 3179 | platform | platform/… | not started | — | → platform/render |
 | hmac.c | 61 | needs §DIFFS | — | not started | — | d0_blind_id player keys → Roblox accounts (allowed diff: accounts) — log in §DIFFS |
-| host.c | 1468 | engine port | engine/host.luau | not started | — |  |
-| host_cmd.c | 3109 | engine port | engine/host_cmd.luau | not started | — |  |
+| host.c | 1468 | engine port | engine/host.luau | partial | integration/config_load | dedicated Host_Init registrations (engine/_port/sv_init_defs.luau, tools/engine/gen_cvars.py) + config chain |
+| host_cmd.c | 3109 | engine port | engine/host_cmd.luau | partial | integration/config_load | MaxPlayers_f; other commands are logging stubs |
 | image.c | 1649 | offline tool | — | not started | — | decode offline in tools/textures; runtime image API → platform/render |
 | image_png.c | 561 | offline tool | — | not started | — | decode offline in tools/textures; runtime image API → platform/render |
 | jpeg.c | 1114 | offline tool | — | not started | — | decode offline in tools/textures; runtime image API → platform/render |
@@ -219,9 +243,9 @@ Source: `work/source/Xonotic/source/darkplaces/` (`tools/release/fetch.sh source
 | polygon.c | 310 | engine port | engine/polygon.luau | not started | — |  |
 | portals.c | 480 | engine port | engine/portals.luau | not started | — |  |
 | protocol.c | 3418 | engine port | engine/protocol.luau | not started | — |  |
-| prvm_cmds.c | 7366 | engine port | engine/prvm_cmds.luau | not started | — |  |
-| prvm_edict.c | 3442 | engine port | engine/prvm_edict.luau | not started | — | progs loading/strings/edicts; reader prototype tools/qcaot/progs.py |
-| prvm_exec.c | 1054 | engine port | engine/prvm_exec.luau | not started | — | reference interpreter (M2-INTERP); AOT replaces the hot path; docs/subsystems/qcvm.md |
+| prvm_cmds.c | 7366 | engine port | engine/prvm_cmds.luau | partial | integration/sv_config_worldspawn | cvar builtins (cvar, cvar_string/defstring/description/type, cvar_set, registercvar) |
+| prvm_edict.c | 3442 | engine port | engine/prvm_edict.luau | partial | tests/unit/prvm_exec.test.luau | PRVM_Prog_Load (to statement checks) + PRVM_GetString done; rest M2-RUNNER |
+| prvm_exec.c | 1054 | engine port | engine/prvm_exec.luau | partial | tests/unit/prvm_exec.test.luau, qcaot_* | Enter/Leave/ExecuteProgram + all opcodes done; debug/profiling not yet (M2-INTERP-DEBUG); docs/subsystems/qcvm.md |
 | r_explosion.c | 285 | engine port | engine/r_explosion.luau | not started | — |  |
 | r_lerpanim.c | 0 | engine port | engine/r_lerpanim.luau | not started | — |  |
 | r_lightning.c | 196 | engine port | engine/r_lightning.luau | not started | — |  |
@@ -244,12 +268,12 @@ Source: `work/source/Xonotic/source/darkplaces/` (`tools/release/fetch.sh source
 | snd_wav.c | 348 | offline tool | — | not started | — | decode offline in tools/sounds; sample metadata kept for engine |
 | snd_win.c | 897 | n/a | — | not started | — | other OS backend |
 | sv_demo.c | 99 | engine port | engine/sv_demo.luau | not started | — |  |
-| sv_main.c | 4089 | engine port | engine/sv_main.luau | not started | — |  |
+| sv_main.c | 4089 | engine port | engine/sv_main.luau | partial | tests/integration/sv_vm_setup.test.luau | SV_VM_Setup up to Prog_Load; docs/subsystems/server-runner.md |
 | sv_move.c | 448 | engine port | engine/sv_move.luau | not started | — |  |
 | sv_phys.c | 3232 | engine port | engine/sv_phys.luau | not started | — |  |
 | sv_user.c | 975 | engine port | engine/sv_user.luau | not started | — |  |
 | svbsp.c | 453 | engine port | engine/svbsp.luau | not started | — |  |
-| svvm_cmds.c | 3862 | engine port | engine/svvm_cmds.luau | not started | — |  |
+| svvm_cmds.c | 3862 | engine port | engine/svvm_cmds.luau | partial | tests/integration/sv_vm_setup.test.luau | builtin table (generated names) + logging stubs; no builtin ported yet |
 | sys_linux.c | 184 | n/a | — | not started | — | other OS backend |
 | sys_sdl.c | 262 | platform | platform/… | not started | — | → platform/boot (time, main loop) |
 | sys_shared.c | 652 | engine port | engine/sys_shared.luau | not started | — |  |
@@ -275,6 +299,9 @@ Source: `work/source/Xonotic/source/darkplaces/` (`tools/release/fetch.sh source
 | platform/net | — | platform | platform/net/init.luau | not started | — | lhnet → RemoteEvent / UnreliableRemoteEvent |
 | platform/input | — | platform | platform/input/init.luau | not started | — | SDL input → UserInputService |
 | platform/storage | — | platform | platform/storage/init.luau | not started | — | fs writes → DataStores |
+| platform/contentpolicy + assets/optional/gore | — | platform | platform/contentpolicy/init.luau | partial | tests/unit/contentpolicy.test.luau | gore isolation switch + separate gore asset group (D-016) |
+| prvm_offsets.h + builtin tables | — | port support | engine/prvm_offsets.luau, engine/_port/builtin_names.luau | done (generated) | tests/integration/sv_vm_setup.test.luau | tools/engine/gen_tables.py from the pinned source |
+| engine/_port/qcrt | — | port support | engine/_port/qcrt.luau | verified vs interpreter | tests/integration/qcaot_diff.test.luau, tests/unit/qcaot_synth.test.luau | AOT runtime (calls, returns, edict access, runaway counter) |
 | engine/_port/f32 | — | port support | engine/_port/f32.luau | verified | tests/unit/f32.test.luau | docs/subsystems/float32.md |
 <!-- /§MAP -->
 
@@ -287,7 +314,14 @@ If it isn't here, it isn't allowed.
 
 | ID | What differs | Tried | Why impossible | Category | Closeness |
 |---|---|---|---|---|---|
-| (none yet) | | | | | |
+| DIFF-002 | **Planned, not built.** Console (gamepad) and mobile (touch) controls with slight gameplay assists, for those inputs only; keyboard-and-mouse stays exactly Xonotic | — (blocked: Q-009) | owner-approved design difference, not a platform limit | owner-approved planned difference (D-018) | to be measured once defined |
+| DIFF-003 | **Planned, not built, much later.** Game passes | — (blocked: Q-009) | owner-approved | owner-approved planned difference (D-018) | — |
+| DIFF-004 | Roblox asset of `sound/misc/null.wav` and `sound/menu/close.ogg` (4 samples each, all silent) is a 16-bit WAV of exactly those samples padded with silence to 0.05 s | uploading the original files: rejected ("Audio duration too long", really a minimum length, G-037) | Roblox audio minimum length | proven platform limit | audibly identical; engine timing uses the original files' lengths (M8) |
+| DIFF-005 | 13 voice lines (Q-013 list) play with the profanity bleeped ("bitch", "retard", "pussy", "ass" → 1 kHz tone); timing/length identical | uploading the originals and one identical retry: rejected by Roblox moderation | Roblox Community Rules for audio | Roblox policy, owner decision D-022 | everything except the bleeped words is sample-identical |
+| DIFF-006 | soldier/coms/meet: besides the DIFF-005 bleep (wider: mid "your".."to"), pitch +3% (≈ half a semitone), same length | bleep only (2 versions): rejected | Roblox moderation (likely matched to the rejected recording) | Roblox policy, owner decision D-023 | slight pitch change; timing identical |
+| DIFF-007 | Textures with web addresses / phone-number text: those text areas blurred (list + boxes in assets/manifest, tool tools/upload/blur_text.py) | uploading as-is: account warnings + 2 one-day suspensions (off-platform links) | Roblox Community Standards (off-platform links) | Roblox policy, owner decision D-024 | only the text areas differ |
+| DIFF-008 | 106 textures changed for Roblox (gore: splat icons → blobs, blood decals → soot, stains → grime, gibs/flesh → rock; text: URLs/IP/phone digits/"NO PORNOGRAPHIC..."/"PILLS"/crude lines/brands removed or blurred). Lists: assets/manifest/review/{gore_fixes,content_fixes}.tsv; tools/upload/{gore_fix,content_fix,blur_text}.py; set: tools/upload/build_ready.py → assets/manifest/upload-ready.tsv | originals uploaded: warnings + 2 suspensions | Roblox Community Standards | Roblox policy, owner decisions D-022/D-024/D-025 | only the listed areas differ |
+(DIFF-001 withdrawn 2026-11-20, see D-015.)
 
 Candidates already known (become entries when the subsystem lands, after real attempts):
 - FOV above ~133.4° (4:3 horizontal) — Roblox `Camera.FieldOfView` is vertical, clamped 1–120 (G-006).
@@ -297,6 +331,8 @@ Candidates already known (become entries when the subsystem lands, after real at
 
 <!-- §DECISIONS -->
 ## §DECISIONS
+
+One line each; **full text: `docs/decisions.md`** (add new decisions to both). Never contradict; supersede.
 
 **D-001 (2026-11-20) Version pin: Xonotic 0.8.6.** Latest stable per gitlab.com/xonotic tags and
 dl.xonotic.org (checked 2026-11-20; no newer tag). Tags `xonotic-v0.8.6`: xonotic `0100f2c8d794`,
@@ -313,113 +349,145 @@ Data pk3 sha256 (full table + sizes: `assets/manifest/pk3-{standard,high}.tsv`):
 - QuakeC (identical in both builds): progs.dat `e6f5c70b8e0e5f329531ce53ac982eb698a12660a1b45622a900a7bc3bb87a62`,
   csprogs.dat `7d7807166d38521aadb8109830b69580596be4c05924d1b1fd8b71c31d4def13`, menu.dat `dc75076060bac00aacdcd58d6a216cfb33f7a4665a18a622ff970bc73869bbb8`
 
-**D-002 (2026-11-20) Two builds, one version; textures come from `-high`.** Verified: all 3 `.dat` files
-and every non-texture file are byte-identical between `xonotic-0.8.6.zip` and `-high.zip`; only texture
-encoding differs (standard: S3TC DDS; high: original JPEGs + `_alpha` JPEGs). The Ultra preset
-(`effects-ultra.cfg`) sets `r_texture_dds_load 0`, `gl_texturecompression_2d 0`, `gl_picmip -1`, i.e. it
-loads uncompressed originals at full resolution, which exist only in `-high`. So textures come from
-`work/vfs-high/`, everything else may come from either. Reference screenshots: `-high` at Ultra. (Q-001)
-
-**D-003 (2026-11-20) Engine source of truth** = `Xonotic/source/darkplaces/` in the release zip, verified
-byte-identical to darkplaces tag `xonotic-v0.8.6`; `source/qcsrc` identical to xonotic-data tag. Line
-numbers in `-- port:` comments refer to these files.
-
-**D-004 (2026-11-20) Float32 approach.** Luau numbers are doubles. Rules: (a) round to f32 after every C
-float operation (+,−,×,÷,sqrt): one IEEE op in double then one rounding equals the float op exactly
-(binary64 has ≥2·24+2 bits); multi-op expressions round after each op in C evaluation order; (b) every
-store into a float variable/field/global rounds — QC globals and entity fields live in `buffer` f32 slots,
-which round on write; (c) C `double` values (realtime, sv.time, cl.time…) are not rounded; (d) the
-reference build is x86-64 SSE without FMA contraction, so never fuse multiply-add. Helper
-`engine/_port/f32.luau` (`f32.round` = `buffer.writef32/readf32`); `vector.create(x,0,0).x` is equivalent
-(Luau vector components are float32 and vector `+ - *` are computed in float). Both verified bit-exact
-against numpy float32 on 12,025 vectors. Details: `docs/subsystems/float32.md`.
-
-**D-005 (2026-11-20) Tick rate.** `sys_ticrate 0.0333333` (30 Hz; `xonotic-common.cfg` L81 overrides the
-engine default). Client: `cl_netfps 60`, `cl_movement 1` (prediction, server runs player physics per input
-packet), `cl_maxfps 250` (`xonotic-client.cfg`). The Roblox server must sustain 30 Hz SV_Frame plus
-per-move player physics.
-
-**D-006 (2026-11-20) Tooling.** Lune 0.11.1, Rojo 7.7.1, StyLua 2.6.0, Selene 0.31.0 (`rokit.toml`,
-`tools/bootstrap.sh`); offline converters in Python 3 (`tools/requirements.txt`); Selene std `xonotic_std.yml`.
-
-**D-007 (2026-11-20) Requires** use relative string paths only (`./`, `../`, `@self/`), no aliases — same
-resolution in Lune and in Roblox's require-by-string (verified: Roblox docs + Lune test).
-
-**D-008 (2026-11-20) Units.** The engine works in Quake units, unchanged. Conversion to studs happens only
-in `platform/render` through one constant, chosen in M5 after Studio tests of near-plane and light range
-(G-007, G-009, Q-005).
-
-**D-009 (2026-11-20) Visual reference** = Ultra preset exactly as `effects-ultra.cfg` in the pinned data
-(cvar list in `docs/subsystems/visual-reference.md`), on the `-high` build, defaults otherwise.
-
-**D-010 (2026-11-20) Data locations.** Downloads and extracted pk3 contents live in `work/` (gitignored,
-regenerate with `tools/release/fetch.sh` + `tools/pk3/manifest.py --build <b> --extract`). Manifests,
-generated tables and test vectors are committed.
-
-**D-011 (2026-11-20) Session id** = first 8 characters of the Claude session id (e.g. `017gQiyN`). If the
-environment assigns a git branch, use it instead of `<task-id>-<short-name>` and name the task in the PR.
+- **D-002** Two builds of 0.8.6 with identical code and non-texture data; textures from `-high` (Ultra loads uncompressed originals).
+- **D-003** Engine source of truth: `source/darkplaces` in the release = darkplaces tag xonotic-v0.8.6 (byte-identical).
+- **D-004** Float32: round after every C float op and on every float store (buffer f32 slots); doubles stay double; no FMA. `engine/_port/f32.luau`.
+- **D-005** Tick: `sys_ticrate 0.0333333` (30 Hz); client `cl_netfps 60`, `cl_movement 1`, `cl_maxfps 250`.
+- **D-006** Tooling: Lune 0.11.1, Rojo 7.7.1, StyLua 2.6.0, Selene 0.31.0; Python 3 converters; Selene std `xonotic_std.yml`.
+- **D-007** Relative string requires only (same in Lune and Roblox).
+- **D-008** Engine in Quake units; studs only in `platform/render` via one constant (M5).
+- **D-009** Visual reference: `-high` build, Ultra preset (docs/subsystems/visual-reference.md).
+- **D-010** Downloads/extracted data in `work/` (gitignored); manifests, tables, test vectors committed.
+- **D-011** Session id = first 8 chars of the Claude session id; an assigned branch replaces `<task-id>-<name>`.
+- **D-012** `main` is the integration branch; sessions PR into it.
+- **D-013** Owner confirmed D-002.
+- **D-014** (superseded by D-015) gentle mode on by default.
+- **D-015** Blood/gore policy deferred by owner until before publishing (Q-007); `cl_gentle` exactly as Xonotic.
+- **D-016** Gore ported fully but isolated: separate asset group + one `platform/contentpolicy` switch (3 modes); QuakeC never edited.
+- **D-017** (refined by D-020) generated QuakeC not committed.
+- **D-018** Owner-approved planned differences: console/mobile controls with slight assists (those inputs only), game passes later; not built until Q-009; keyboard-and-mouse exact.
+- **D-019** Gore `removed` mode approved: same-name placeholder models/sounds; identical precache order and indices; no server missing-model error.
+- **D-020** Generated QuakeC = reproducible build step (`tools/build.sh`); progs → ServerScriptService, csprogs/menu → ReplicatedStorage; modules ≤ 190k chars.
+- **D-021** Session names + chat (owner, 2026-11-21): each session is `Claude-<Word>` (WELCOME.md list, unique per
+  docs/chat/roster.md) and uses it in chat, logs, claims and commits (`T-014 [Claude-Zigzag] ...`); replaces
+  D-011's session id. Chat = docs/chat/YYYY-MM-DD.md on `main`, append-only, posted by tools/chat.sh straight to
+  `main` (chat-only commits; the only direct pushes to `main`), retried from the new main on rejection;
+  `merge=union` for docs/chat/*.md. HANDOFF.md stays the record (docs/chat/README.md).
+- **D-022** (owner, 2026-11-21) Voice lines rejected by Roblox moderation for profanity get the bad words bleeped
+  (1 kHz tone over exactly the word, same length), everything else untouched; tools/sounds/censor_voice.py,
+  DIFF-005. Applies to the 13 lines of Q-013; heavymetal.ogg (music, no profanity) stays original for an appeal.
+- **D-023** (owner, 2026-11-21) "Tweak a bit" to pass moderation without appeals: soldier/coms/meet = censored v2
+  + pitch +3% (rubberband, formants kept, same length) → approved; heavymetal.ogg pitch +3% → still rejected.
+- **D-024** (owner, 2026-11-21) Textures with web addresses ("xonotic.org" etc.) or phone-number-like text get only
+  those text areas blurred for the Roblox upload; everything else and the originals stay unchanged (DIFF-007).
+- **D-025** (owner, 2026-11-21 night) Every asset must reach the game; anything against Roblox rules is changed as subtly
+  as possible (owner's example: blood-splat kill-feed icons → irregular rounded blobs). Done by 6 review agents (all
+  10,910 textures: content sheets + zoomed text sheets) and 2 fix agents; DIFF-008.
 <!-- /§DECISIONS -->
 
 <!-- §QUESTIONS -->
 ## §QUESTIONS
 
-- **Q-001 (2026-11-20) Which build is "real Xonotic"?** Ultra disables DDS, and only the `-high` build
-  ships the uncompressed textures it loads. Default taken: textures from `-high` (D-002). Please confirm,
-  and take reference screenshots with the `-high` build.
-- **Q-002 (2026-11-20) Max image size.** Roblox docs conflict: "up to 4096×4096" vs "up to 1024×1024 pixel
+- **Q-002 (2026-11-20, owner: will test later; [needs Studio]) Max image size.** Roblox docs conflict: "up to 4096×4096" vs "up to 1024×1024 pixel
   spaces for texture maps" (G-004). Default taken: tile anything > 1024 (lossless either way). Please test
   in Studio: upload one 2048² and one 4096² image and check whether they display at full resolution.
-- **Q-003 (2026-11-20) Content ratings for blood/gibs.** Roblox requires the IARC content-ratings
-  questionnaire, which asks about violence, blood and gore (create.roblox.com/docs/production/promotion/content-ratings,
-  section "Violence, blood, or gory images", read 2026-11-20). It also says: "Realistic or excessive
-  depictions of violence, blood, crude humor, or romantic themes may be moderated regardless of your game's
-  content ratings" (for uploaded assets). Xonotic has blood particles, decals and gibs. Nothing is changed;
-  you decide how to answer the questionnaire and whether to accept the moderation risk.
-- **Q-004 (2026-11-20) Open Cloud API key** for uploading assets (M1-UPLOAD): needs Assets read+write
+- **Q-007 (2026-11-20) Blood/gore policy: deferred by owner until before publishing.** Covers the content-
+  ratings questionnaire, any gentle-mode default and locking. Until decided: `cl_gentle` exactly as in
+  Xonotic; gore isolated per D-016 so any choice is a one-line `platform/contentpolicy` change. Facts for
+  the questionnaire (both states, and that players can untick gentle mode): docs/policy/gentle-mode.md.
+- **Q-004 (2026-11-20, owner: will provide later) Open Cloud API key** for uploading assets (M1-UPLOAD): needs Assets read+write
   for your account or group. Provide it as a session network secret or local env var, never in the repo.
   Also: upload to your user or a group?
-- **Q-005 (2026-11-20) Studio measurements needed** (cannot be done headless): `Camera.NearPlaneZ` on your
+- **Q-005 (2026-11-20, owner: will test later; [needs Studio]) Studio measurements needed** (cannot be done headless): `Camera.NearPlaneZ` on your
   devices, and the maximum `PointLight.Range` Studio accepts (docs give none). These set the stud scale (D-008).
-- **Q-006 (2026-11-20) Default branch.** The repo was empty, so the first session branch
-  `claude/xonotic-roblox-setup-gb3pjp` became the only (default) branch and no PR could be opened. Please
-  rename it to `main` in GitHub (Settings → Branches) or allow a session to create `main`. Until then,
-  sessions branch from `claude/xonotic-roblox-setup-gb3pjp`. CI runs on PRs and pushes to `main`.
+- **Q-009 (2026-11-20) Define the console/mobile assists and the game passes exactly** (D-018). Needed before
+  any work: which inputs get assists (gamepad, touch), what each assist does (e.g. aim slowdown/magnetism,
+  movement help), its strength and limits, whether it applies in every mode and against keyboard-and-mouse
+  players, and how it is shown. For game passes: what each grants, and confirmation that none changes
+  gameplay balance. Until defined: neither is built; all inputs play exactly like Xonotic.
+- **Q-010 (2026-11-20) Client code size.** Every player would download ≈ 48 MB of bytecode and hold ≈ 53 MB
+  heap for csprogs+menu (G-026; Studio numbers still needed). Options, none changing behaviour (qcaot_diff
+  must stay at zero): (a) structured control flow (removes the ≈ 30% scaffolding; task M2-AOT-STRUCT);
+  (b) compact code generation (shorter emitted forms, shared helpers); (c) hybrid: ship csprogs.dat/menu.dat
+  (≈ 6 MB) and run cold functions on the reference interpreter, compile only hot ones (profile-guided);
+  this departs from "all QC compiled to Luau" for cold code, so it is your call; (d) sound dead-code
+  elimination via call-graph reachability incl. name lookups (risky, likely small); (e) send client code
+  after join (shorter join, same total). Default meanwhile: (a)+(b) next, then measure in Studio.
+- **Q-011 (2026-11-21, Claude-Anvil) Server settings on Roblox.** A real Xonotic dedicated server is started
+  with a command line and usually `+exec server.cfg` (hostname, player limit, map list, game type). The port
+  now loads exactly the stock chain (quake.rc → default.cfg → … → post-config.cfg) and nothing else; player
+  limit = DP default 8 at startup, and quake.rc's `maxplayers $menu_maxplayers` makes it 16 from the next map.
+  Which player limit and server.cfg should Roblox servers use? Default meanwhile: stock chain only.
+- **Q-012 (2026-11-21, Claude-Anvil) Roblox Open Cloud API key + user/group id.** Scopes for the whole project
+  in G-035: assets Read+Write (quota, all uploads), universe-places Write (publish), Luau execution sessions
+  Read+Write (automated tests on real Roblox servers), optional asset-permissions Write. The key is entered through the
+  session's secure credential form (never in chat or the repo) when M1-SOUNDS starts.
+- **Q-013 (2026-11-21, Claude-Anvil) 13 sounds rejected by Roblox moderation** (no reason given; list in
+  assets/manifest/roblox-audio-moderation.tsv): 12 voice-set taunts/team messages (carni-lycan needhelp2,
+  taunt1, teamshoot3; pyria-skadi taunt1, taunt5, teamshoot2; robot needhelp2; soldier meet, taunt2; specop
+  taunt1, taunt4, teamshoot2) and music track cdtracks/heavymetal.ogg. Not changed or re-uploaded (rules:
+  never change content for policy on our own; re-uploading identical rejected audio risks account moderation).
+  Your options: appeal in the Creator Dashboard / via Roblox support, or decide what the game should do
+  with them (would be a §DIFFS entry). Until then those sounds have no usable asset (silent in game).
+  Update 2026-11-21 (owner asked to retry): recheck → 785 approved, 14 rejected (+ marine/coms/teamshoot3),
+  6 reviewing. One identical re-upload (robot needhelp2 → asset 120983016932971) was rejected instantly
+  (file recognised), so the other 13 were NOT retried. **Owner decided (D-022): bleep the bad words**; the 13
+  censored versions were uploaded: 12 approved. soldier/coms/meet ("get your ass to the waypoint") rejected
+  again twice (word bleep, then mid "your"..mid "to" bleep): probably matched to the rejected recording;
+  stopped retrying (account strikes). meet.ogg approved after pitch +3% (D-023, DIFF-006). Still open: heavymetal.ogg (instrumental, likely a false
+  copyright match; original + pitch +3% both rejected) → appeal, or owner decides on a bigger change.
 <!-- /§QUESTIONS -->
 
 <!-- §GOTCHAS -->
 ## §GOTCHAS
 
-Roblox facts are from create.roblox.com / github.com/Roblox/creator-docs, read 2026-11-20, unless noted.
-- **G-001** EditableImage max size 1024×1024; strict client memory budget (server/Studio unlimited).
-- **G-002** EditableMesh: max 60,000 vertices and 20,000 triangles (quad = 2). Imported mesh assets: max
-  20,000 triangles each (art/modeling/specifications).
-- **G-003** UnreliableRemoteEvent payload > 1000 bytes is dropped. RemoteEvent + UnreliableRemoteEvent
-  share ~500 requests/s per client (client→server). Non-string table keys are converted to strings.
-- **G-004** Image size docs conflict: texture-specifications says "up to 4096×4096", same page's UV
-  section says "up to 1024×1024 pixel spaces". Formats: png, jpg, bmp, tga. (Q-002)
-- **G-005** `Lighting.Technology`: Future is the most advanced selectable; `Unified`, `Compatibility`,
-  `Legacy` are deprecated and cannot be selected.
-- **G-006** `Camera.FieldOfView` is vertical, clamped 1–120°. `FieldOfViewMode` (Vertical/Diagonal/…)
-  decides what stays fixed on resize. DarkPlaces horizontal FOV f on a 4:3 basis gives vertical
-  2·atan(tan(f/2)·3/4), so fov > ~133.4 cannot be shown.
-- **G-007** `Camera.NearPlaneZ` is read-only and "currently always between -0.1 and -0.5" studs, varying by
-  platform. DarkPlaces `r_nearclip` default is 1 qu.
-- **G-008** BasePart Size per axis: 0.001–2048 studs.
-- **G-009** PointLight/SpotLight `Range` has no documented maximum in the API reference (Q-005).
-- **G-010** DataStore: 4,194,304 characters per key value; per-server request limits and queues of 30.
-- **G-011** require-by-string: `./` = script.Parent, `../` = script.Parent.Parent, `@self/` = script,
-  `@game/` = game; non-blocking (no WaitForChild). Lune 0.11 resolves identically (init.luau = folder).
-- **G-012** Selene `generate-roblox-std` fails in cloud sessions (GitHub raw over its own TLS roots), so we use
-  `xonotic_std.yml`. Rokit needs the GitHub API, which is scoped in cloud sessions, so use `tools/bootstrap.sh`.
-- **G-013** Cloud network: dl.xonotic.org, create.roblox.com and github.com release downloads need the
-  "Roblox-Xonotic" environment allowlist; gitlab.com, PyPI, npm and crates are reachable by default.
-  `github.com/<repo>/releases/latest` pages are blocked; only `/releases/download/` works.
-- **G-014** Standard-build map textures exist only as `dds/…dds`, sometimes twice (`dds/x.dds` and
-  `dds/textures/x.dds`). DarkPlaces' image loader has no DDS fallback; DDS loads only via `r_texture_dds_load`.
-- **G-015** DarkPlaces VFS: pk3s sorted with strcasecmp, each prepended → alphabetically last pk3 wins;
-  lookups inside pk3 are case-sensitive. 8 paths are shadowed in 0.8.6 (see manifests' last column).
-- **G-016** JPEG has no alpha: DarkPlaces loads `<name>_alpha.jpg` as the alpha channel (image.c
-  loadimagepixelsbgra). The `-high` build has 2,326 such files; converters must merge them.
-- **G-017** Roblox content ratings: an IARC-based questionnaire; uploaded assets with realistic or excessive
-  blood can be moderated regardless of rating (Q-003).
+One line each; **details and sources: `docs/gotchas.md`** (add to both). Roblox facts read 2026-11-20.
+
+- **G-001** EditableImage max 1024×1024; strict client memory budget.
+- **G-002** EditableMesh ≤ 60,000 vertices / 20,000 triangles; mesh assets ≤ 20,000 triangles.
+- **G-003** UnreliableRemoteEvent payload > 1000 bytes dropped; ~500 remote requests/s per client.
+- **G-004** Image size docs conflict (4096² vs 1024²) → tile at 1024 (Q-002).
+- **G-005** Lighting: Future is the best selectable technology.
+- **G-006** Camera.FieldOfView is vertical, 1–120° → DP fov > ~133.4° not showable.
+- **G-007** Camera.NearPlaneZ read-only, -0.1 to -0.5 studs by platform.
+- **G-008** Part size 0.001–2048 studs per axis.
+- **G-009** Light Range maximum undocumented (Q-005).
+- **G-010** DataStore value ≤ 4,194,304 chars per key; request queues of 30.
+- **G-011** require-by-string semantics (`./`, `../`, `@self/`, `@game/`), non-blocking.
+- **G-012** Selene std generation and Rokit don't work in cloud sessions → `xonotic_std.yml`, `tools/bootstrap.sh`.
+- **G-013** Cloud network needs the "Roblox-Xonotic" environment (personal env of the owner, created 2026-11-21 by Claude-Anvil: dl.xonotic.org, create.roblox.com, apis.roblox.com + package registries; setup script runs tools/bootstrap.sh). The Default environment gets proxy 403 on dl.xonotic.org.
+- **G-014** Standard-build map textures are DDS-only; DP image loader has no DDS fallback.
+- **G-015** DP VFS: alphabetically last pk3 wins; pk3 lookups case-sensitive.
+- **G-016** JPEG alpha comes from `<name>_alpha.jpg` (2,326 such files in -high).
+- **G-017** Content ratings: IARC questionnaire; realistic blood in assets may be moderated.
+- **G-018** SurfaceAppearance maps only via `AssetService:CreateSurfaceAppearanceAsync` (client-side for EditableImages).
+- **G-019** `Lighting.Technology` only settable in the place file (Rojo `$properties`).
+- **G-020** ViewportFrame: no shadows, no post-processing.
+- **G-021** Runtime mesh route: CreateEditableMesh → CreateMeshPartAsync; CreateEditableImage returns nil when out of budget.
+- **G-022** Lune: relative requires only, no Roblox `Random`; loads all 65 MB of generated QC fine.
+- **G-023** Place ≤ 100 MB; full place with generated QC = 14 MB .rbxl.
+- **G-024** No documented script size limit; DevForum: 200,000 chars via plugin `Source` → modules ≤ 190k chars ([needs Studio] confirm).
+- **G-025** ReplicatedStorage replicates to all clients (bytecode even if unused); server code in ServerScriptService.
+- **G-027** progs.dat declares 3 builtins that are NULL in vm_sv_builtins (#352, #566, #608): keep NULL; real DP errors only if called.
+- **G-028** Xonotic progs crc 5927 == PROGHEADER_CRC, so SV_VM_Setup's entvars_t field-offset branch applies.
+- **G-026** Bytecode ≈ 1.65× source: client ≈ 48 MB download, ≈ 53 MB heap for csprogs+menu (Q-010).
+- **G-029** Direct pushes of chat-only commits to `main` work (no branch protection, 2026-11-21); 8 concurrent posts from 2 clones all landed with tools/chat.sh.
+- **G-031** pk3s contain **1,927 zip symlinks** (high; 1,908 standard: 1,399 textures, 405 gfx, 94 models, 25 sounds, 3 particles, 1 maps); DarkPlaces follows them (fs.c FS_OpenReadFile, 16 levels). tools/pk3 follows them since 2026-11-21 (manifest column `symlink_to`); re-run `manifest.py --extract` on older work/vfs-* (they held link text).
+- **G-030** Audio (creator-docs 2026-11-21): ≤ 7 min, ≤ 20 MB, ≤ 48 kHz, mp3/ogg/wav/flac; not updatable via Open Cloud. Quota docs conflict (2,000 vs 100 per 30 days verified) → read live: `GET apis.roblox.com/cloud/v2/users/{id}/asset-quotas` (scope asset:read; usage/capacity/period/usageResetTime). Sound.PlaybackRegion needs PlaybackRegionsEnabled; AudioPlayer has PlaybackRegion/LoopRegion always on.
+- **G-032** qsort is unstable: FS_Search results equal under strcasecmp (only case differs) have no defined order in DP; the port breaks ties by strcmp. No such pair exists in the 0.8.6 data.
+- **G-033** `stylua --check ... game` also scans git-ignored game/generated (AOT output, not formatted): check `game/*` minus `generated`.
+- **G-034** DP quirk kept: `exec dir/*.cfg` runs the matches in *reverse* sorted order (each Cmd_Exec inserts at the buffer front).
+- **G-035** Open Cloud scopes (creator-docs openapi.json, 2026-11-21): assets upload/update/operations + quota read = `asset:write` / `asset:read`; place publish (`POST /universes/v1/{u}/places/{p}/versions`) = `universe-places:write`; run Luau on a Roblox server (`luau-execution-session-tasks`, headless [needs Studio]-style tests) = `universe.place.luau-execution-session:write` (+`:read` for results/logs); grant an asset to an experience = `asset-permissions:write`. Don't IP-restrict keys used from cloud sessions (changing IPs). Group-owned work: key on a dedicated alt account with minimal group role (docs' advice).
+- **G-036** Live audio quota of the owner's account (2026-11-21, Open Cloud asset-quotas): capacity 2,000 per MONTH, 30 used → 1,970 left ≥ 805 unique sounds, so **every sound is uploaded as its own asset; no packing** (AUDIO-PLAN rule 4 not triggered). Key: environment network secret for apis.roblox.com (x-api-key), never in the repo; user id passed as an argument, not committed.
+- **G-037** Open Cloud audio upload rejects very short files (4 samples at 11 kHz) with `InvalidArgument: Audio duration too long` (misleading: a minimum length); 0.05 s is accepted (2026-11-21). New audio goes to moderation: `moderationState` Reviewing → Approved / Rejected, no reason given via API (tools/sounds/check_moderation.py).
+- **G-038** (owner's Violations & Appeals page, 2026-11-21) Each audio rejected for content becomes an account violation ("Audio removed"): all 13 profanity originals + both rejected censored meet versions (15). Not listed: heavymetal.ogg (both uploads → copyright-type block, appeal via roblox.com/support) and an identical re-upload rejected instantly. **Never upload uncertain audio without the owner's OK.**
+- **G-039** 2026-11-21: after 671 textures (byte-for-byte jpg Image uploads, tools/upload/upload_images.py) Open Cloud returned `HTTP 403 User is moderated` for every upload: the owner's account was moderated (likely the 15 audio violations of G-038 + earlier account history). Uploads stopped; resumable once the owner's account is clear (or another owner account/group is chosen).
+- **G-040** The 403 (G-039) was a **Warning** for gfx/hud/default/notify_headshot.jpg ("Violent Content and Gore"); after the owner acknowledged it, uploads work again. Gore filter: CLIP ViT-B/32 zero-shot score + visual review of 198 candidates → 59 textures in assets/optional/gore/textures.tsv, skipped by tools/upload/upload_images.py. Images cannot be archived via Open Cloud ("not an archivable asset type"): already-uploaded notify_death(+_alpha)/notify_fall must be removed by the owner in the Creator Dashboard.
+- **G-041** 2026-11-21: second moderation after 1,752 textures (gore filter of G-040 active): 403 "User is moderated" again; watcher stopped the run. Unknown which image (owner to check roblox.com/report-appeals). **Do not upload more to the owner's personal account**; next uploads need a dedicated account/group (owner decision) and a stricter content review.
+- **G-042** 2026-11-21: third and fourth strikes → **owner suspended for 1 day**: gfx/menu/wickedx/background_ingame.jpg ("Directing users off-platform": tiny engraved "XONOTIC.org"; Tesseract OCR cannot read it) and gfx/hud/default/notify_selfkill.jpg (blood-splat kill-feed icon, CLIP gore score only 0.06, uploaded before the filter). Gore list now 98 (all notify_* splat icons of every HUD skin). Lessons: CLIP misses small stylised blood; URLs hide in menu skins/logos; **no further uploads to the owner's personal account** — a dedicated account/group + human review of every image category first.
+- **G-043** 2026-11-21 07:05 UTC: owner's appeal succeeded: account no longer moderated and asset 85776129881684 (notify_selfkill.jpg) is now `Approved`. Still: no uploads until the review step exists and the owner OKs each risky category (G-042).
+- **G-044** Gated batches (2026-11-21): batches 1-2 (600 low-risk textures) all Approved; then 403 "User is moderated" from a new off-site-link warning on an *older* menu-skin upload. Any unacknowledged warning blocks every upload until the owner clicks through it in the Roblox app. Uploader now stops all workers at the first 403.
+- **G-045** 2026-11-21: second 1-day suspension (off-site link text in textures: "xonotic.org", phone-number-like text on walls). Uploads stopped until the account is clear AND text areas are blurred (D-024).
+- **G-046** (creator-docs 2026-11-21) Image upload: png/jpeg/bmp/tga, < 8000×8000, not updatable via Open Cloud (a changed image is a new asset). texture-specifications: "Roblox supports up to 4096×4096 pixel texture resolutions" (engine streams lower mips first); the same page still says 1024×1024 for texture *maps* (G-004 conflict) → [needs Studio] check that a 2048² image keeps full detail. Xonotic -high: 10,662 textures ≤ 1024, 242 ≤ 2048, 6 > 2048.
+- **G-047** All 805 audio + 2,396 image uploads so far carry "xonotic.org" in their *description* and the file path (words like "blood") in their display name: likely extra off-platform/gore triggers. Uploaders now use neutral names ("Xonotic texture <sha12>") and descriptions without a domain. **First thing after the suspension ends:** PATCH every existing asset's displayName/description (Open Cloud `PATCH /assets/v1/assets/{id}`, asset:write) before any new upload.
 <!-- /§GOTCHAS -->

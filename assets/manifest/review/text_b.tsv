@@ -1,0 +1,10 @@
+gfx/menu/wickedx/background_ingame.jpg	url	high	528 988 234 36	XONOTIC.org (engraved orange logo text in bottom menu frame) + tiny unreadable engraved line under it
+gfx/menu/wickedx/background_l2.jpg	url	high	528 988 234 36	XONOTIC.org (same engraved bottom-frame text; file outside batch text_059-117, found while checking siblings)
+gfx/menu/wickedx/skinpreview.jpg	url	high	102 243 52 13	XONOTIC.org (downscaled copy of the bottom menu frame engraving, barely legible)
+gfx/menu/xaw/skinpreview.jpg	url	high	418 226 320 198	menu screenshot server list: hostnames with web addresses (www.radio-...de, www.eagle76.fr, www.xxx-server.net, ...attenbande.org, (30MB/japan.ne)) and Address: 91.121.x.x:26000 IP
+gfx/menu/luminos/skinpreview.jpg	url	maybe	138 78 98 30	menu screenshot server list, sub-pixel illegible server names (may contain domains)
+gfx/reticle_nex_alpha.jpg	phone	high	1168 484 132 20	m 12345 423--60 -433-00 (digit string, phone-number-like, only in alpha channel)
+gfx/reticle_nex.jpg	phone	maybe	1168 484 132 20	same area as alpha text (color plane is black here; blur if alpha is merged into the uploaded PNG)
+models/desertfactory/textures/documents/note02.jpg	brand	maybe	6 110 244 136	The programs I used: NetRadiant, Blender, GIMP, Q3Map2, xsane, p7zip, Nexuiz (software brand names)
+models/desertfactory/textures/shaders/writing02.jpg	brand	maybe	23 6 206 115	graffiti: Nexuiz Rulez (Nexuiz trademark)
+models/desertfactory/textures/documents/writing02_alpha.jpg	brand	maybe	23 6 206 115	graffiti: Nexuiz Rulez (alpha mask)

@@ -1,0 +1,29 @@
+{
+	"name": "XonoticStudioTests",
+	"tree": {
+		"$className": "DataModel",
+		"Lighting": {
+			"$properties": {
+				"Technology": "Future",
+				"Ambient": [0, 0, 0],
+				"OutdoorAmbient": [0, 0, 0],
+				"Brightness": 0,
+				"EnvironmentDiffuseScale": 0,
+				"EnvironmentSpecularScale": 0,
+				"GlobalShadows": true,
+				"ExposureCompensation": 0
+			}
+		},
+		"ReplicatedStorage": {
+			"StudioTests": { "$path": "tests/studio/lib" }
+		},
+		"ServerScriptService": {
+			"StudioTestsServer": { "$path": "tests/studio/StudioTestsServer.server.luau" }
+		},
+		"StarterPlayer": {
+			"StarterPlayerScripts": {
+				"StudioTestsClient": { "$path": "tests/studio/StudioTestsClient.client.luau" }
+			}
+		}
+	}
+}

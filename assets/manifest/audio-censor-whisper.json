@@ -1,0 +1,317 @@
+{
+ "player_carni-lycan_coms_needhelp2.ogg": {
+  "text": "SON OF A BITCH!",
+  "words": [
+   [
+    "SON",
+    0.0,
+    0.42
+   ],
+   [
+    "OF",
+    0.42,
+    0.52
+   ],
+   [
+    "A",
+    0.52,
+    0.8
+   ],
+   [
+    "BITCH!",
+    0.8,
+    1.24
+   ]
+  ]
+ },
+ "player_carni-lycan_coms_taunt1.ogg": {
+  "text": "little bitch",
+  "words": [
+   [
+    "little",
+    0.0,
+    0.44
+   ],
+   [
+    "bitch",
+    0.44,
+    1.06
+   ]
+  ]
+ },
+ "player_carni-lycan_coms_teamshoot3.ogg": {
+  "text": "Same team, retard!",
+  "words": [
+   [
+    "Same",
+    0.0,
+    0.4
+   ],
+   [
+    "team,",
+    0.4,
+    0.92
+   ],
+   [
+    "retard!",
+    1.12,
+    1.52
+   ]
+  ]
+ },
+ "player_marine_coms_teamshoot3.ogg": {
+  "text": "Same team, retard!",
+  "words": [
+   [
+    "Same",
+    0.0,
+    0.4
+   ],
+   [
+    "team,",
+    0.4,
+    0.88
+   ],
+   [
+    "retard!",
+    1.06,
+    1.42
+   ]
+  ]
+ },
+ "player_pyria-skadi_coms_taunt1.ogg": {
+  "text": "stay down, bitch",
+  "words": [
+   [
+    "stay",
+    0.0,
+    0.42
+   ],
+   [
+    "down,",
+    0.42,
+    0.94
+   ],
+   [
+    "bitch",
+    1.26,
+    1.6
+   ]
+  ]
+ },
+ "player_pyria-skadi_coms_taunt5.ogg": {
+  "text": "You worthless pussy!",
+  "words": [
+   [
+    "You",
+    0.0,
+    0.26
+   ],
+   [
+    "worthless",
+    0.26,
+    0.84
+   ],
+   [
+    "pussy!",
+    0.84,
+    1.42
+   ]
+  ]
+ },
+ "player_pyria-skadi_coms_teamshoot2.ogg": {
+  "text": "You retard! We're on the same team!",
+  "words": [
+   [
+    "You",
+    0.0,
+    0.28
+   ],
+   [
+    "retard!",
+    0.28,
+    0.88
+   ],
+   [
+    "We're",
+    1.1,
+    1.18
+   ],
+   [
+    "on",
+    1.18,
+    1.28
+   ],
+   [
+    "the",
+    1.28,
+    1.44
+   ],
+   [
+    "same",
+    1.44,
+    1.76
+   ],
+   [
+    "team!",
+    1.76,
+    2.24
+   ]
+  ]
+ },
+ "player_robot_coms_needhelp2.ogg": {
+  "text": "Son of a bitch!",
+  "words": [
+   [
+    "Son",
+    0.0,
+    0.4
+   ],
+   [
+    "of",
+    0.4,
+    0.62
+   ],
+   [
+    "a",
+    0.62,
+    0.82
+   ],
+   [
+    "bitch!",
+    0.82,
+    1.22
+   ]
+  ]
+ },
+ "player_soldier_coms_meet.ogg": {
+  "text": "GET YOUR ASS TO THE WAYPOINT!",
+  "words": [
+   [
+    "GET",
+    0.0,
+    0.2
+   ],
+   [
+    "YOUR",
+    0.2,
+    0.42
+   ],
+   [
+    "ASS",
+    0.42,
+    0.66
+   ],
+   [
+    "TO",
+    0.66,
+    0.84
+   ],
+   [
+    "THE",
+    0.84,
+    0.9
+   ],
+   [
+    "WAYPOINT!",
+    0.9,
+    1.5
+   ]
+  ]
+ },
+ "player_soldier_coms_taunt2.ogg": {
+  "text": "PUSSY",
+  "words": [
+   [
+    "PUSSY",
+    0.0,
+    0.46
+   ]
+  ]
+ },
+ "player_specop_coms_taunt1.ogg": {
+  "text": "Stay down, bitch!",
+  "words": [
+   [
+    "Stay",
+    0.0,
+    0.44
+   ],
+   [
+    "down,",
+    0.44,
+    0.94
+   ],
+   [
+    "bitch!",
+    1.24,
+    1.56
+   ]
+  ]
+ },
+ "player_specop_coms_taunt4.ogg": {
+  "text": "You worthless pussy!",
+  "words": [
+   [
+    "You",
+    0.0,
+    0.28
+   ],
+   [
+    "worthless",
+    0.28,
+    0.84
+   ],
+   [
+    "pussy!",
+    0.84,
+    1.42
+   ]
+  ]
+ },
+ "player_specop_coms_teamshoot2.ogg": {
+  "text": "You reached hard, we're on the same team!",
+  "words": [
+   [
+    "You",
+    0.0,
+    0.36
+   ],
+   [
+    "reached",
+    0.36,
+    0.74
+   ],
+   [
+    "hard,",
+    0.74,
+    1.04
+   ],
+   [
+    "we're",
+    1.24,
+    1.24
+   ],
+   [
+    "on",
+    1.24,
+    1.36
+   ],
+   [
+    "the",
+    1.36,
+    1.54
+   ],
+   [
+    "same",
+    1.54,
+    1.82
+   ],
+   [
+    "team!",
+    1.82,
+    2.3
+   ]
+  ]
+ }
+}

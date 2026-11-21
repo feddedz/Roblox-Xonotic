@@ -1,0 +1,54 @@
+textures/evil9/9techwall05b.jpg	text	maybe	95 290 315 40	blur/paint over "NEXX CORP" lettering (fictional Nexuiz corp name, keep logo shape)
+textures/evil9/9screen01.jpg	text	maybe	10 236 100 16	blur tiny engraved line of text bottom-left (illegible, could read as URL/credit)
+textures/evil9/9screen01.jpg	text	maybe	190 30 140 20	blur "NEXX CORP" small text at top
+textures/eyeblood.jpg	gore	high	whole	recolor blood-red to non-blood hue (e.g. dark grey/brown) — texture named and used as eye blood
+textures/eye.jpg	gore	maybe	whole	recolor red bloodshot veins to neutral grey/white (detached bloodshot eyeball)
+textures/flesh1.jpg	gore	high	whole	recolor raw-flesh red streaks to neutral grey/metallic (gib flesh texture)
+textures/facility114invx/misc/door01inv.jpg	brand	maybe	100 188 300 42	replace "APERTURE" (Valve/Portal trademark) with neutral word or blur
+textures/facility114x/misc/door01.jpg	brand	maybe	100 188 300 42	replace "APERTURE" (Valve/Portal trademark) with neutral word or blur
+textures/facility114invx/wall/corridor01inv.jpg	sexual	high	68 232 160 16	remove/blur rule line "NO PORNOGRAPHIC MATERIALS ALLOWED BEYOND PERSONAL CUBICLES"
+textures/facility114invx/wall/corridor01inv.jpg	drugs	maybe	68 212 160 16	blur "NO SMOKING EXCEPT WHEN INSTRUCTED..." line (smoking reference)
+textures/facility114invx/wall/corridor01invr.jpg	sexual	high	68 232 160 16	remove/blur rule line "NO PORNOGRAPHIC MATERIALS..." (red variant)
+textures/facility114invx/wall/corridor01invr.jpg	drugs	maybe	68 212 160 16	blur "NO SMOKING..." line
+textures/facility114x/wall/corridor01.jpg	sexual	high	68 232 160 16	remove/blur rule line "NO PORNOGRAPHIC MATERIALS..." (light variant)
+textures/facility114x/wall/corridor01.jpg	drugs	maybe	68 212 160 16	blur "NO SMOKING..." line
+textures/facility114x/wall/corridor01b.jpg	sexual	high	68 232 160 16	remove/blur rule line "NO PORNOGRAPHIC MATERIALS..." (blue variant)
+textures/facility114x/wall/corridor01b.jpg	drugs	maybe	68 212 160 16	blur "NO SMOKING..." line
+textures/facility114x/wall/corridor01r.jpg	sexual	high	68 232 160 16	remove/blur rule line "NO PORNOGRAPHIC MATERIALS..." (red variant)
+textures/facility114x/wall/corridor01r.jpg	drugs	maybe	68 212 160 16	blur "NO SMOKING..." line
+textures/facility114invx/wall/corridor02inv.jpg	gore	maybe	20 180 230 25	reword/blur "MAY CAUSE DECAPITATION AND EXPLOSIVE EVISCERATION" text
+textures/facility114invx/wall/corridor02invr.jpg	gore	maybe	20 180 230 25	reword/blur "DECAPITATION AND EXPLOSIVE EVISCERATION" text
+textures/facility114x/wall/corridor02.jpg	gore	maybe	20 180 230 25	reword/blur "DECAPITATION AND EXPLOSIVE EVISCERATION" text
+textures/gib1.jpg	gore	high	whole	recolor raw-meat red to non-organic grey/metal debris (gib texture)
+textures/gib2.jpg	gore	high	whole	recolor raw-meat red to non-organic grey/metal debris (gib texture; gib2_gloss/_norm share it)
+textures/gib3.jpg	gore	high	whole	recolor raw-meat red to non-organic grey/metal debris (gib texture; gib3_gloss/_norm share it)
+textures/gib4.jpg	gore	high	whole	recolor raw-meat red to non-organic grey/metal debris (gib texture; gib4_gloss/_norm share it)
+textures/hook.jpg	gore	maybe	whole	recolor dark-red smears on claw tips (look like blood) to grey/rust
+textures/ignishead.jpg	gore	maybe	355 580 65 265	recolor blood-red slash mark across eye (reads as bleeding scar) to black ink tattoo
+textures/ignishead.jpg	gore	maybe	1465 415 65 245	recolor red slash mark on back of head to black ink
+textures/ignisheadfb.jpg	gore	maybe	355 580 65 265	recolor blood-red slash mark across eye to black ink tattoo (fullbright variant)
+textures/ignisheadfb.jpg	gore	maybe	1465 415 65 245	recolor red slash mark on back of head to black ink
+textures/map_catharsis/samual_easter.jpg	gore	high	whole	recolor blood-red dripping text and splatters to neutral (e.g. grey/white) and reshape splats into non-blood blobs
+textures/map_catharsis/samual_easter.jpg	text	maybe	30 160 870 140	author name "Samual balance" text (off-platform username) - blur or keep if names allowed
+textures/map_boil/credit.jpg	text	maybe	0 260 512 70	author handle "kuniuthefrogg" (off-platform username) - blur/replace if usernames not allowed
+textures/map_boil/credit_alpha.jpg	text	maybe	0 260 512 70	alpha of credit.jpg (same username shape)
+textures/map_erbium/fightingzone.jpg	text	maybe	300 205 95 15	tiny author handle "SMILECYTHE?" - blur
+textures/map_courtfun/screen_obey.jpg	brand	maybe	whole	"OBEY" wordmark resembles OBEY clothing brand (They Live reference) - change font/colour if flagged
+textures/map_space-elevator/screen-blue.jpg	text	maybe	10 236 100 16	blur tiny engraved line of text bottom-left (same as evil9/9screen01)
+textures/map_space-elevator/screen-blue.jpg	text	maybe	190 30 140 20	blur "NEXX CORP" small text at top
+textures/meat_pants.jpg	gore	maybe	whole	gib flesh colormap (veined meat pattern tinted red at runtime); image itself grey - keep grey, avoid red tint or soften vein pattern
+textures/meat.jpg	gore	maybe	whole	gib flesh base texture (near-black, flesh via pants tint); low risk as image, note with meat_pants
+textures/meat_alien.jpg	gore	maybe	whole	green alien gib flesh texture; low risk (non-red) but gib flesh - shift toward slime/rock look if flagged
+textures/skies/distant_sunset.jpg	text	maybe	0 145 256 85	sky preview with author credit "distant sunset By Cuinn Herrick" - blur/crop text (preview image only)
+textures/skies/polluted_earth.jpg	text	maybe	0 145 256 85	sky preview with author credit "polluted earth ... By Cuinn Herrick" - blur/crop text (preview image only)
+textures/spider.jpg	gore	maybe	360 1664 530 233	dark-red raw-flesh rim around spider mouth - shift red to brown/orange like rest of body
+textures/spider.jpg	gore	maybe	138 678 340 488	dark-red fleshy pits on spider abdomen - shift red to brown/orange
+textures/techpanelx/panel/panel_tech2r.jpg	gore	maybe	whole	dark-red splattered paint reads as dried blood stains - shift splotches to brighter team-red/orange paint tone (or desaturate) so it reads as paint
+textures/stralenex1/slimepit_ad.jpg	text	maybe	whole	author handle "strahlemann" credit tile (part of "strahlemann presents a nexuiz 2.3 map" sign) - replace if usernames/other-game names not allowed
+textures/stralenex1/slime_rev-3.jpg	text	maybe	whole	author handle "STRAHLEMANN" credit tile - replace if usernames not allowed (slime_rev-3_glow shares it)
+textures/stralenex1/slimepit_ad-3.jpg	text	maybe	whole	"nexuiz" (other game name) credit tile - low risk, replace if flagged
+textures/trak4x/decal/decal_help.jpg	gore	high	whole	"HELP" written in dripping blood-red - recolor to non-blood paint colour (e.g. black/blue spray paint) and trim drips
+textures/trak4x/decal/decal_help_alpha.jpg	gore	maybe	whole	alpha of blood-drip HELP decal (drip shape) - trim drip streaks to match fixed decal_help
+textures/trak4x/decal/decal_pills.jpg	drugs	high	25 150 610 210	reword "DID YOU TAKE YOUR PILLS TODAY?" (e.g. blank or neutral text) - medication/drug reference
+textures/trak4x/decal/decal_pills.jpg	drugs	high	705 25 250 425	pill bottle with spilled pills - replace pills with neutral contents or remove bottle
+textures/trak4x/decal/decal_pills_alpha.jpg	drugs	maybe	whole	alpha mask of pills decal (same text/bottle shapes) - update with decal_pills

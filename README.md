@@ -2,7 +2,9 @@
 
 A faithful port of [Xonotic](https://xonotic.org) 0.8.6 to Roblox: the DarkPlaces engine hand-ported to
 Luau, the original QuakeC game code compiled ahead of time to Luau, and the original assets at full
-quality. The goal is that a Xonotic player cannot tell the difference. Project state lives in
+quality. The goal is that a Xonotic player cannot tell the difference. Planned changes: Roblox servers instead of
+Xonotic servers, own controls with slight assists for console and mobile players, and game passes much
+later (overview: [`WELCOME.md`](WELCOME.md)). Project state lives in
 [`HANDOFF.md`](HANDOFF.md); AI sessions follow [`CLAUDE.md`](CLAUDE.md).
 
 Xonotic is © Team Xonotic and contributors, licensed GPLv3+. This port is GPLv3+ too: see
@@ -13,11 +15,16 @@ Xonotic is © Team Xonotic and contributors, licensed GPLv3+. This port is GPLv3
 1. Install [Rokit](https://github.com/rojo-rbx/rokit), then in a terminal in this repo run `rokit install`
    (installs the pinned Rojo, Lune, StyLua and Selene from `rokit.toml`).
 2. Install the Rojo Studio plugin: `rojo plugin install` (once).
-3. Run `rojo serve` in the repo. In Studio, open a new Baseplate, open the **Rojo** plugin tab, click
+3. Once per checkout and after updates, run `tools/build.sh` (needs bash, curl, unzip, python3; downloads
+   the pinned Xonotic 0.8.6 release once, ~1.5 GB, and compiles the game code into `game/generated/`).
+   Then run `rojo serve` in the repo. In Studio, open a new Baseplate, open the **Rojo** plugin tab, click
    **Connect**. The code appears under `ReplicatedStorage.Xonotic`, plus `ServerScriptService.XonoticServer`
    and `StarterPlayerScripts.XonoticClient`.
-4. Press **Play**. Until the engine is ported, the Output window shows `NOT YET PORTED: …` messages: that is
-   expected. `HANDOFF.md` §STATUS says what currently works and what to test.
+4. Press **Play**. The server runs what is ported so far (settings, config files, game-code setup, world
+   spawn) and prints a report between `===== BEGIN XONOTIC SERVER BOOT REPORT =====` and `===== END …`:
+   copy that block (and any red errors) back to the session. Expected today: ≈ 6,000 cvars, ≈ 3,300 autocvar
+   globals, spawnfunc_worldspawn "completed". `NOT YET PORTED: …` lines (≈ 40 builtins) are expected.
+   `HANDOFF.md` §STATUS says what currently works and what to test.
 
 Alternative without the plugin: `rojo build default.project.json -o xonotic.rbxl` and open the file.
 
