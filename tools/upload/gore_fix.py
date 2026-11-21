@@ -222,7 +222,7 @@ def new_blob(body: np.ndarray, text: np.ndarray, sigma: float, F: int) -> np.nda
     return sm
 
 
-def splat_badge(cv: str, av: str, mode: str, sigma: float = 7.0, F: int = 4):
+def splat_badge(cv: str, av: str, mode: str, sigma: float = 11.0, F: int = 4):
     """mode: 'neutral' (desaturate the blood red to a dark warm grey) or 'team' (keep team colour)."""
     c = load(cv)
     a = load(av)
@@ -268,7 +268,7 @@ def _neutral_text(c: np.ndarray) -> np.ndarray:
     return np.clip(np.where(y > 150, c, 1.5 * y + 0.1 * (c - y)), 0, 255)
 
 
-def luma_blob(cv: str, av: str, sigma: float = 6.0, F: int = 4, hue_shift: float = 28 / 360):
+def luma_blob(cv: str, av: str, sigma: float = 9.0, F: int = 4, hue_shift: float = 18 / 360):
     """Luma theme: the fall splat (salmon fill, red glow) -> smooth blob, hue moved from red to amber."""
     c = load(cv)
     a = load(av)
