@@ -257,11 +257,15 @@ def splat_badge(cv: str, av: str, mode: str, sigma: float = 11.0, F: int = 4):
     if len(ys):  # notify_death has no word
         band[max(ys.min() - 2, 0):ys.max() + 3, max(xs.min() - 28, 0):xs.max() + 29] = True
     deep = drop_small(deep & band, 50)  # a letter is >= ~100 px; outline crumbs in notches are smaller
-    for _ in range(2):
-        deep = dilate(deep, 1) & bright & (d_old < -3.5)
+    deep = dilate(deep, 1) & bright & (d_old < -5)
+    deep &= dilate(erode(deep, 1), 1)  # opening: strip the thin outline spur left where a letter met it
+    for _ in range(3):  # prune remaining 1-px diagonal spurs (pixels with < 4 of 8 neighbours set)
+        p = np.pad(deep, 1).astype(int)
+        nbr = sum(np.roll(np.roll(p, dy, 0), dx, 1) for dy in (-1, 0, 1) for dx in (-1, 0, 1)) - p
+        deep &= nbr[1:-1, 1:-1] >= 4
     text |= deep
     fillreg |= dilate(text, 1)
-    textzone = dilate(text, 1) & body
+    textzone = text | (dilate(text, 1) & body & (lum(c) < 110))  # never paste bits of the old white outline
     # edge profile of the original (alpha and colour), outside the body and the first pixels inside
     sel = (d_old > -2.5) & (d_old < 60)
     # colour profile ignores the leftover droplets: only pixels whose alpha fits the glow are used
