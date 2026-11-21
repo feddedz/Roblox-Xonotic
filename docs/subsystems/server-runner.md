@@ -35,6 +35,15 @@ with logged `NOT YET PORTED` messages.
 - Tests: unit/libc, unit/cvar_cmd, integration/config_load, integration/sv_config_worldspawn (fresh engine per
   run: interpreter and AOT identical incl. cvars afterwards).
 
+## Done 2026-11-21 (Claude-Anvil): strings
+- `engine/utf8lib.luau` (u8_analyze/strlen/bytelen/byteofs/getchar), PRVM_AllocString/FreeString (+ freeable flags),
+  builtins print, ftos, stof, floor, pow, strlen, strcat, substring, strzone, strunzone, str2chr, strncmp
+  (tests/unit/string_builtins). Worldspawn with real cvars: 22k stub calls (was 280k), interp == AOT; stops at
+  "PRVM_FreeString: attempt to free a constant string" caused by the remaining stubs.
+- Remaining worldspawn stubs, in call order: nextent, remove, fopen/fclose/fgets, changelevel, buf_create,
+  buf_cvarlist, buf_getsize, buf_del, spawn, etof, bufstr_set/get, ftoe, digest_hex, SV_AddStat, SV_precache_model.
+  strtoupper/strtolower need u8_tolower/u8_toupper tables (utf8lib.c).
+
 ## Next steps, in order
 1. Still open from the settings work: PRVM_FindOffsets + the PROGHEADER_CRC branch of SV_VM_Setup (engine
    field offsets from entvars_t, progs crc 5927), .po translation when prvm_language is set (default "").

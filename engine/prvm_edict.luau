@@ -311,6 +311,7 @@ function prvm_edict.NewProg(name: string): Prog
 		edictsfields = buffer.create(0),
 		tempstringsbuf = { data = buffer.create(65536), cursize = 0, maxsize = 65536 },
 		knownstrings = {},
+		knownstrings_freeable = {},
 		numknownstrings = 0,
 		maxknownstrings = 0,
 		firstfreeknownstring = 0,
@@ -364,6 +365,7 @@ function prvm_edict.PRVM_Prog_Load(
 	prog.maxknownstrings = 0
 	prog.firstfreeknownstring = 0
 	prog.knownstrings = {}
+	(prog :: any).knownstrings_freeable = {}
 	-- dprograms_t header
 	prog.progs_version = L(0)
 	prog.progs_crc = L(4)
@@ -817,8 +819,57 @@ function prvm_edict.PRVM_SetEngineString(prog: Prog, s: any): number
 		prog.numknownstrings += 1
 	end
 	prog.firstfreeknownstring = i + 1
-	prog.knownstrings[i + 1] = s
+	prog.knownstrings[i + 1] = s;
+	(prog :: any).knownstrings_freeable[i + 1] = false
 	return PRVM_KNOWNSTRINGBASE + i
+end
+
+-- port: prvm_edict.c PRVM_AllocString L3118-3166 @xonotic-v0.8.6
+-- The C caller memcpy()s its text into *pointer; here the text is passed in (`str`, without the NUL).
+function prvm_edict.PRVM_AllocString(prog: Prog, bufferlength: number, str: string): number
+	if bufferlength == 0 then
+		return 0
+	end
+	local i = prog.firstfreeknownstring
+	while i < prog.numknownstrings do
+		if not prog.knownstrings[i + 1] then
+			break
+		end
+		i += 1
+	end
+	if i >= prog.numknownstrings then
+		if i >= prog.maxknownstrings then
+			prog.maxknownstrings += 128
+		end
+		prog.numknownstrings += 1
+	end
+	prog.firstfreeknownstring = i + 1
+	prog.knownstrings[i + 1] = { str = str }
+	(prog :: any).knownstrings_freeable[i + 1] = true
+	return PRVM_KNOWNSTRINGBASE + i
+end
+
+-- port: prvm_edict.c PRVM_FreeString L3168-3191 @xonotic-v0.8.6
+function prvm_edict.PRVM_FreeString(prog: Prog, num: number)
+	local fr = (prog :: any).knownstrings_freeable
+	if num == 0 then
+		prog.error_cmd("PRVM_FreeString: attempt to free a NULL string")
+	elseif num >= 0 and num < prog.stringssize then
+		prog.error_cmd("PRVM_FreeString: attempt to free a constant string")
+	elseif num >= PRVM_KNOWNSTRINGBASE and num < PRVM_KNOWNSTRINGBASE + prog.numknownstrings then
+		num -= PRVM_KNOWNSTRINGBASE
+		if not prog.knownstrings[num + 1] then
+			prog.error_cmd("PRVM_FreeString: attempt to free a non-existent or already freed string")
+		end
+		if not fr[num + 1] then
+			prog.error_cmd("PRVM_FreeString: attempt to free a string owned by the engine")
+		end
+		prog.knownstrings[num + 1] = false
+		fr[num + 1] = false
+		prog.firstfreeknownstring = math.min(prog.firstfreeknownstring, num)
+	else
+		prog.error_cmd(string.format("PRVM_FreeString: invalid string offset %i", num))
+	end
 end
 
 -- port: prvm_edict.c PRVM_ED_FindField L360-372 @xonotic-v0.8.6 (returns the 1-based def index or nil)

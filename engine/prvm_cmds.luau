@@ -13,6 +13,8 @@ local cmd = require("./cmd")
 local console = require("./console")
 local libc = require("./_port/libc")
 local prvm_edict = require("./prvm_edict")
+local utf8lib = require("./utf8lib")
+local f32 = require("./_port/f32")
 
 local prvm_cmds = {}
 
@@ -27,6 +29,17 @@ local function SET_G_FLOAT(prog: any, ofs: number, v: number)
 end
 local function SET_G_INT(prog: any, ofs: number, v: number)
 	buffer.writei32(prog.globals, ofs * 4, v)
+end
+
+local function G_FLOAT(prog: any, ofs: number): number
+	return buffer.readf32(prog.globals, ofs * 4)
+end
+
+-- VM_SAFEPARMCOUNT (prvm_cmds.h L207)
+local function SAFEPARMCOUNT(prog: any, p: number, f: string)
+	if prog.argc ~= p then
+		prog.error_cmd(string.format("%s wrong parameter count %i (%d expected ) !", f, prog.argc, p))
+	end
 end
 
 -- VM_SAFEPARMCOUNTRANGE (prvm_cmds.h L206)
@@ -169,6 +182,151 @@ function prvm_cmds.VM_registercvar(prog: any)
 	SET_G_FLOAT(prog, OFS_RETURN, 1) -- success
 end
 
+-- port: prvm_cmds.c VM_print L373-379 @xonotic-v0.8.6
+function prvm_cmds.VM_print(prog: any)
+	console.Con_Print(prvm_cmds.VM_VarString(prog, 0, VM_STRINGTEMP_LENGTH))
+end
+
+-- port: prvm_cmds.c VM_ftos L785-799 @xonotic-v0.8.6
+function prvm_cmds.VM_ftos(prog: any)
+	SAFEPARMCOUNT(prog, 1, "VM_ftos")
+	local v = G_FLOAT(prog, OFS_PARM0)
+	local s
+	if f32.round(libc.toint(v)) == v then
+		s = string.format("%.0f", v)
+	else
+		s = string.format("%f", v)
+	end
+	SET_G_INT(prog, OFS_RETURN, prvm_edict.PRVM_SetTempString(prog, libc.snprintf(128, "%s", s)))
+end
+
+-- port: prvm_cmds.c VM_stof L862-868 @xonotic-v0.8.6
+function prvm_cmds.VM_stof(prog: any)
+	SAFEPARMCOUNTRANGE(prog, 1, 8, "VM_stof")
+	SET_G_FLOAT(prog, OFS_RETURN, libc.atof(prvm_cmds.VM_VarString(prog, 0, VM_STRINGTEMP_LENGTH)))
+end
+
+-- port: prvm_cmds.c VM_floor L1433-1438 @xonotic-v0.8.6
+function prvm_cmds.VM_floor(prog: any)
+	SAFEPARMCOUNT(prog, 1, "VM_floor")
+	SET_G_FLOAT(prog, OFS_RETURN, math.floor(G_FLOAT(prog, OFS_PARM0)))
+end
+
+-- port: prvm_cmds.c VM_pow L1750-1754 @xonotic-v0.8.6
+function prvm_cmds.VM_pow(prog: any)
+	SAFEPARMCOUNT(prog, 2, "VM_pow")
+	SET_G_FLOAT(prog, OFS_RETURN, G_FLOAT(prog, OFS_PARM0) ^ G_FLOAT(prog, OFS_PARM0 + 3))
+end
+
+-- port: prvm_cmds.c VM_strlen L2170-2176 @xonotic-v0.8.6
+function prvm_cmds.VM_strlen(prog: any)
+	SAFEPARMCOUNT(prog, 1, "VM_strlen")
+	SET_G_FLOAT(prog, OFS_RETURN, utf8lib.u8_strlen(G_STRING(prog, OFS_PARM0)))
+end
+
+-- port: prvm_cmds.c VM_strcat L2279-2286 @xonotic-v0.8.6
+function prvm_cmds.VM_strcat(prog: any)
+	SAFEPARMCOUNTRANGE(prog, 1, 8, "VM_strcat")
+	SET_G_INT(
+		prog,
+		OFS_RETURN,
+		prvm_edict.PRVM_SetTempString(prog, prvm_cmds.VM_VarString(prog, 0, VM_STRINGTEMP_LENGTH))
+	)
+end
+
+-- port: prvm_cmds.c VM_substring L2297-2359 @xonotic-v0.8.6
+function prvm_cmds.VM_substring(prog: any)
+	SAFEPARMCOUNT(prog, 3, "VM_substring")
+	local s = libc.cstr(G_STRING(prog, OFS_PARM0))
+	local start = libc.toint(G_FLOAT(prog, OFS_PARM0 + 3))
+	local length = libc.toint(G_FLOAT(prog, OFS_PARM0 + 6))
+	local u_slength = 0
+	if start < 0 then -- FTE_STRINGS feature
+		u_slength = utf8lib.u8_strlen(s)
+		start += u_slength
+		start = math.clamp(start, 0, u_slength)
+	end
+	if length < 0 then -- FTE_STRINGS feature
+		if u_slength == 0 then -- it's not calculated when it's not needed above
+			u_slength = utf8lib.u8_strlen(s)
+		end
+		length += u_slength - start + 1
+	end
+	local u_start = utf8lib.u8_byteofs(s, start)
+	if u_start < 0 then
+		SET_G_INT(prog, OFS_RETURN, prvm_edict.PRVM_SetTempString(prog, ""))
+		return
+	end
+	local u_length = utf8lib.u8_bytelen(s, 1 + u_start, length)
+	if u_length >= VM_STRINGTEMP_LENGTH - 1 then
+		u_length = VM_STRINGTEMP_LENGTH - 1
+	end
+	SET_G_INT(prog, OFS_RETURN, prvm_edict.PRVM_SetTempString(prog, string.sub(s, 1 + u_start, u_start + u_length)))
+end
+
+-- port: prvm_cmds.c VM_strzone L2521-2533 @xonotic-v0.8.6
+function prvm_cmds.VM_strzone(prog: any)
+	SAFEPARMCOUNT(prog, 1, "VM_strzone")
+	local s = prvm_cmds.VM_VarString(prog, 0, VM_STRINGTEMP_LENGTH)
+	SET_G_INT(prog, OFS_RETURN, prvm_edict.PRVM_AllocString(prog, #s + 1, s))
+end
+
+-- port: prvm_cmds.c VM_strunzone L2543-2547 @xonotic-v0.8.6
+function prvm_cmds.VM_strunzone(prog: any)
+	SAFEPARMCOUNT(prog, 1, "VM_strunzone")
+	prvm_edict.PRVM_FreeString(prog, buffer.readi32(prog.globals, OFS_PARM0 * 4))
+end
+
+-- port: prvm_cmds.c VM_str2chr L5671-5690 @xonotic-v0.8.6
+function prvm_cmds.VM_str2chr(prog: any)
+	SAFEPARMCOUNT(prog, 2, "VM_str2chr")
+	local s = libc.cstr(G_STRING(prog, OFS_PARM0))
+	local index = utf8lib.u8_bytelen(s, 1, libc.toint(G_FLOAT(prog, OFS_PARM0 + 3)))
+	index = libc.toint(index) -- (int) of the size_t result
+	local uindex = if index < 0 then index + 4294967296 else index -- (unsigned)
+	if uindex < #s then
+		local ch
+		if utf8lib.enabled() then
+			ch = (utf8lib.u8_getchar_utf8_enabled(s, 1 + index))
+		else
+			ch = string.byte(s, 1 + index)
+		end
+		SET_G_FLOAT(prog, OFS_RETURN, ch)
+	else
+		SET_G_FLOAT(prog, OFS_RETURN, 0)
+	end
+end
+
+-- strcmp / strncmp result as glibc returns it: difference of the first differing bytes (unsigned)
+local function cmpbytes(a: string, b: string, n: number): number
+	local i = 1
+	while i <= n do
+		local x, y = string.byte(a, i) or 0, string.byte(b, i) or 0
+		if x ~= y then
+			return x - y
+		end
+		if x == 0 then
+			return 0
+		end
+		i += 1
+	end
+	return 0
+end
+
+-- port: prvm_cmds.c VM_strncmp L5898-5912 @xonotic-v0.8.6
+function prvm_cmds.VM_strncmp(prog: any)
+	SAFEPARMCOUNTRANGE(prog, 2, 3, "VM_strncmp")
+	local s1 = libc.cstr(G_STRING(prog, OFS_PARM0))
+	local s2 = libc.cstr(G_STRING(prog, OFS_PARM0 + 3))
+	if prog.argc > 2 then
+		local n = G_FLOAT(prog, OFS_PARM0 + 6)
+		n = if n < 0 then math.huge else math.floor(n) -- (size_t) of a float
+		SET_G_FLOAT(prog, OFS_RETURN, cmpbytes(s1, s2, n))
+	else
+		SET_G_FLOAT(prog, OFS_RETURN, cmpbytes(s1, s2, math.huge))
+	end
+end
+
 -- C name -> builtin, for the vm_*_builtins tables
 prvm_cmds.BUILTINS = {
 	VM_cvar = prvm_cmds.VM_cvar,
@@ -178,6 +336,18 @@ prvm_cmds.BUILTINS = {
 	VM_cvar_description = prvm_cmds.VM_cvar_description,
 	VM_cvar_set = prvm_cmds.VM_cvar_set,
 	VM_registercvar = prvm_cmds.VM_registercvar,
+	VM_print = prvm_cmds.VM_print,
+	VM_ftos = prvm_cmds.VM_ftos,
+	VM_stof = prvm_cmds.VM_stof,
+	VM_floor = prvm_cmds.VM_floor,
+	VM_pow = prvm_cmds.VM_pow,
+	VM_strlen = prvm_cmds.VM_strlen,
+	VM_strcat = prvm_cmds.VM_strcat,
+	VM_substring = prvm_cmds.VM_substring,
+	VM_strzone = prvm_cmds.VM_strzone,
+	VM_strunzone = prvm_cmds.VM_strunzone,
+	VM_str2chr = prvm_cmds.VM_str2chr,
+	VM_strncmp = prvm_cmds.VM_strncmp,
 } :: { [string]: (prog: any) -> () }
 
 return prvm_cmds
