@@ -318,6 +318,7 @@ If it isn't here, it isn't allowed.
 | DIFF-004 | Roblox asset of `sound/misc/null.wav` and `sound/menu/close.ogg` (4 samples each, all silent) is a 16-bit WAV of exactly those samples padded with silence to 0.05 s | uploading the original files: rejected ("Audio duration too long", really a minimum length, G-037) | Roblox audio minimum length | proven platform limit | audibly identical; engine timing uses the original files' lengths (M8) |
 | DIFF-005 | 13 voice lines (Q-013 list) play with the profanity bleeped ("bitch", "retard", "pussy", "ass" → 1 kHz tone); timing/length identical | uploading the originals and one identical retry: rejected by Roblox moderation | Roblox Community Rules for audio | Roblox policy, owner decision D-022 | everything except the bleeped words is sample-identical |
 | DIFF-006 | soldier/coms/meet: besides the DIFF-005 bleep (wider: mid "your".."to"), pitch +3% (≈ half a semitone), same length | bleep only (2 versions): rejected | Roblox moderation (likely matched to the rejected recording) | Roblox policy, owner decision D-023 | slight pitch change; timing identical |
+| DIFF-007 | Textures with web addresses / phone-number text: those text areas blurred (list + boxes in assets/manifest, tool tools/upload/blur_text.py) | uploading as-is: account warnings + 2 one-day suspensions (off-platform links) | Roblox Community Standards (off-platform links) | Roblox policy, owner decision D-024 | only the text areas differ |
 (DIFF-001 withdrawn 2026-11-20, see D-015.)
 
 Candidates already known (become entries when the subsystem lands, after real attempts):
@@ -375,6 +376,8 @@ Data pk3 sha256 (full table + sizes: `assets/manifest/pk3-{standard,high}.tsv`):
   DIFF-005. Applies to the 13 lines of Q-013; heavymetal.ogg (music, no profanity) stays original for an appeal.
 - **D-023** (owner, 2026-11-21) "Tweak a bit" to pass moderation without appeals: soldier/coms/meet = censored v2
   + pitch +3% (rubberband, formants kept, same length) → approved; heavymetal.ogg pitch +3% → still rejected.
+- **D-024** (owner, 2026-11-21) Textures with web addresses ("xonotic.org" etc.) or phone-number-like text get only
+  those text areas blurred for the Roblox upload; everything else and the originals stay unchanged (DIFF-007).
 <!-- /§DECISIONS -->
 
 <!-- §QUESTIONS -->
@@ -479,4 +482,5 @@ One line each; **details and sources: `docs/gotchas.md`** (add to both). Roblox 
 - **G-042** 2026-11-21: third and fourth strikes → **owner suspended for 1 day**: gfx/menu/wickedx/background_ingame.jpg ("Directing users off-platform": tiny engraved "XONOTIC.org"; Tesseract OCR cannot read it) and gfx/hud/default/notify_selfkill.jpg (blood-splat kill-feed icon, CLIP gore score only 0.06, uploaded before the filter). Gore list now 98 (all notify_* splat icons of every HUD skin). Lessons: CLIP misses small stylised blood; URLs hide in menu skins/logos; **no further uploads to the owner's personal account** — a dedicated account/group + human review of every image category first.
 - **G-043** 2026-11-21 07:05 UTC: owner's appeal succeeded: account no longer moderated and asset 85776129881684 (notify_selfkill.jpg) is now `Approved`. Still: no uploads until the review step exists and the owner OKs each risky category (G-042).
 - **G-044** Gated batches (2026-11-21): batches 1-2 (600 low-risk textures) all Approved; then 403 "User is moderated" from a new off-site-link warning on an *older* menu-skin upload. Any unacknowledged warning blocks every upload until the owner clicks through it in the Roblox app. Uploader now stops all workers at the first 403.
+- **G-045** 2026-11-21: second 1-day suspension (off-site link text in textures: "xonotic.org", phone-number-like text on walls). Uploads stopped until the account is clear AND text areas are blurred (D-024).
 <!-- /§GOTCHAS -->
