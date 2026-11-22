@@ -208,5 +208,83 @@ return function(ctx: t.Ctx)
 	t.eq(ctx, common.InfoString_SetValue("\\a\\1\\b\\2", 100, "a", "9"), "\\a\\9\\b\\2", "replace keeps order")
 	t.eq(ctx, common.InfoString_SetValue("\\a\\1\\b\\2", 100, "a", ""), "\\b\\2", "empty value removes the key")
 	t.eq(ctx, common.InfoString_SetValue("", 100, "c", "3"), "\\c\\3")
+	-- case conversion (utf8_enable 1: Unicode tables of utf8lib.c; 0: ASCII only)
+	prog.argc = 1
+	setstr(0, "Héllo Wörld ÿ")
+	prvm_cmds.VM_strtoupper(prog)
+	t.eq(ctx, rets(), "HÉLLO WÖRLD Ÿ", "u8_toupper")
+	prvm_cmds.VM_strtolower(prog)
+	setstr(0, "ÀÉ ΣΩ ABC")
+	prvm_cmds.VM_strtolower(prog)
+	t.eq(ctx, rets(), "àé σω abc", "u8_tolower")
+	setstr(0, "a\128b")
+	prvm_cmds.VM_strtoupper(prog)
+	t.eq(ctx, rets(), "AB", "invalid byte skipped by u8_getchar")
+	t.eq(ctx, common.COM_ToUpperString("abcdef", 4), "ABC", "size_out caps")
+	t.eq(ctx, common.COM_ToUpperString("aéb", 3), "A", "multibyte char that does not fit stops")
+	t.eq(ctx, utf8lib.u8_fromchar(0x1F600, 8), 4)
+	cvar.Cvar_SetQuick(u8, "0")
+	setstr(0, "Héllo")
+	prvm_cmds.VM_strtoupper(prog)
+	t.eq(ctx, rets(), "HéLLO", "utf8 off: ASCII only")
+	cvar.Cvar_SetQuick(u8, "1")
+	-- search_*
+	local fs = require("../../engine/fs")
+	fs.SetProvider({
+		files = { "maps/b.bsp", "maps/a.bsp", "maps/a.mapinfo" },
+		load = function(_: string): string?
+			return nil
+		end,
+	} :: any)
+	prog.name = "server"
+	prog.argc = 3
+	setstr(0, "maps/*.bsp")
+	setf(1, 1)
+	setf(2, 1)
+	prvm_cmds.VM_search_begin(prog)
+	t.eq(ctx, retf(), 0, "first handle")
+	local h = retf()
+	setstr(0, "nothing*")
+	prvm_cmds.VM_search_begin(prog)
+	t.eq(ctx, retf(), -1, "no match -> -1")
+	prog.argc = 1
+	setf(0, h)
+	prvm_cmds.VM_search_getsize(prog)
+	t.eq(ctx, retf(), 2)
+	prog.argc = 2
+	setf(1, 0)
+	prvm_cmds.VM_search_getfilename(prog)
+	t.eq(ctx, rets(), "maps/a.bsp", "sorted")
+	prog.argc = 1
+	prvm_cmds.VM_search_end(prog)
+	buffer.writef32(prog.globals, 4, 123)
+	prvm_cmds.VM_search_getsize(prog)
+	t.eq(ctx, retf(), 123, "closed handle: warning, return untouched")
+	-- digest_hex (RFC 1320 / FIPS 180-2 vectors)
+	local mdfour = require("../../engine/mdfour")
+	local function hex(x: string): string
+		return (string.gsub(x, ".", function(c: string): string
+			return string.format("%02x", string.byte(c))
+		end))
+	end
+	t.eq(ctx, hex(mdfour.mdfour("")), "31d6cfe0d16ae931b73c59d7e0c089c0")
+	t.eq(ctx, hex(mdfour.mdfour("abc")), "a448017aaf21d8525fc10ae87aa6729d")
+	t.eq(ctx, hex(mdfour.mdfour(string.rep("1234567890", 8))), "e33b4ddc9c38f2199c3e7b164fcc0536")
+	prog.argc = 2
+	setstr(0, "MD4")
+	setstr(1, "message digest")
+	prvm_cmds.VM_digest_hex(prog)
+	t.eq(ctx, rets(), "d9130a8164549fe818874806e1c7014b")
+	setstr(0, "SHA256")
+	setstr(1, "abc")
+	prvm_cmds.VM_digest_hex(prog)
+	t.eq(ctx, rets(), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
+	setstr(1, string.rep("a", 1000))
+	prvm_cmds.VM_digest_hex(prog)
+	t.eq(ctx, rets(), "41edece42d63e8d9bf515a9ba6932e1c20cbc9f5a5d134645adb5db1b9737ea3")
+	setstr(0, "MD5")
+	prvm_cmds.VM_digest_hex(prog)
+	t.eq(ctx, buffer.readi32(prog.globals, 4), 0, "unknown digest -> string_null")
+	fs.SetProvider(nil)
 	cvar.reset()
 end

@@ -17,6 +17,9 @@ local utf8lib = require("./utf8lib")
 local filematch = require("./filematch")
 local common = require("./common")
 local f32 = require("./_port/f32")
+local fs = require("./fs")
+local mdfour = require("./mdfour")
+local sha256 = require("./_port/sha256")
 
 local prvm_cmds = {}
 
@@ -954,6 +957,130 @@ function prvm_cmds.VM_infoget(prog: any)
 end
 
 -- C name -> builtin, for the vm_*_builtins tables
+-- port: prvm_cmds.c VM_strtolower L2233-2245 @xonotic-v0.8.6
+function prvm_cmds.VM_strtolower(prog: any)
+	SAFEPARMCOUNT(prog, 1, "VM_strtolower")
+	local s = G_STRING(prog, OFS_PARM0)
+	SET_G_INT(prog, OFS_RETURN, prvm_edict.PRVM_SetTempString(prog, common.COM_ToLowerString(s, VM_STRINGTEMP_LENGTH)))
+end
+
+-- port: prvm_cmds.c VM_strtoupper L2255-2267 @xonotic-v0.8.6
+function prvm_cmds.VM_strtoupper(prog: any)
+	SAFEPARMCOUNT(prog, 1, "VM_strtoupper")
+	local s = G_STRING(prog, OFS_PARM0)
+	SET_G_INT(prog, OFS_RETURN, prvm_edict.PRVM_SetTempString(prog, common.COM_ToUpperString(s, VM_STRINGTEMP_LENGTH)))
+end
+
+local PRVM_MAX_OPENSEARCHES = 128 -- progsvm.h L272 (not DP_SMALLMEMORY)
+
+local function opensearches(prog: any): { [number]: { string } }
+	prog.opensearches = prog.opensearches or {}
+	return prog.opensearches
+end
+
+-- port: prvm_cmds.c VM_search_begin L3088-3121 @xonotic-v0.8.6 (PRVM_AllocationOrigin: leak report not ported)
+function prvm_cmds.VM_search_begin(prog: any)
+	SAFEPARMCOUNT(prog, 3, "VM_search_begin")
+	local pattern = G_STRING(prog, OFS_PARM0)
+	prvm_cmds.VM_CheckEmptyString(prog, pattern)
+	local caseinsens = libc.toint(G_FLOAT(prog, OFS_PARM0 + 3))
+	local quiet = libc.toint(G_FLOAT(prog, OFS_PARM0 + 6))
+	local os_ = opensearches(prog)
+	local handle = 0
+	while handle < PRVM_MAX_OPENSEARCHES do
+		if not os_[handle] then
+			break
+		end
+		handle += 1
+	end
+	if handle >= PRVM_MAX_OPENSEARCHES then
+		SET_G_FLOAT(prog, OFS_RETURN, -2)
+		prvm_cmds.VM_Warning(
+			prog,
+			"VM_search_begin: %s ran out of search handles (%i)\n",
+			prog.name,
+			PRVM_MAX_OPENSEARCHES
+		)
+		return
+	end
+	local r = fs.FS_Search(libc.cstr(pattern), caseinsens ~= 0, quiet ~= 0)
+	os_[handle] = r :: any
+	if not r then
+		SET_G_FLOAT(prog, OFS_RETURN, -1)
+	else
+		SET_G_FLOAT(prog, OFS_RETURN, handle)
+	end
+end
+
+-- shared handle checks of VM_search_end / getsize / getfilename
+local function searchHandle(prog: any, fname: string): { string }?
+	local handle = libc.toint(G_FLOAT(prog, OFS_PARM0))
+	if handle < 0 or handle >= PRVM_MAX_OPENSEARCHES then
+		prvm_cmds.VM_Warning(prog, "%s: invalid handle %i used in %s\n", fname, handle, prog.name)
+		return nil
+	end
+	local r = opensearches(prog)[handle]
+	if r == nil then
+		prvm_cmds.VM_Warning(prog, "%s: no such handle %i in %s\n", fname, handle, prog.name)
+		return nil
+	end
+	return r
+end
+
+-- port: prvm_cmds.c VM_search_end L3130-3152 @xonotic-v0.8.6
+function prvm_cmds.VM_search_end(prog: any)
+	SAFEPARMCOUNT(prog, 1, "VM_search_end")
+	if searchHandle(prog, "VM_search_end") then
+		opensearches(prog)[libc.toint(G_FLOAT(prog, OFS_PARM0))] = nil
+	end
+end
+
+-- port: prvm_cmds.c VM_search_getsize L3161-3180 @xonotic-v0.8.6
+function prvm_cmds.VM_search_getsize(prog: any)
+	SAFEPARMCOUNT(prog, 1, "VM_M_search_getsize")
+	local r = searchHandle(prog, "VM_search_getsize")
+	if r then
+		SET_G_FLOAT(prog, OFS_RETURN, #r)
+	end
+end
+
+-- port: prvm_cmds.c VM_search_getfilename L3189-3214 @xonotic-v0.8.6
+function prvm_cmds.VM_search_getfilename(prog: any)
+	SAFEPARMCOUNT(prog, 2, "VM_search_getfilename")
+	local r = searchHandle(prog, "VM_search_getfilename")
+	if not r then
+		return
+	end
+	local filenum = libc.toint(G_FLOAT(prog, OFS_PARM0 + 3))
+	if filenum < 0 or filenum >= #r then
+		prvm_cmds.VM_Warning(prog, "VM_search_getfilename: invalid filenum %i in %s\n", filenum, prog.name)
+		return
+	end
+	SET_G_INT(prog, OFS_RETURN, prvm_edict.PRVM_SetTempString(prog, r[filenum + 1]))
+end
+
+-- port: prvm_cmds.c VM_digest_hex L5944-5990 @xonotic-v0.8.6 (Crypto_Available: the release ships d0_blind_id)
+function prvm_cmds.VM_digest_hex(prog: any)
+	SAFEPARMCOUNTRANGE(prog, 2, 8, "VM_digest_hex")
+	local digest = libc.cstr(G_STRING(prog, OFS_PARM0))
+	local s = prvm_cmds.VM_VarString(prog, 1, VM_STRINGTEMP_LENGTH)
+	local out: string? = nil
+	if digest == "MD4" then
+		out = mdfour.mdfour(s)
+	elseif digest == "SHA256" then
+		out = sha256(s)
+	end
+	-- no warning needed on mismatch - we return string_null to QC
+	if out then
+		local hex = string.gsub(out, ".", function(c: string): string
+			return string.format("%02x", string.byte(c))
+		end)
+		SET_G_INT(prog, OFS_RETURN, prvm_edict.PRVM_SetTempString(prog, hex))
+	else
+		SET_G_INT(prog, OFS_RETURN, 0)
+	end
+end
+
 prvm_cmds.BUILTINS = {
 	VM_cvar = prvm_cmds.VM_cvar,
 	VM_cvar_type = prvm_cmds.VM_cvar_type,
@@ -1005,6 +1132,13 @@ prvm_cmds.BUILTINS = {
 	VM_bufstr_get = prvm_cmds.VM_bufstr_get,
 	VM_bufstr_set = prvm_cmds.VM_bufstr_set,
 	VM_buf_cvarlist = prvm_cmds.VM_buf_cvarlist,
+	VM_strtolower = prvm_cmds.VM_strtolower,
+	VM_digest_hex = prvm_cmds.VM_digest_hex,
+	VM_strtoupper = prvm_cmds.VM_strtoupper,
+	VM_search_begin = prvm_cmds.VM_search_begin,
+	VM_search_end = prvm_cmds.VM_search_end,
+	VM_search_getsize = prvm_cmds.VM_search_getsize,
+	VM_search_getfilename = prvm_cmds.VM_search_getfilename,
 } :: { [string]: (prog: any) -> () }
 
 return prvm_cmds

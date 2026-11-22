@@ -6,9 +6,11 @@
 	Port of utf8lib.c @xonotic-v0.8.6. PARTIAL: utf8_enable lookup, utf8_lengths, utf8_range, u8_analyze,
 	u8_strlen, u8_bytelen, u8_byteofs, u8_getchar_utf8_enabled, u8_getchar_noendptr, u8_quake2utf8map.
 	A C `const char *` is (s, i): string + 1-based byte index; bytes past the end read as NUL.
-	NOT YET PORTED: the rest (u8_fromchar, u8_encodech, u8_strpad, ...), added with the builtins that need them.
+	u8_fromchar, u8_toupper, u8_tolower.
+	NOT YET PORTED: the rest (u8_encodech, u8_strpad, ...), added with the builtins that need them.
 ]]
 local cvar = require("./cvar")
+local u8_case = require("./_port/u8_case")
 
 local utf8lib = {}
 
@@ -248,6 +250,69 @@ function utf8lib.u8_getchar_noendptr(s: string, p: number): number
 		return (utf8lib.u8_getchar_utf8_enabled(s, p))
 	end
 	return quake2utf8(at(s, p))
+end
+
+-- port: utf8lib.c u8_fromchar L636-698 @xonotic-v0.8.6
+-- Returns n, bytes: n as in C (bytes written, <= 0 if the buffer is too small), bytes = what was written
+-- before the terminating NUL (only meaningful when n > 0).
+function utf8lib.u8_fromchar(w: number, maxlen: number): (number, string)
+	if maxlen < 1 then
+		return 0, ""
+	end
+	if w == 0 then
+		return 0, ""
+	end
+	local on = enabled()
+	if w >= 0xE000 and not on then
+		w -= 0xE000
+	end
+	if w < 0x80 or not on then
+		if maxlen < 2 then
+			return -1, ""
+		end
+		return 1, string.char(w % 256) -- (char)w
+	end
+	if w < 0x800 then
+		if maxlen < 3 then
+			return -1, ""
+		end
+		return 2, string.char(bit32.bor(0xC0, bit32.rshift(w, 6)), bit32.bor(0x80, bit32.band(w, 0x3F)))
+	end
+	if w < 0x10000 then
+		if maxlen < 4 then
+			return -1, ""
+		end
+		return 3,
+			string.char(
+				bit32.bor(0xE0, bit32.rshift(w, 12)),
+				bit32.bor(0x80, bit32.band(bit32.rshift(w, 6), 0x3F)),
+				bit32.bor(0x80, bit32.band(w, 0x3F))
+			)
+	end
+	-- RFC 3629
+	if w <= 0x10FFFF then
+		if maxlen < 5 then
+			return -1, ""
+		end
+		return 4,
+			string.char(
+				bit32.bor(0xF0, bit32.rshift(w, 18)),
+				bit32.bor(0x80, bit32.band(bit32.rshift(w, 12), 0x3F)),
+				bit32.bor(0x80, bit32.band(bit32.rshift(w, 6), 0x3F)),
+				bit32.bor(0x80, bit32.band(w, 0x3F))
+			)
+	end
+	return 0, ""
+end
+
+-- port: utf8lib.c u8_toupper L957-2009 @xonotic-v0.8.6 (table in engine/_port/u8_case.luau)
+function utf8lib.u8_toupper(ch: number): number
+	return u8_case.u8_toupper[ch] or ch
+end
+
+-- port: utf8lib.c u8_tolower L2011-3055 @xonotic-v0.8.6 (table in engine/_port/u8_case.luau)
+function utf8lib.u8_tolower(ch: number): number
+	return u8_case.u8_tolower[ch] or ch
 end
 
 return utf8lib

@@ -388,4 +388,46 @@ function common.InfoString_SetValue(buffer: string, bufferlength: number, key: s
 	return head .. string.sub(rest, 1, bufferlength - pos - 1) -- just remove the key from the text
 end
 
+-- COM_ToLowerString / COM_ToUpperString share one body; upper selects the direction.
+local function caseString(input: string, size_out: number, upper: boolean): string
+	if size_out == 0 then
+		return ""
+	end
+	local utf8lib = require("./utf8lib")
+	local out = {}
+	local i = 1
+	if utf8lib.enabled() then
+		while (string.byte(input, i) or 0) ~= 0 and size_out > 1 do
+			local ch
+			ch, i = utf8lib.u8_getchar_utf8_enabled(input, i)
+			ch = if upper then utf8lib.u8_toupper(ch) else utf8lib.u8_tolower(ch)
+			local n, bytes = utf8lib.u8_fromchar(ch, size_out)
+			if n <= 0 then
+				break
+			end
+			table.insert(out, bytes)
+			size_out -= n
+		end
+		return table.concat(out)
+	end
+	local lo, hi, d = if upper then 97 else 65, if upper then 122 else 90, if upper then -32 else 32
+	while (string.byte(input, i) or 0) ~= 0 and size_out > 1 do
+		local c = string.byte(input, i)
+		table.insert(out, string.char(if c >= lo and c <= hi then c + d else c))
+		i += 1
+		size_out -= 1
+	end
+	return table.concat(out)
+end
+
+-- port: common.c COM_ToLowerString L1717-1748 @xonotic-v0.8.6 (returns the out string)
+function common.COM_ToLowerString(input: string, size_out: number): string
+	return caseString(input, size_out, false)
+end
+
+-- port: common.c COM_ToUpperString L1750-1781 @xonotic-v0.8.6 (returns the out string)
+function common.COM_ToUpperString(input: string, size_out: number): string
+	return caseString(input, size_out, true)
+end
+
 return common
