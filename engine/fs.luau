@@ -22,6 +22,8 @@ export type Provider = {
 	files: { string },
 	-- file contents as DarkPlaces reads them, or nil if not found
 	load: (vpath: string) -> string?,
+	-- pk3 file name the file comes from (FS_WhichPack), nil if not in a pack
+	pack: ((vpath: string) -> string?)?,
 }
 
 local provider: Provider? = nil
@@ -220,6 +222,21 @@ function fs.FS_UnGetc(file: QFile, c: number): number
 	end
 	file.ungetc = c
 	return c
+end
+
+-- port: fs.c FS_WhichPack L3886-3896 @xonotic-v0.8.6 (FS_FindFile: written files first, then the packs)
+function fs.FS_WhichPack(filename: string): string?
+	if fs.realfiles[filename] then
+		return "" -- found, not in a pack
+	end
+	if not provider then
+		return nil
+	end
+	local pk = (provider :: Provider).pack
+	if pk then
+		return pk(filename)
+	end
+	return if (provider :: Provider).load(filename) then "" else nil
 end
 
 local _ = libc

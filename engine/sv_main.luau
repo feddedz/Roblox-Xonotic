@@ -111,6 +111,7 @@ function sv_main.SV_VM_Setup(progsdata: buffer, opts: { onStub: ((number, string
 	prog.max_edicts = 512
 	prog.limit_edicts = MAX_EDICTS
 	prog.reserved_edicts = (opts and opts.maxclients) or host_cmd.svs.maxclients
+	prog.extensionstring = require("./_port/extensions").sv
 	prog.init_edict = sv_main.SVVM_init_edict
 	prog.free_edict = sv_main.SVVM_free_edict
 	prog.begin_increase_edicts = function(_p: any)

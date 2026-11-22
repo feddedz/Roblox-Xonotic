@@ -273,4 +273,266 @@ function libc.snprintf(size: number, fmt: string, ...: any): string
 	return s
 end
 
+-- glibc srand/rand (stdlib/random_r.c TYPE_3: x**31 + x**3 + 1, 31 words of state, 310 discarded outputs).
+-- DarkPlaces calls srand(time) at startup (host.c L1177-1179) and rand() through lhrandom; sv_random_seed
+-- makes the sequence reproducible, so it must be glibc's. Vectors: tests/vectors/rand.tsv (real glibc).
+libc.RAND_MAX = 2147483647
+local rstate = table.create(31, 0)
+local rf, rr = 4, 1 -- 1-based fptr / rptr into rstate (SEP_3 = 3)
+
+local function rand_step(): number
+	local v = (rstate[rf] + rstate[rr]) % 4294967296
+	rstate[rf] = v
+	rf = if rf == 31 then 1 else rf + 1
+	rr = if rr == 31 then 1 else rr + 1
+	return v // 2 -- (uint32 >> 1) & 0x7fffffff
+end
+
+function libc.srand(seed: number)
+	seed = seed % 4294967296
+	if seed == 0 then
+		seed = 1
+	end
+	-- state words are int32_t: the seed is stored as-is (bits), the LCG runs on its signed value
+	local word = if seed >= 2147483648 then seed - 4294967296 else seed
+	rstate[1] = seed
+	for i = 2, 31 do
+		-- word = 16807 * word % 2147483647 without overflow (Schrage), C truncating division
+		local hi = if word >= 0 then word // 127773 else -(-word // 127773)
+		local lo = word - hi * 127773
+		word = 16807 * lo - 2836 * hi
+		if word < 0 then
+			word += 2147483647
+		end
+		rstate[i] = word % 4294967296
+	end
+	rf, rr = 4, 1
+	for _ = 1, 310 do
+		rand_step()
+	end
+end
+
+function libc.rand(): number
+	return rand_step()
+end
+libc.srand(1) -- C: the state before any srand() call is srand(1)
+
+-- glibc strftime in the "C" locale (time/strftime_l.c). tm fields as struct tm: year (full year),
+-- mon (1-12), mday, hour, min, sec, wday (0 = Sunday), yday (0-based), zone, gmtoff (s), t (time_t).
+-- Returns the result, or "" when it does not fit in maxsize (C returns 0).
+-- NOT YET PORTED: flags (_ - 0 ^ #), field widths and the E/O modifiers (logged; Xonotic uses none).
+export type Tm = {
+	year: number,
+	mon: number,
+	mday: number,
+	hour: number,
+	min: number,
+	sec: number,
+	wday: number,
+	yday: number,
+	zone: string,
+	gmtoff: number,
+	t: number,
+}
+local WDAY = { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" }
+local MON = {
+	"January",
+	"February",
+	"March",
+	"April",
+	"May",
+	"June",
+	"July",
+	"August",
+	"September",
+	"October",
+	"November",
+	"December",
+}
+
+local function iso_week(tm: Tm): (number, number)
+	-- ISO 8601 week number and week-based year (glibc iso_week_days)
+	local function iso_week_days(yday: number, wday: number): number
+		local big_enough_multiple_of_7 = (-366 // 7 + 2) * 7
+		return yday - (yday - wday + 4 + big_enough_multiple_of_7) % 7 + 3
+	end
+	local function leap(y: number): boolean
+		return y % 4 == 0 and (y % 100 ~= 0 or y % 400 == 0)
+	end
+	local year = tm.year
+	local days = iso_week_days(tm.yday, tm.wday)
+	if days < 0 then
+		year -= 1
+		days = iso_week_days(tm.yday + (if leap(year) then 366 else 365), tm.wday)
+	else
+		local d = iso_week_days(tm.yday - (if leap(year) then 366 else 365), tm.wday)
+		if d >= 0 then
+			year += 1
+			days = d
+		end
+	end
+	return days // 7 + 1, year
+end
+
+local function strftime_conv(c: string, tm: Tm): string?
+	local h12 = tm.hour % 12
+	if h12 == 0 then
+		h12 = 12
+	end
+	if c == "a" then
+		return string.sub(WDAY[tm.wday + 1], 1, 3)
+	elseif c == "A" then
+		return WDAY[tm.wday + 1]
+	elseif c == "b" or c == "h" then
+		return string.sub(MON[tm.mon], 1, 3)
+	elseif c == "B" then
+		return MON[tm.mon]
+	elseif c == "c" then
+		return libc.strftime("%a %b %e %H:%M:%S %Y", tm, 1024)
+	elseif c == "C" then
+		return string.format("%02d", tm.year // 100)
+	elseif c == "d" then
+		return string.format("%02d", tm.mday)
+	elseif c == "D" then
+		return libc.strftime("%m/%d/%y", tm, 1024)
+	elseif c == "e" then
+		return string.format("%2d", tm.mday)
+	elseif c == "F" then
+		return libc.strftime("%Y-%m-%d", tm, 1024)
+	elseif c == "g" then
+		local _, y = iso_week(tm)
+		return string.format("%02d", y % 100)
+	elseif c == "G" then
+		local _, y = iso_week(tm)
+		return tostring(y)
+	elseif c == "H" then
+		return string.format("%02d", tm.hour)
+	elseif c == "I" then
+		return string.format("%02d", h12)
+	elseif c == "j" then
+		return string.format("%03d", tm.yday + 1)
+	elseif c == "k" then
+		return string.format("%2d", tm.hour)
+	elseif c == "l" then
+		return string.format("%2d", h12)
+	elseif c == "m" then
+		return string.format("%02d", tm.mon)
+	elseif c == "M" then
+		return string.format("%02d", tm.min)
+	elseif c == "n" then
+		return "\n"
+	elseif c == "p" then
+		return if tm.hour >= 12 then "PM" else "AM"
+	elseif c == "P" then
+		return if tm.hour >= 12 then "pm" else "am"
+	elseif c == "r" then
+		return libc.strftime("%I:%M:%S %p", tm, 1024)
+	elseif c == "R" then
+		return libc.strftime("%H:%M", tm, 1024)
+	elseif c == "s" then
+		return string.format("%d", tm.t)
+	elseif c == "S" then
+		return string.format("%02d", tm.sec)
+	elseif c == "t" then
+		return "\t"
+	elseif c == "T" then
+		return libc.strftime("%H:%M:%S", tm, 1024)
+	elseif c == "u" then
+		return tostring((tm.wday + 6) % 7 + 1)
+	elseif c == "U" then
+		return string.format("%02d", (tm.yday - tm.wday + 7) // 7)
+	elseif c == "V" then
+		local w = iso_week(tm)
+		return string.format("%02d", w)
+	elseif c == "w" then
+		return tostring(tm.wday)
+	elseif c == "W" then
+		return string.format("%02d", (tm.yday - (tm.wday - 1 + 7) % 7 + 7) // 7)
+	elseif c == "x" then
+		return libc.strftime("%m/%d/%y", tm, 1024)
+	elseif c == "X" then
+		return libc.strftime("%H:%M:%S", tm, 1024)
+	elseif c == "y" then
+		return string.format("%02d", tm.year % 100)
+	elseif c == "Y" then
+		return tostring(tm.year)
+	elseif c == "z" then
+		local off = tm.gmtoff
+		local sign = if off < 0 then "-" else "+"
+		off = math.abs(off) // 60
+		return string.format("%s%02d%02d", sign, off // 60, off % 60)
+	elseif c == "Z" then
+		return tm.zone
+	elseif c == "%" then
+		return "%"
+	end
+	return nil
+end
+
+function libc.strftime(fmt: string, tm: Tm, maxsize: number): string
+	local out = {}
+	local i, n = 1, #fmt
+	while i <= n do
+		local ch = string.sub(fmt, i, i)
+		if ch ~= "%" then
+			table.insert(out, ch)
+			i += 1
+			continue
+		end
+		local c = string.sub(fmt, i + 1, i + 1)
+		local r = if c ~= "" then strftime_conv(c, tm) else nil
+		if r then
+			table.insert(out, r)
+			i += 2
+		else
+			if c ~= "" then
+				print("NOT YET PORTED: strftime conversion %" .. c)
+			end
+			-- glibc copies an unknown conversion through unchanged
+			table.insert(out, "%" .. c)
+			i += 2
+		end
+	end
+	local res = table.concat(out)
+	if #res >= maxsize then
+		return ""
+	end
+	return res
+end
+
+-- gmtime / localtime from os.date("!*t") / os.date("*t") (both exist on Roblox and Lune, G-048).
+local function totm(d: any, t: number, zone: string, gmtoff: number): Tm
+	return {
+		year = d.year,
+		mon = d.month,
+		mday = d.day,
+		hour = d.hour,
+		min = d.min,
+		sec = d.sec,
+		wday = d.wday - 1,
+		yday = d.yday - 1,
+		zone = zone,
+		gmtoff = gmtoff,
+		t = t,
+	}
+end
+
+function libc.gmtime(t: number): Tm
+	return totm(os.date("!*t", t), t, "GMT", 0)
+end
+
+-- tm_zone: the host's zone name is not available; "UTC" when the offset is 0 (glibc's name for TZ unset
+-- or UTC), else the numeric offset as glibc prints for zones without an abbreviation.
+function libc.localtime(t: number): Tm
+	local u: any = os.date("!*t", t)
+	u.isdst = false
+	local gmtoff = t - os.time(u)
+	local zone = "UTC"
+	if gmtoff ~= 0 then
+		local o = math.abs(gmtoff) // 60
+		zone = string.format("%s%02d%02d", if gmtoff < 0 then "-" else "+", o // 60, o % 60)
+	end
+	return totm(os.date("*t", t), t, zone, gmtoff)
+end
+
 return libc

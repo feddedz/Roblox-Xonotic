@@ -26,6 +26,8 @@ def main() -> None:
     rows = [l.split("\t") for l in (ROOT / f"assets/manifest/vfs-{a.build}.tsv").read_text().splitlines()
             if l and not l.startswith("#")]
     names = [r[0] for r in rows]
+    pk3s = sorted({r[2] for r in rows})
+    pack_of = "".join(chr(48 + pk3s.index(r[2])) for r in rows)  # one char per name, same order
     want = [r[0] for r in rows if r[1] == "config" or r[0] == "progs.dat"]
     out = ROOT / "game/generated/vfs"
     out.mkdir(parents=True, exist_ok=True)
@@ -50,6 +52,11 @@ def main() -> None:
         size += len(line) + 1
     if cur:
         emit("n", cur)
+    # which pk3 each name comes from (FS_WhichPack): pack list + one index char per name
+    body = ["\tpacks = true,", "\t" + ", ".join(f'"{p}"' for p in pk3s) + ","]
+    for i in range(0, len(pack_of), LIMIT // 2):
+        body.append(f'\t{{ "", "{pack_of[i:i + LIMIT // 2]}" }},')
+    emit("p", body)
     # file data: base64 pieces; a big file spans several modules (pieces joined in order)
     cur, size = [], 0
     for v in want:
@@ -73,7 +80,19 @@ local parts = {{
 }}
 local files: {{ string }} = {{}}
 local b64: {{ [string]: {{ string }} }} = {{}}
+local packnames: {{ string }} = {{}}
+local packidx: {{ string }} = {{}}
 for _, p in parts do
+	if (p :: any).packs then
+		for _, e in (p :: any) do
+			if type(e) == "string" then
+				table.insert(packnames, e)
+			elseif type(e) == "table" then
+				table.insert(packidx, e[2])
+			end
+		end
+		continue
+	end
 	for _, e in p :: any do
 		if type(e) == "string" then
 			table.insert(files, e)
@@ -108,6 +127,7 @@ local function decode(s: string): string
 	end
 	return buffer.tostring(out)
 end
+local packof: {{ [string]: string }}? = nil
 local cache: {{ [string]: string }} = {{}}
 return {{
 	files = files,
@@ -123,6 +143,18 @@ return {{
 		c = decode(table.concat(p))
 		cache[vpath] = c
 		return c
+	end,
+	-- FS_WhichPack: pk3 file name of the file DarkPlaces opens (nil if not in a pack)
+	pack = function(vpath: string): string?
+		if not packof then
+			local m: {{ [string]: string }} = {{}}
+			local idx = table.concat(packidx)
+			for i, f in files do
+				m[f] = packnames[string.byte(idx, i) - 47]
+			end
+			packof = m
+		end
+		return (packof :: any)[vpath]
 	end,
 }}
 ''')

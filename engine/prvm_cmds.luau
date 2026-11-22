@@ -1235,6 +1235,64 @@ function prvm_cmds.VM_fputs(prog: any)
 	end
 end
 
+-- port: prvm_cmds.c checkextension L266-309 @xonotic-v0.8.6 (no USEODE in the release's server; Crypto_Available
+-- true: the release ships d0_blind_id)
+local function checkextension(prog: any, name: string): boolean
+	local ext = prog.extensionstring or ""
+	local len = #name
+	for word in string.gmatch(ext, "[^ ]+") do
+		if #word == len and libc.strcasecmp(word, name) == 0 then
+			return true
+		end
+	end
+	return false
+end
+prvm_cmds.checkextension = checkextension
+
+-- port: prvm_cmds.c VM_checkextension L311-316 @xonotic-v0.8.6
+function prvm_cmds.VM_checkextension(prog: any)
+	SAFEPARMCOUNT(prog, 1, "VM_checkextension")
+	SET_G_FLOAT(prog, OFS_RETURN, if checkextension(prog, libc.cstr(G_STRING(prog, OFS_PARM0))) then 1 else 0)
+end
+
+-- port: mathlib.h lhrandom L65 @xonotic-v0.8.6 (double arithmetic, glibc rand)
+function prvm_cmds.lhrandom(min: number, max: number): number
+	return ((libc.rand() + 0.5) / (libc.RAND_MAX + 1)) * (max - min) + min
+end
+
+-- port: prvm_cmds.c VM_random L559-564 @xonotic-v0.8.6
+function prvm_cmds.VM_random(prog: any)
+	SAFEPARMCOUNT(prog, 0, "VM_random")
+	SET_G_FLOAT(prog, OFS_RETURN, prvm_cmds.lhrandom(0, 1))
+end
+
+-- port: prvm_cmds.c VM_strftime L922-959 @xonotic-v0.8.6
+function prvm_cmds.VM_strftime(prog: any)
+	SAFEPARMCOUNTRANGE(prog, 2, 8, "VM_strftime")
+	local fmt = prvm_cmds.VM_VarString(prog, 1, VM_STRINGTEMP_LENGTH)
+	local t = os.time()
+	local tm = if G_FLOAT(prog, OFS_PARM0) ~= 0 then libc.localtime(t) else libc.gmtime(t)
+	SET_G_INT(prog, OFS_RETURN, prvm_edict.PRVM_SetTempString(prog, libc.strftime(fmt, tm, VM_STRINGTEMP_LENGTH)))
+end
+
+-- port: prvm_cmds.c VM_entityfieldname L2035-2049 @xonotic-v0.8.6
+function prvm_cmds.VM_entityfieldname(prog: any)
+	local i = libc.toint(G_FLOAT(prog, OFS_PARM0))
+	if i < 0 or i >= #prog.fielddefs then
+		prvm_cmds.VM_Warning(prog, "VM_entityfieldname: %s: field index out of bounds\n", prog.name)
+		SET_G_INT(prog, OFS_RETURN, prvm_edict.PRVM_SetTempString(prog, ""))
+		return
+	end
+	SET_G_INT(prog, OFS_RETURN, prog.fielddefs[i + 1].s_name) -- presuming that s_name points to a string already
+end
+
+-- port: prvm_cmds.c VM_whichpack L6134-6143 @xonotic-v0.8.6
+function prvm_cmds.VM_whichpack(prog: any)
+	SAFEPARMCOUNT(prog, 1, "VM_whichpack")
+	local pack = fs.FS_WhichPack(libc.cstr(G_STRING(prog, OFS_PARM0)))
+	SET_G_INT(prog, OFS_RETURN, if pack then prvm_edict.PRVM_SetTempString(prog, pack) else 0)
+end
+
 prvm_cmds.BUILTINS = {
 	VM_cvar = prvm_cmds.VM_cvar,
 	VM_cvar_type = prvm_cmds.VM_cvar_type,
@@ -1287,6 +1345,11 @@ prvm_cmds.BUILTINS = {
 	VM_bufstr_set = prvm_cmds.VM_bufstr_set,
 	VM_buf_cvarlist = prvm_cmds.VM_buf_cvarlist,
 	VM_strtolower = prvm_cmds.VM_strtolower,
+	VM_checkextension = prvm_cmds.VM_checkextension,
+	VM_random = prvm_cmds.VM_random,
+	VM_strftime = prvm_cmds.VM_strftime,
+	VM_entityfieldname = prvm_cmds.VM_entityfieldname,
+	VM_whichpack = prvm_cmds.VM_whichpack,
 	VM_fopen = prvm_cmds.VM_fopen,
 	VM_fclose = prvm_cmds.VM_fclose,
 	VM_fgets = prvm_cmds.VM_fgets,

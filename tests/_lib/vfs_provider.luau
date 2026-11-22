@@ -10,9 +10,12 @@ return function(build: string?): any
 		return nil
 	end
 	local files: { string } = {}
+	local packs: { [string]: string } = {}
 	for line in string.gmatch(fs.readFile("assets/manifest/vfs-" .. b .. ".tsv"), "[^\n]+") do
 		if string.sub(line, 1, 1) ~= "#" then
-			table.insert(files, string.match(line, "^[^\t]+") :: string)
+			local name, pk3 = string.match(line, "^([^\t]+)\t[^\t]*\t([^\t]*)")
+			table.insert(files, name :: string)
+			packs[name :: string] = pk3 :: string
 		end
 	end
 	local known: { [string]: boolean } = {}
@@ -26,6 +29,9 @@ return function(build: string?): any
 				return nil -- pk3 lookup is case-sensitive
 			end
 			return fs.readFile(root .. p)
+		end,
+		pack = function(p: string): string?
+			return packs[p]
 		end,
 	}
 end

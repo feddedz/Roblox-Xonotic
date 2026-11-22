@@ -50,4 +50,35 @@ return function(ctx: t.Ctx)
 	t.ok(ctx, n > 80, "vectors read")
 	t.eq(ctx, libc.strcmp("a\200", "a\127"), 1, "strcmp unsigned bytes")
 	t.eq(ctx, libc.strcasecmp("ABC", "abd"), -1, "strcasecmp")
+	-- glibc srand/rand
+	local nr = 0
+	for line in string.gmatch(t.read("tests/vectors/rand.tsv"), "[^\n]+") do
+		local seed, list = string.match(line, "^(%d+)\t(.*)$")
+		libc.srand(tonumber(seed) :: number)
+		local got = {}
+		for _ = 1, 40 do
+			table.insert(got, tostring(libc.rand()))
+		end
+		t.eq(ctx, table.concat(got, ","), list, "rand after srand(" .. (seed :: string) .. ")")
+		nr += 1
+	end
+	t.eq(ctx, nr, 9, "rand vectors")
+	-- glibc strftime, C locale, gmtime
+	local ns = 0
+	for line in string.gmatch(t.read("tests/vectors/strftime.tsv"), "[^\n]+") do
+		local ts, c, hex = string.match(line, "^(%d+)\t(.)\t(%x*)$")
+		local want = string.gsub(hex :: string, "%x%x", function(h)
+			return string.char(tonumber(h, 16) :: number)
+		end)
+		local tm = libc.gmtime(tonumber(ts) :: number)
+		t.eq(
+			ctx,
+			libc.strftime("%" .. (c :: string), tm, 256),
+			want,
+			"strftime %" .. (c :: string) .. " at " .. (ts :: string)
+		)
+		ns += 1
+	end
+	t.eq(ctx, ns, 451, "strftime vectors")
+	t.eq(ctx, libc.strftime("%Y-%m-%d", libc.gmtime(0), 5), "", "does not fit -> 0")
 end

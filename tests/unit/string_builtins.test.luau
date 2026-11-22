@@ -6,6 +6,7 @@ local utf8lib = require("../../engine/utf8lib")
 local prvm_edict = require("../../engine/prvm_edict")
 local prvm_cmds = require("../../engine/prvm_cmds")
 local common = require("../../engine/common")
+local f32 = require("../../engine/_port/f32")
 
 return function(ctx: t.Ctx)
 	cvar.reset()
@@ -326,6 +327,30 @@ return function(ctx: t.Ctx)
 	prvm_cmds.VM_fopen(prog)
 	t.eq(ctx, retf(), -1, "provider load returns nil here")
 	fs.realfiles = {}
+	-- checkextension / random / whichpack
+	prog.extensionstring = require("../../engine/_port/extensions").sv
+	prog.argc = 1
+	setstr(0, "dp_qc_strftime")
+	prvm_cmds.VM_checkextension(prog)
+	t.eq(ctx, retf(), 1, "case-insensitive")
+	setstr(0, "DP_QC_STR")
+	prvm_cmds.VM_checkextension(prog)
+	t.eq(ctx, retf(), 0, "whole words only")
+	local libc = require("../../engine/_port/libc")
+	libc.srand(0)
+	prog.argc = 0
+	prvm_cmds.VM_random(prog)
+	t.eq(ctx, retf(), f32.round((1804289383 + 0.5) / 2147483648), "lhrandom on glibc rand")
+	prog.argc = 1
+	fs.realfiles["data/w.txt"] = "x"
+	setstr(0, "data/w.txt")
+	buffer.writei32(prog.globals, 4, 0)
+	prvm_cmds.VM_whichpack(prog)
+	t.eq(ctx, buffer.readi32(prog.globals, 4) ~= 0 and rets() == "", true, "written file: found, not in a pack")
+	fs.realfiles = {}
+	setstr(0, "maps/zzz.bsp")
+	prvm_cmds.VM_whichpack(prog)
+	t.eq(ctx, buffer.readi32(prog.globals, 4), 0, "not found -> string_null")
 	fs.SetProvider(nil)
 	cvar.reset()
 end
