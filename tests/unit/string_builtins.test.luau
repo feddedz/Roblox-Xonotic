@@ -450,6 +450,75 @@ return function(ctx: t.Ctx)
 	setf(1, -1)
 	prvm_cmds.VM_atan2(prog)
 	t.eq(ctx, retf(), f32.round(math.atan2(1, -1)))
+	-- string buffers: add / sort / implode / find / free / copy; matchpattern
+	prog.argc = 0
+	prvm_cmds.VM_buf_create(prog)
+	local bh = retf()
+	local function add(str: string, order: number)
+		prog.argc = 3
+		setf(0, bh)
+		setstr(1, str)
+		setf(2, order)
+		prvm_cmds.VM_bufstr_add(prog)
+	end
+	add("pear", 1)
+	add("apple", 1)
+	add("", 1)
+	add("fig", 1)
+	t.eq(ctx, retf(), 3, "appended at index 3")
+	local function implode(sep: string): string
+		prog.argc = 2
+		setf(0, bh)
+		setstr(1, sep)
+		prvm_cmds.VM_buf_implode(prog)
+		return rets()
+	end
+	t.eq(ctx, implode(","), ",pear,apple,,fig", "separator before every string, the first too")
+	prog.argc = 3
+	setf(0, bh)
+	setf(1, 0)
+	setf(2, 0)
+	prvm_cmds.VM_buf_sort(prog)
+	t.eq(ctx, implode("|"), "|apple|fig|pear|", "ascending, empty last")
+	local function find(pat: string, rule: number): number
+		prog.argc = 3
+		setf(0, bh)
+		setstr(1, pat)
+		setf(2, rule)
+		prvm_cmds.VM_bufstr_find(prog)
+		return retf()
+	end
+	t.eq(ctx, find("fig", 0), 1, "whole")
+	t.eq(ctx, find("*ple", 0), 0, "right")
+	t.eq(ctx, find("p?ar", 0), 2, "pattern")
+	t.eq(ctx, find("pe", 2), 2, "left (explicit rule)")
+	t.eq(ctx, find("zz", 0), -1)
+	prog.argc = 2
+	setf(0, bh)
+	setf(1, 1)
+	prvm_cmds.VM_bufstr_free(prog)
+	add("kiwi", 0)
+	t.eq(ctx, retf(), 1, "order 0 fills the first hole")
+	prog.argc = 2
+	setf(0, bh)
+	setf(1, bh + 1)
+	prvm_cmds.VM_buf_copy(prog)
+	t.eq(ctx, implode("|"), "", "buf_copy empties the source (C reads PARM0 as destination)")
+	local function mp(str: string, pat: string, rule: number, ofs: number?): number
+		prog.argc = if ofs then 4 else 3
+		setstr(0, str)
+		setstr(1, pat)
+		setf(2, rule)
+		if ofs then
+			setf(3, ofs)
+		end
+		prvm_cmds.VM_matchpattern(prog)
+		return retf()
+	end
+	t.eq(ctx, mp("hello world", "hello*", 0), 1, "x* -> pattern rule")
+	t.eq(ctx, mp("hello world", "*world", 0), 1)
+	t.eq(ctx, mp("hello world", "world", 0, 6), 1, "offset")
+	t.eq(ctx, mp("hello", "ell", 4), 1, "middle")
 	fs.SetProvider(nil)
 	cvar.reset()
 end

@@ -2027,6 +2027,306 @@ function prvm_cmds.VM_findchainflags(prog: any)
 	end)
 end
 
+-- port: prvm_cmds.c VM_buf_copy L4817-4861 @xonotic-v0.8.6
+-- The C fetches the destination with PARM0 (the source), so dst == src: the strings are freed, the record
+-- is assigned to itself, a new zeroed strings array is allocated and the copy loop reads it (all NULL).
+-- Net effect, reproduced here: the source keeps num_strings/max_strings but loses every string.
+function prvm_cmds.VM_buf_copy(prog: any)
+	SAFEPARMCOUNT(prog, 2, "VM_buf_copy")
+	local n0 = libc.toint(G_FLOAT(prog, OFS_PARM0))
+	local src = RecordAtIndex(prog, n0)
+	if not src then
+		prvm_cmds.VM_Warning(prog, "VM_buf_copy: invalid source buffer %i used in %s\n", n0, prog.name)
+		return
+	end
+	local i = libc.toint(G_FLOAT(prog, OFS_PARM0 + 3))
+	if i == n0 then
+		prvm_cmds.VM_Warning(prog, "VM_buf_copy: source == destination (%i) in %s\n", i, prog.name)
+		return
+	end
+	src.strings = {}
+end
+
+-- glibc msort (stdlib/msort.c msort_with_tmp): top-down merge sort, n1 = n / 2, the left element wins
+-- when cmp <= 0. The comparators below are not consistent for NULL/empty strings, so the algorithm matters.
+local function msort(a: { any }, lo: number, n: number, cmp: (any, any) -> number)
+	if n <= 1 then
+		return
+	end
+	local n1 = n // 2
+	local n2 = n - n1
+	msort(a, lo, n1, cmp)
+	msort(a, lo + n1, n2, cmp)
+	local tmp = table.create(n)
+	local i, j = lo, lo + n1
+	local ie, je = lo + n1, lo + n
+	while i < ie and j < je do
+		if cmp(a[i], a[j]) <= 0 then
+			table.insert(tmp, a[i])
+			i += 1
+		else
+			table.insert(tmp, a[j])
+			j += 1
+		end
+	end
+	while i < ie do
+		table.insert(tmp, a[i])
+		i += 1
+	end
+	-- the rest of the right half is already in place
+	for k, v in tmp do
+		a[lo + k - 1] = v
+	end
+end
+
+-- port: prvm_cmds.c VM_buf_sort L4871-4897 @xonotic-v0.8.6 (BufStr_SortStringsUP/DOWN L4625-4643)
+function prvm_cmds.VM_buf_sort(prog: any)
+	SAFEPARMCOUNT(prog, 3, "VM_buf_sort")
+	local n = libc.toint(G_FLOAT(prog, OFS_PARM0))
+	local sb = RecordAtIndex(prog, n)
+	if not sb then
+		prvm_cmds.VM_Warning(prog, "VM_buf_sort: invalid buffer %i used in %s\n", n, prog.name)
+		return
+	end
+	if sb.num_strings <= 0 then
+		prvm_cmds.VM_Warning(prog, "VM_buf_sort: tried to sort empty buffer %i in %s\n", n, prog.name)
+		return
+	end
+	local sortlength = libc.toint(G_FLOAT(prog, OFS_PARM0 + 3))
+	if sortlength <= 0 then
+		sortlength = 0x7FFFFFFF
+	end
+	local function strncmp(a: string, b: string): number
+		return libc.strcmp(string.sub(a, 1, sortlength), string.sub(b, 1, sortlength))
+	end
+	local up = G_FLOAT(prog, OFS_PARM0 + 6) == 0
+	local cmp = function(a: string?, b: string?): number
+		if not a or a == "" then
+			return 1
+		end
+		if not b or b == "" then
+			return -1
+		end
+		return if up then strncmp(a, b) else strncmp(b, a)
+	end
+	local arr: { any } = table.create(sb.num_strings)
+	for k = 0, sb.num_strings - 1 do
+		arr[k] = sb.strings[k] or false
+	end
+	local wrapped = function(a: any, b: any): number
+		return cmp(if a == false then nil else a, if b == false then nil else b)
+	end
+	msort(arr, 0, sb.num_strings, wrapped)
+	for k = 0, sb.num_strings - 1 do
+		sb.strings[k] = if arr[k] == false then nil else arr[k]
+	end
+	BufStr_Shrink(sb)
+end
+
+-- port: prvm_cmds.c VM_buf_implode L4906-4938 @xonotic-v0.8.6 (the separator is strlcat'ed before every
+-- string, the first included; l does not count it for i == 0)
+function prvm_cmds.VM_buf_implode(prog: any)
+	SAFEPARMCOUNT(prog, 2, "VM_buf_implode")
+	local n = libc.toint(G_FLOAT(prog, OFS_PARM0))
+	local sb = RecordAtIndex(prog, n)
+	SET_G_INT(prog, OFS_RETURN, 0) -- OFS_NULL
+	if not sb then
+		prvm_cmds.VM_Warning(prog, "VM_buf_implode: invalid buffer %i used in %s\n", n, prog.name)
+		return
+	end
+	if sb.num_strings == 0 then
+		return
+	end
+	local sep = libc.cstr(G_STRING(prog, OFS_PARM0 + 3))
+	local k = ""
+	local l = 0
+	local cap = VM_STRINGTEMP_LENGTH - 1
+	for i = 0, sb.num_strings - 1 do
+		local str = sb.strings[i]
+		if str then
+			l += (if i > 0 then #sep else 0) + #str
+			if l >= cap then
+				break
+			end
+			k = string.sub(k .. sep, 1, cap) -- strlcat(k, sep, sizeof(k))
+			k = string.sub(k .. str, 1, cap)
+		end
+	end
+	SET_G_INT(prog, OFS_RETURN, prvm_edict.PRVM_SetTempString(prog, k))
+end
+
+-- port: prvm_cmds.c VM_bufstr_add L5010-5048 @xonotic-v0.8.6
+function prvm_cmds.VM_bufstr_add(prog: any)
+	SAFEPARMCOUNT(prog, 3, "VM_bufstr_add")
+	local n = libc.toint(G_FLOAT(prog, OFS_PARM0))
+	local sb = RecordAtIndex(prog, n)
+	SET_G_FLOAT(prog, OFS_RETURN, -1)
+	if not sb then
+		prvm_cmds.VM_Warning(prog, "VM_bufstr_add: invalid buffer %i used in %s\n", n, prog.name)
+		return
+	end
+	if buffer.readi32(prog.globals, (OFS_PARM0 + 3) * 4) == 0 then -- NULL string
+		prvm_cmds.VM_Warning(prog, "VM_bufstr_add: can not add an empty string to buffer %i in %s\n", n, prog.name)
+		return
+	end
+	local str = libc.cstr(G_STRING(prog, OFS_PARM0 + 3))
+	local order = libc.toint(G_FLOAT(prog, OFS_PARM0 + 6))
+	local strindex
+	if order ~= 0 then
+		strindex = sb.num_strings
+	else
+		strindex = 0
+		while strindex < sb.num_strings do
+			if sb.strings[strindex] == nil then
+				break
+			end
+			strindex += 1
+		end
+	end
+	BufStr_Expand(sb, strindex)
+	sb.num_strings = math.max(sb.num_strings, strindex + 1)
+	sb.strings[strindex] = str
+	SET_G_FLOAT(prog, OFS_RETURN, strindex)
+end
+
+-- port: prvm_cmds.c VM_bufstr_free L5057-5084 @xonotic-v0.8.6
+function prvm_cmds.VM_bufstr_free(prog: any)
+	SAFEPARMCOUNT(prog, 2, "VM_bufstr_free")
+	local n = libc.toint(G_FLOAT(prog, OFS_PARM0))
+	local sb = RecordAtIndex(prog, n)
+	if not sb then
+		prvm_cmds.VM_Warning(prog, "VM_bufstr_free: invalid buffer %i used in %s\n", n, prog.name)
+		return
+	end
+	local i = libc.toint(G_FLOAT(prog, OFS_PARM0 + 3))
+	if i < 0 then
+		prvm_cmds.VM_Warning(prog, "VM_bufstr_free: invalid string index %i used in %s\n", i, prog.name)
+		return
+	end
+	if i < sb.num_strings then
+		sb.strings[i] = nil
+	end
+	BufStr_Shrink(sb)
+end
+
+local MATCH_WHOLE, MATCH_LEFT, MATCH_RIGHT, MATCH_MIDDLE, MATCH_PATTERN = 1, 2, 3, 4, 5
+
+-- port: prvm_cmds.c detect_match_rule L5257-5309 @xonotic-v0.8.6 (ppos - pattern == patternlength never
+-- holds, so "*x*" and "x*" are MATCH_PATTERN, as in C)
+local function detect_match_rule(pattern: string): (string, number)
+	local patternlength = #pattern
+	local ppos = string.find(pattern, "*", 1, true)
+	local qpos = string.find(pattern, "?", 1, true)
+	-- has ? - pattern
+	if qpos then
+		return pattern, MATCH_PATTERN
+	end
+	-- has * - left, mid, right or pattern
+	if ppos then
+		-- starts with * - may be right/mid or pattern
+		if ppos - 1 == 0 then
+			ppos = string.find(pattern, "*", 2, true)
+			-- *something
+			if not ppos then
+				return string.sub(pattern, 2), MATCH_RIGHT
+			end
+			-- *something*
+			if ppos - 1 == patternlength then
+				return string.sub(pattern, 2, ppos - 1), MATCH_MIDDLE
+			end
+			-- *som*thing
+			return pattern, MATCH_PATTERN
+		end
+		-- end with * - left
+		if ppos - 1 == patternlength then
+			return string.sub(pattern, 1, ppos - 1), MATCH_LEFT
+		end
+		-- som*thing
+		return pattern, MATCH_PATTERN
+	end
+	-- have no wildcards - whole string
+	return pattern, MATCH_WHOLE
+end
+
+-- port: prvm_cmds.c match_rule L5312-5329 @xonotic-v0.8.6
+local function match_rule(
+	str: string,
+	max_string: number,
+	pattern: string,
+	patternlength: number,
+	rule: number
+): boolean
+	if rule == 1 then
+		return string.sub(str, 1, max_string) == string.sub(pattern, 1, max_string)
+	end
+	if rule == 2 then
+		return string.sub(str, 1, patternlength) == string.sub(pattern, 1, patternlength)
+	end
+	if rule == 3 then
+		local mid = string.find(str, pattern, 1, true)
+		return mid ~= nil and mid + patternlength - 1 == #str
+	end
+	if rule == 4 then
+		return string.find(str, pattern, 1, true) ~= nil
+	end
+	-- pattern
+	return filematch.matchpattern_with_separator(str, pattern, false, "", false)
+end
+
+-- port: prvm_cmds.c VM_bufstr_find L5339-5386 @xonotic-v0.8.6
+function prvm_cmds.VM_bufstr_find(prog: any)
+	SAFEPARMCOUNTRANGE(prog, 3, 5, "VM_bufstr_find")
+	SET_G_FLOAT(prog, OFS_RETURN, -1)
+	local n = libc.toint(G_FLOAT(prog, OFS_PARM0))
+	local sb = RecordAtIndex(prog, n)
+	if not sb then
+		prvm_cmds.VM_Warning(prog, "VM_bufstr_find: invalid buffer %i used in %s\n", n, prog.name)
+		return
+	end
+	local matchrule = libc.toint(G_FLOAT(prog, OFS_PARM0 + 6))
+	local match
+	if matchrule ~= 0 then
+		match = libc.cstr(G_STRING(prog, OFS_PARM0 + 3))
+	else
+		match, matchrule =
+			detect_match_rule(string.sub(libc.cstr(G_STRING(prog, OFS_PARM0 + 3)), 1, VM_STRINGTEMP_LENGTH - 1))
+	end
+	local matchlen = #match
+	local i = if prog.argc > 3 then libc.toint(G_FLOAT(prog, OFS_PARM0 + 9)) else 0
+	local step = if prog.argc > 4 then libc.toint(G_FLOAT(prog, OFS_PARM0 + 12)) else 1
+	while i < sb.num_strings do
+		local str = sb.strings[i]
+		if str and match_rule(str, VM_STRINGTEMP_LENGTH, match, matchlen, matchrule) then
+			SET_G_FLOAT(prog, OFS_RETURN, i)
+			break
+		end
+		i += step
+	end
+end
+
+-- port: prvm_cmds.c VM_matchpattern L5394-5426 @xonotic-v0.8.6
+function prvm_cmds.VM_matchpattern(prog: any)
+	SAFEPARMCOUNTRANGE(prog, 2, 4, "VM_matchpattern")
+	local str = libc.cstr(G_STRING(prog, OFS_PARM0))
+	local matchrule = libc.toint(G_FLOAT(prog, OFS_PARM0 + 6))
+	local match
+	if matchrule ~= 0 then
+		match = libc.cstr(G_STRING(prog, OFS_PARM0 + 3))
+	else
+		match, matchrule =
+			detect_match_rule(string.sub(libc.cstr(G_STRING(prog, OFS_PARM0 + 3)), 1, VM_STRINGTEMP_LENGTH - 1))
+	end
+	local l = #match
+	if prog.argc > 3 then
+		-- s += max(0, min((unsigned int)PARM3, strlen(s) - 1)) in size_t
+		local u = libc.toint64(G_FLOAT(prog, OFS_PARM0 + 9)) % 4294967296
+		local lim = if #str == 0 then 2 ^ 64 - 1 else #str - 1
+		local off = math.min(u, lim)
+		str = string.sub(str, off + 1)
+	end
+	SET_G_FLOAT(prog, OFS_RETURN, if match_rule(str, VM_STRINGTEMP_LENGTH, match, l, matchrule) then 1 else 0)
+end
+
 prvm_cmds.BUILTINS = {
 	VM_cvar = prvm_cmds.VM_cvar,
 	VM_cvar_type = prvm_cmds.VM_cvar_type,
@@ -2079,6 +2379,13 @@ prvm_cmds.BUILTINS = {
 	VM_bufstr_set = prvm_cmds.VM_bufstr_set,
 	VM_buf_cvarlist = prvm_cmds.VM_buf_cvarlist,
 	VM_strtolower = prvm_cmds.VM_strtolower,
+	VM_buf_copy = prvm_cmds.VM_buf_copy,
+	VM_buf_sort = prvm_cmds.VM_buf_sort,
+	VM_buf_implode = prvm_cmds.VM_buf_implode,
+	VM_bufstr_add = prvm_cmds.VM_bufstr_add,
+	VM_bufstr_free = prvm_cmds.VM_bufstr_free,
+	VM_bufstr_find = prvm_cmds.VM_bufstr_find,
+	VM_matchpattern = prvm_cmds.VM_matchpattern,
 	VM_makevectors = prvm_cmds.VM_makevectors,
 	VM_vectorvectors = prvm_cmds.VM_vectorvectors,
 	VM_normalize = prvm_cmds.VM_normalize,
