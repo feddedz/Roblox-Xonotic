@@ -1081,6 +1081,160 @@ function prvm_cmds.VM_digest_hex(prog: any)
 	end
 end
 
+local PRVM_MAX_OPENFILES = 256 -- progsvm.h L271 (not DP_SMALLMEMORY)
+
+local function openfiles(prog: any): { [number]: any }
+	prog.openfiles = prog.openfiles or {}
+	return prog.openfiles
+end
+
+local function developer_extra(): boolean
+	local v = cvar.Cvar_FindVar("developer_extra")
+	return v ~= nil and v.integer ~= 0
+end
+
+-- port: prvm_cmds.c VM_fopen L1805-1859 @xonotic-v0.8.6 (PRVM_AllocationOrigin: leak report not ported)
+function prvm_cmds.VM_fopen(prog: any)
+	SAFEPARMCOUNT(prog, 2, "VM_fopen")
+	local of = openfiles(prog)
+	local filenum = 0
+	while filenum < PRVM_MAX_OPENFILES do
+		if of[filenum] == nil then
+			break
+		end
+		filenum += 1
+	end
+	if filenum >= PRVM_MAX_OPENFILES then
+		SET_G_FLOAT(prog, OFS_RETURN, -2)
+		prvm_cmds.VM_Warning(prog, "VM_fopen: %s ran out of file handles (%i)\n", prog.name, PRVM_MAX_OPENFILES)
+		return
+	end
+	local filename = libc.cstr(G_STRING(prog, OFS_PARM0))
+	local mode = libc.toint(G_FLOAT(prog, OFS_PARM0 + 3))
+	local modestring
+	if mode == 0 then -- FILE_READ
+		modestring = "rb"
+		of[filenum] = fs.FS_OpenVirtualFile(string.sub("data/" .. filename, 1, 1023), false)
+		if of[filenum] == nil then
+			of[filenum] = fs.FS_OpenVirtualFile(string.sub(filename, 1, 1023), false)
+		end
+	elseif mode == 1 then -- FILE_APPEND
+		modestring = "a"
+		of[filenum] = fs.FS_OpenRealFile(string.sub("data/" .. filename, 1, 1023), modestring, false)
+	elseif mode == 2 then -- FILE_WRITE
+		modestring = "w"
+		of[filenum] = fs.FS_OpenRealFile(string.sub("data/" .. filename, 1, 1023), modestring, false)
+	else
+		SET_G_FLOAT(prog, OFS_RETURN, -3)
+		prvm_cmds.VM_Warning(
+			prog,
+			"VM_fopen: %s: no such mode %i (valid: 0 = read, 1 = append, 2 = write)\n",
+			prog.name,
+			mode
+		)
+		return
+	end
+	if of[filenum] == nil then
+		SET_G_FLOAT(prog, OFS_RETURN, -1)
+		if developer_extra() then
+			prvm_cmds.VM_Warning(prog, "VM_fopen: %s: %s mode %s failed\n", prog.name, filename, modestring)
+		end
+	else
+		SET_G_FLOAT(prog, OFS_RETURN, filenum)
+		if developer_extra() then
+			console.Con_DPrint(
+				string.format("VM_fopen: %s: %s mode %s opened as #%i\n", prog.name, filename, modestring, filenum)
+			)
+		end
+	end
+end
+
+-- handle checks shared by VM_fclose / VM_fgets / VM_fputs
+local function fileHandle(prog: any, fname: string): (any, number)
+	local filenum = libc.toint(G_FLOAT(prog, OFS_PARM0))
+	if filenum < 0 or filenum >= PRVM_MAX_OPENFILES then
+		prvm_cmds.VM_Warning(prog, "%s: invalid file handle %i used in %s\n", fname, filenum, prog.name)
+		return nil, filenum
+	end
+	local f = openfiles(prog)[filenum]
+	if f == nil then
+		prvm_cmds.VM_Warning(
+			prog,
+			"%s: no such file handle %i (or file has been closed) in %s\n",
+			fname,
+			filenum,
+			prog.name
+		)
+	end
+	return f, filenum
+end
+
+-- port: prvm_cmds.c VM_fclose L1869-1892 @xonotic-v0.8.6
+function prvm_cmds.VM_fclose(prog: any)
+	SAFEPARMCOUNT(prog, 1, "VM_fclose")
+	local f, filenum = fileHandle(prog, "VM_fclose")
+	if not f then
+		return
+	end
+	fs.FS_Close(f)
+	openfiles(prog)[filenum] = nil
+	if developer_extra() then
+		console.Con_DPrint(string.format("VM_fclose: %s: #%i closed\n", prog.name, filenum))
+	end
+end
+
+-- port: prvm_cmds.c VM_fgets L1902-1945 @xonotic-v0.8.6
+function prvm_cmds.VM_fgets(prog: any)
+	SAFEPARMCOUNT(prog, 1, "VM_fgets")
+	-- set the return value regardless of any possible errors
+	SET_G_INT(prog, OFS_RETURN, 0) -- OFS_NULL
+	local f = fileHandle(prog, "VM_fgets")
+	if not f then
+		return
+	end
+	local out = {}
+	local c
+	while true do
+		c = fs.FS_Getc(f)
+		if c == 13 or c == 10 or c < 0 then
+			break
+		end
+		if #out < VM_STRINGTEMP_LENGTH - 1 then
+			table.insert(out, string.char(c))
+		end
+	end
+	local str = table.concat(out)
+	-- remove \n following \r
+	if c == 13 then
+		c = fs.FS_Getc(f)
+		if c ~= 10 then
+			fs.FS_UnGetc(f, c % 256) -- (unsigned char)c: EOF becomes 255, as in C
+		end
+	end
+	if developer_extra() then
+		console.Con_DPrint(string.format("fgets: %s: %s\n", prog.name, libc.cstr(str)))
+	end
+	if c >= 0 or #out > 0 then
+		SET_G_INT(prog, OFS_RETURN, prvm_edict.PRVM_SetTempString(prog, str))
+	end
+end
+
+-- port: prvm_cmds.c VM_fputs L1955-1979 @xonotic-v0.8.6
+function prvm_cmds.VM_fputs(prog: any)
+	SAFEPARMCOUNT(prog, 2, "VM_fputs")
+	local f = fileHandle(prog, "VM_fputs")
+	if not f then
+		return
+	end
+	local str = prvm_cmds.VM_VarString(prog, 1, VM_STRINGTEMP_LENGTH)
+	if #str > 0 then
+		fs.FS_Write(f, str)
+	end
+	if developer_extra() then
+		console.Con_DPrint(string.format("fputs: %s: %s\n", prog.name, str))
+	end
+end
+
 prvm_cmds.BUILTINS = {
 	VM_cvar = prvm_cmds.VM_cvar,
 	VM_cvar_type = prvm_cmds.VM_cvar_type,
@@ -1133,6 +1287,10 @@ prvm_cmds.BUILTINS = {
 	VM_bufstr_set = prvm_cmds.VM_bufstr_set,
 	VM_buf_cvarlist = prvm_cmds.VM_buf_cvarlist,
 	VM_strtolower = prvm_cmds.VM_strtolower,
+	VM_fopen = prvm_cmds.VM_fopen,
+	VM_fclose = prvm_cmds.VM_fclose,
+	VM_fgets = prvm_cmds.VM_fgets,
+	VM_fputs = prvm_cmds.VM_fputs,
 	VM_digest_hex = prvm_cmds.VM_digest_hex,
 	VM_strtoupper = prvm_cmds.VM_strtoupper,
 	VM_search_begin = prvm_cmds.VM_search_begin,

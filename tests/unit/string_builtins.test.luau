@@ -285,6 +285,47 @@ return function(ctx: t.Ctx)
 	setstr(0, "MD5")
 	prvm_cmds.VM_digest_hex(prog)
 	t.eq(ctx, buffer.readi32(prog.globals, 4), 0, "unknown digest -> string_null")
+	-- fopen / fgets / fputs / fclose
+	fs.realfiles = {}
+	prog.argc = 2
+	setstr(0, "x.txt")
+	setf(1, 2) -- FILE_WRITE
+	prvm_cmds.VM_fopen(prog)
+	local wh = retf()
+	t.eq(ctx, wh, 0)
+	setf(0, wh)
+	setstr(1, "line1\r\nline2\rline3\n")
+	prvm_cmds.VM_fputs(prog)
+	prog.argc = 1
+	prvm_cmds.VM_fclose(prog)
+	t.eq(ctx, fs.realfiles["data/x.txt"], "line1\r\nline2\rline3\n", "written under data/")
+	prog.argc = 2
+	setstr(0, "x.txt")
+	setf(1, 0)
+	prvm_cmds.VM_fopen(prog)
+	local rh = retf()
+	prog.argc = 1
+	setf(0, rh)
+	local got = {}
+	for _ = 1, 4 do
+		prvm_cmds.VM_fgets(prog)
+		table.insert(got, if buffer.readi32(prog.globals, 4) == 0 then "<null>" else rets())
+	end
+	t.eq(ctx, table.concat(got, "|"), "line1|line2|line3|<null>", "CR, CRLF, LF; EOF -> string_null")
+	prvm_cmds.VM_fclose(prog)
+	prog.argc = 2
+	setstr(0, "missing.txt")
+	setf(1, 0)
+	prvm_cmds.VM_fopen(prog)
+	t.eq(ctx, retf(), -1)
+	setf(1, 7)
+	prvm_cmds.VM_fopen(prog)
+	t.eq(ctx, retf(), -3, "bad mode")
+	setstr(0, "maps/a.mapinfo")
+	setf(1, 0)
+	prvm_cmds.VM_fopen(prog)
+	t.eq(ctx, retf(), -1, "provider load returns nil here")
+	fs.realfiles = {}
 	fs.SetProvider(nil)
 	cvar.reset()
 end
