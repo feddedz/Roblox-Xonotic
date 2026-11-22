@@ -17,7 +17,7 @@ Every section except §MAP and §DIFFS stays under ~60 lines; detail lives in `d
 
 <!-- §STATUS -->
 ## §STATUS (rewritten 2026-11-22, Claude-Anvil)
-- **Owner's account clear (unbanned 2026-11-22 08:00 UTC).** All 3,201 uploaded assets renamed to neutral names
+- **Owner's account moderated again (13:40 UTC 2026-11-22, Open Cloud 'User is moderated'); uploads stopped.** Earlier: unbanned 08:00 UTC. All 3,201 uploaded assets renamed to neutral names
   (G-047). Gated texture upload (`tools/upload/run_unattended.sh`, batches of 300, stops at Rejected/403/45-min review)
   at 3,296 approved; paused because textures/cp_glow.jpg sat in review > 45 min — relaunch once it is Approved.
   Owner still to archive the old flagged images (72623604865243, 93867009513964, assets/manifest/replace-after-review.tsv).
