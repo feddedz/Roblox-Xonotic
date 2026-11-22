@@ -37,5 +37,60 @@ return function(ctx: t.Ctx)
 	t.eq(ctx, prvm_edict.PRVM_ED_Alloc(prog), a, "free again after 1 s")
 	prvm_edict.PRVM_ED_Free(prog, 1)
 	t.ok(ctx, not prog.ed_free[1], "reserved edicts are never freed")
+	-- find / findfloat / findflags / findchain* on field slots (0: string, 1: float, 3: chain)
+	local prvm_cmds = require("../../engine/prvm_cmds")
+	prog.globals = buffer.create(4 * 64)
+	prog.strings = "\0" -- offset 0 is string_null, as in a real progs.dat
+	prog.stringssize = 1
+	prog.argc = 3
+	local function E(e: number, f: number): number
+		return (e * prog.entityfields + f) * 4
+	end
+	local str = prvm_edict.PRVM_SetTempString(prog, "item")
+	for e = 1, prog.num_edicts - 1 do
+		if not prog.ed_free[e] then
+			buffer.writei32(prog.edictsfields, E(e, 0), 0)
+			buffer.writef32(prog.edictsfields, E(e, 1), 0)
+		end
+	end
+	local live = {}
+	for e = 1, prog.num_edicts - 1 do
+		if not prog.ed_free[e] then
+			table.insert(live, e)
+		end
+	end
+	local x, y = live[2], live[3]
+	buffer.writei32(prog.edictsfields, E(x, 0), str)
+	buffer.writei32(prog.edictsfields, E(y, 0), str)
+	buffer.writef32(prog.edictsfields, E(y, 1), 6)
+	local function ret(): number
+		return buffer.readi32(prog.globals, 4)
+	end
+	buffer.writei32(prog.globals, 16, 0)
+	buffer.writei32(prog.globals, 28, 0)
+	buffer.writei32(prog.globals, 40, prvm_edict.PRVM_SetTempString(prog, "item"))
+	prvm_cmds.VM_find(prog)
+	t.eq(ctx, ret(), x, "find first")
+	buffer.writei32(prog.globals, 16, x)
+	prvm_cmds.VM_find(prog)
+	t.eq(ctx, ret(), y, "find next")
+	buffer.writei32(prog.globals, 16, y)
+	prvm_cmds.VM_find(prog)
+	t.eq(ctx, ret(), 0, "find end -> world")
+	buffer.writei32(prog.globals, 16, 0)
+	buffer.writei32(prog.globals, 28, 1)
+	buffer.writef32(prog.globals, 40, 2)
+	prvm_cmds.VM_findflags(prog)
+	t.eq(ctx, ret(), y, "findflags 6 & 2")
+	buffer.writef32(prog.globals, 40, 6)
+	prvm_cmds.VM_findfloat(prog)
+	t.eq(ctx, ret(), y, "findfloat")
+	buffer.writei32(prog.globals, 16, 0)
+	buffer.writei32(prog.globals, 28, prvm_edict.PRVM_SetTempString(prog, "item"))
+	buffer.writei32(prog.globals, 40, 3)
+	prvm_cmds.VM_findchain(prog)
+	t.eq(ctx, ret(), y, "chain head = last match")
+	t.eq(ctx, buffer.readi32(prog.edictsfields, E(y, 3)), x, "chain link")
+	t.eq(ctx, buffer.readi32(prog.edictsfields, E(x, 3)), 0, "chain end")
 	prvm_edict.realtime = 0
 end

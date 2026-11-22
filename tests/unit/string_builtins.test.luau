@@ -392,6 +392,64 @@ return function(ctx: t.Ctx)
 	prvm_cmds.VM_strdecolorize(prog)
 	t.eq(ctx, rets(), "red green ^^caret ^q ^^xZZ end^^")
 	t.eq(ctx, select(2, common.COM_StringDecolorize("^1abc", 0, 3, false)), "ab", "out of room")
+	-- math / vector builtins
+	local function vecret(): string
+		return string.format(
+			"%g %g %g",
+			buffer.readf32(prog.globals, 4),
+			buffer.readf32(prog.globals, 8),
+			buffer.readf32(prog.globals, 12)
+		)
+	end
+	prog.argc = 2
+	setf(0, 1)
+	setf(1, 4)
+	prvm_cmds.VM_bitshift(prog)
+	t.eq(ctx, retf(), 16)
+	setf(0, -12)
+	setf(1, -2)
+	prvm_cmds.VM_bitshift(prog)
+	t.eq(ctx, retf(), 3, "fabs of the int first")
+	setf(0, 1)
+	setf(1, 33)
+	prvm_cmds.VM_bitshift(prog)
+	t.eq(ctx, retf(), 2, "x86 shift count & 31")
+	prog.argc = 1
+	setstr(0, "'1 -2.5 3e2'")
+	prvm_cmds.VM_stov(prog)
+	t.eq(ctx, vecret(), "1 -2.5 300")
+	setstr(0, "4 x 5")
+	prvm_cmds.VM_stov(prog)
+	t.eq(ctx, vecret(), "4 0 0", "stops at a non-number")
+	for k = 0, 2 do
+		buffer.writef32(prog.globals, (4 + k) * 4, ({ 1, -22.25, 333 })[k + 1])
+	end
+	prvm_cmds.VM_vtos(prog)
+	t.eq(ctx, rets(), "'  1.0 -22.2 333.0'")
+	for k = 0, 2 do
+		buffer.writef32(prog.globals, (4 + k) * 4, ({ 0, -5, 0 })[k + 1])
+	end
+	prvm_cmds.VM_vectoyaw(prog)
+	t.eq(ctx, retf(), 270)
+	prvm_cmds.VM_normalize(prog)
+	t.eq(ctx, vecret(), "0 -1 0")
+	setstr(0, "^1ab^^c^x123d^")
+	prvm_cmds.VM_strlennocol(prog)
+	t.eq(ctx, retf(), 6, "a b ^ c d + unfinished ^")
+	setstr(0, "é^2é")
+	prvm_cmds.VM_strlennocol(prog)
+	t.eq(ctx, retf(), 2)
+	prog.argc = 3
+	setf(0, 72)
+	setf(1, 0xE9)
+	setf(2, 0x263A)
+	prvm_cmds.VM_chr2str(prog)
+	t.eq(ctx, rets(), "Hé☺")
+	prog.argc = 2
+	setf(0, 1)
+	setf(1, -1)
+	prvm_cmds.VM_atan2(prog)
+	t.eq(ctx, retf(), f32.round(math.atan2(1, -1)))
 	fs.SetProvider(nil)
 	cvar.reset()
 end

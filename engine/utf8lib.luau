@@ -454,4 +454,115 @@ function utf8lib.u8_strpad_colorcodes(s: string, leftalign: boolean, minwidth: n
 	return pad3(if leftalign then 0 else pad, l, s, if leftalign then pad else 0)
 end
 
+local function isxdigit(c: number): boolean
+	return (c >= 48 and c <= 57) or (c >= 97 and c <= 102) or (c >= 65 and c <= 70)
+end
+
+-- port: common.c COM_StringLengthNoColors L1871-1923 @xonotic-v0.8.6 (returns len, valid)
+function utf8lib.COM_StringLengthNoColors(s: string, size_s: number): (number, boolean)
+	local e = if size_s ~= 0 then size_s + 1 else -1
+	local function c(k: number): number
+		return if k == e then 0 else at(s, k)
+	end
+	local p, len = 1, 0
+	while true do
+		local ch = c(p)
+		if ch == 0 then
+			return len, true
+		elseif ch == 94 then -- STRING_COLOR_TAG
+			p += 1
+			local d = c(p)
+			if d == 120 then -- STRING_COLOR_RGB_TAG_CHAR
+				if
+					p + 1 ~= e
+					and isxdigit(c(p + 1))
+					and p + 2 ~= e
+					and isxdigit(c(p + 2))
+					and p + 3 ~= e
+					and isxdigit(c(p + 3))
+				then
+					p += 3
+				else
+					len += 2
+				end
+			elseif d == 0 then -- ends with unfinished color code!
+				return len + 1, false
+			elseif d == 94 then -- escaped ^
+				len += 1
+			elseif d < 48 or d > 57 then -- not a color code (0-9: color code)
+				len += 2
+			end
+		else
+			len += 1
+		end
+		p += 1
+	end
+end
+
+-- port: utf8lib.c u8_COM_StringLengthNoColors L784-878 @xonotic-v0.8.6 (returns len, valid)
+function utf8lib.u8_COM_StringLengthNoColors(s: string, size_s: number): (number, boolean)
+	if not enabled() then
+		return utf8lib.COM_StringLengthNoColors(s, size_s)
+	end
+	local e = if size_s ~= 0 then size_s + 1 else -1
+	local function c(k: number): number
+		return if k == e then 0 else at(s, k)
+	end
+	local p, len = 1, 0
+	while true do
+		local ch = c(p)
+		if ch == 0 then
+			return len, true
+		elseif ch == 94 then
+			p += 1
+			local d = c(p)
+			if d == 120 then
+				if
+					p + 1 ~= e
+					and isxdigit(c(p + 1))
+					and p + 2 ~= e
+					and isxdigit(c(p + 2))
+					and p + 3 ~= e
+					and isxdigit(c(p + 3))
+				then
+					p += 3
+				else
+					len += 2
+				end
+			elseif d == 0 then
+				return len + 1, false
+			elseif d == 94 then
+				len += 1
+			elseif d < 48 or d > 57 then
+				len += 2
+			end
+			p += 1
+			continue
+		end
+		-- ascii char, skip u8_analyze
+		if ch < 0x80 then
+			len += 1
+			p += 1
+			continue
+		end
+		-- invalid, skip u8_analyze
+		if ch < 0xC2 then
+			p += 1
+			continue
+		end
+		local ok, st, ln = u8_analyze(s, p, U8_ANALYZE_INFINITY)
+		if not ok then
+			-- we CAN end up here, if an invalid char is between this one and the end of the string
+			return len, true
+		end
+		if e ~= -1 and p + st + ln > e then
+			-- string length exceeded by new character
+			return len, true
+		end
+		-- valid character, skip after it
+		p += st + ln
+		len += 1
+	end
+end
+
 return utf8lib

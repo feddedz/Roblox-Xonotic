@@ -20,6 +20,8 @@ local f32 = require("./_port/f32")
 local fs = require("./fs")
 local mdfour = require("./mdfour")
 local sha256 = require("./_port/sha256")
+local mathlib = require("./mathlib")
+local host_cmd = require("./host_cmd")
 
 local prvm_cmds = {}
 
@@ -1581,6 +1583,450 @@ function prvm_cmds.VM_strdecolorize(prog: any)
 	SET_G_INT(prog, OFS_RETURN, prvm_edict.PRVM_SetTempString(prog, out))
 end
 
+-- vectors and fields
+local R = f32.round
+local M_PI = 3.14159265358979323846
+local function G_VECTOR(prog: any, ofs: number): { number }
+	local g = prog.globals
+	return { buffer.readf32(g, ofs * 4), buffer.readf32(g, ofs * 4 + 4), buffer.readf32(g, ofs * 4 + 8) }
+end
+local function SET_G_VECTOR(prog: any, ofs: number, v: { number })
+	local g = prog.globals
+	buffer.writef32(g, ofs * 4, v[1])
+	buffer.writef32(g, ofs * 4 + 4, v[2])
+	buffer.writef32(g, ofs * 4 + 8, v[3])
+end
+-- PRVM_gameglobal* by name (PRVM_FindOffsets: globaloffsets)
+local function GlobalOfs(prog: any, name: string): number
+	prog.globalofs_cache = prog.globalofs_cache or {}
+	local o = prog.globalofs_cache[name]
+	if o == nil then
+		local d = prvm_edict.PRVM_ED_FindGlobal(prog, name)
+		o = if d then (d :: any).ofs else -1
+		prog.globalofs_cache[name] = o
+	end
+	return o
+end
+local function E_OFS(prog: any, ed: number, f: number): number
+	return (ed * prog.entityfields + f) * 4
+end
+local function E_FLOAT(prog: any, ed: number, f: number): number
+	return buffer.readf32(prog.edictsfields, E_OFS(prog, ed, f))
+end
+local function SET_E_FLOAT(prog: any, ed: number, f: number, v: number)
+	buffer.writef32(prog.edictsfields, E_OFS(prog, ed, f), v)
+end
+local function E_INT(prog: any, ed: number, f: number): number
+	return buffer.readi32(prog.edictsfields, E_OFS(prog, ed, f))
+end
+local function SET_E_INT(prog: any, ed: number, f: number, v: number)
+	buffer.writei32(prog.edictsfields, E_OFS(prog, ed, f), v)
+end
+local function G_EDICTNUM(prog: any, ofs: number): number
+	return buffer.readi32(prog.globals, ofs * 4)
+end
+local function setGameVectors(prog: any, forward: { number }, right: { number }, up: { number })
+	SET_G_VECTOR(prog, GlobalOfs(prog, "v_forward"), forward)
+	SET_G_VECTOR(prog, GlobalOfs(prog, "v_right"), right)
+	SET_G_VECTOR(prog, GlobalOfs(prog, "v_up"), up)
+end
+
+-- port: prvm_cmds.c VM_makevectors L4318-4327 @xonotic-v0.8.6
+function prvm_cmds.VM_makevectors(prog: any)
+	SAFEPARMCOUNT(prog, 1, "VM_makevectors")
+	local f, r, u = {}, {}, {}
+	mathlib.AngleVectors(G_VECTOR(prog, OFS_PARM0), f, r, u)
+	setGameVectors(prog, f, r, u)
+end
+
+-- port: prvm_cmds.c VM_vectorvectors L4337-4346 @xonotic-v0.8.6
+function prvm_cmds.VM_vectorvectors(prog: any)
+	SAFEPARMCOUNT(prog, 1, "VM_vectorvectors")
+	local f, r, u = {}, {}, {}
+	mathlib.VectorNormalize2(G_VECTOR(prog, OFS_PARM0), f)
+	mathlib.VectorVectors(f, r, u)
+	setGameVectors(prog, f, r, u)
+end
+
+-- port: prvm_cmds.c VM_normalize L463-483 @xonotic-v0.8.6
+function prvm_cmds.VM_normalize(prog: any)
+	SAFEPARMCOUNT(prog, 1, "VM_normalize")
+	local v = G_VECTOR(prog, OFS_PARM0)
+	local f = mathlib.DotProduct(v, v)
+	local nv = { 0, 0, 0 }
+	if f ~= 0 then
+		f = 1.0 / math.sqrt(f)
+		nv = { R(v[1] * f), R(v[2] * f), R(v[3] * f) }
+	end
+	SET_G_VECTOR(prog, OFS_RETURN, nv)
+end
+
+-- port: prvm_cmds.c VM_vectoyaw L505-524 @xonotic-v0.8.6
+function prvm_cmds.VM_vectoyaw(prog: any)
+	SAFEPARMCOUNT(prog, 1, "VM_vectoyaw")
+	local v = G_VECTOR(prog, OFS_PARM0)
+	local yaw = 0
+	if not (v[2] == 0 and v[1] == 0) then
+		yaw = libc.toint(math.atan2(v[2], v[1]) * 180 / M_PI)
+		if yaw < 0 then
+			yaw += 360
+		end
+	end
+	SET_G_FLOAT(prog, OFS_RETURN, yaw)
+end
+
+-- port: prvm_cmds.c VM_vectoangles L534-548 @xonotic-v0.8.6
+function prvm_cmds.VM_vectoangles(prog: any)
+	SAFEPARMCOUNTRANGE(prog, 1, 2, "VM_vectoangles")
+	local result = {}
+	if prog.argc >= 2 then
+		mathlib.AnglesFromVectors(result, G_VECTOR(prog, OFS_PARM0), G_VECTOR(prog, OFS_PARM0 + 3), true)
+	else
+		mathlib.AnglesFromVectors(result, G_VECTOR(prog, OFS_PARM0), nil, true)
+	end
+	SET_G_VECTOR(prog, OFS_RETURN, result)
+end
+
+-- one-argument math builtins: PRVM_G_FLOAT(OFS_RETURN) = fn(PRVM_G_FLOAT(OFS_PARM0)) in double
+local function math1(name: string, fn: (number) -> number): (any) -> ()
+	return function(prog: any)
+		SAFEPARMCOUNT(prog, 1, name)
+		SET_G_FLOAT(prog, OFS_RETURN, fn(G_FLOAT(prog, OFS_PARM0)))
+	end
+end
+-- port: prvm_cmds.c VM_ceil L1447-1452 @xonotic-v0.8.6
+prvm_cmds.VM_ceil = math1("VM_ceil", math.ceil)
+-- port: prvm_cmds.c VM_fabs L809-817 @xonotic-v0.8.6
+prvm_cmds.VM_fabs = math1("VM_fabs", math.abs)
+-- port: prvm_cmds.c VM_sin L1524-1528 @xonotic-v0.8.6
+prvm_cmds.VM_sin = math1("VM_sin", math.sin)
+-- port: prvm_cmds.c VM_cos L1536-1540 @xonotic-v0.8.6
+prvm_cmds.VM_cos = math1("VM_cos", math.cos)
+-- port: prvm_cmds.c VM_sqrt L1549-1553 @xonotic-v0.8.6
+prvm_cmds.VM_sqrt = math1("VM_sqrt", math.sqrt)
+-- port: prvm_cmds.c VM_asin L1562-1566 @xonotic-v0.8.6
+prvm_cmds.VM_asin = math1("VM_asin", math.asin)
+-- port: prvm_cmds.c VM_acos L1574-1578 @xonotic-v0.8.6
+prvm_cmds.VM_acos = math1("VM_acos", math.acos)
+-- port: prvm_cmds.c VM_atan L1586-1590 @xonotic-v0.8.6
+prvm_cmds.VM_atan = math1("VM_atan", math.atan)
+-- port: prvm_cmds.c VM_tan L1610-1614 @xonotic-v0.8.6
+prvm_cmds.VM_tan = math1("VM_tan", math.tan)
+-- port: prvm_cmds.c VM_log L1756-1760 @xonotic-v0.8.6
+prvm_cmds.VM_log = math1("VM_log", math.log)
+
+-- port: prvm_cmds.c VM_atan2 L1598-1602 @xonotic-v0.8.6
+function prvm_cmds.VM_atan2(prog: any)
+	SAFEPARMCOUNT(prog, 2, "VM_atan2")
+	SET_G_FLOAT(prog, OFS_RETURN, math.atan2(G_FLOAT(prog, OFS_PARM0), G_FLOAT(prog, OFS_PARM0 + 3)))
+end
+
+-- port: prvm_cmds.c VM_randomvec L1625-1631 @xonotic-v0.8.6 (VectorRandom, mathlib.h L133)
+function prvm_cmds.VM_randomvec(prog: any)
+	SAFEPARMCOUNT(prog, 0, "VM_randomvec")
+	local v = { 0, 0, 0 }
+	repeat
+		v[1] = R(prvm_cmds.lhrandom(-1, 1))
+		v[2] = R(prvm_cmds.lhrandom(-1, 1))
+		v[3] = R(prvm_cmds.lhrandom(-1, 1))
+	until not (mathlib.DotProduct(v, v) > 1)
+	SET_G_VECTOR(prog, OFS_RETURN, v)
+end
+
+-- port: prvm_cmds.c VM_bitshift L4372-4386 @xonotic-v0.8.6 (x86 masks the shift count to 5 bits)
+function prvm_cmds.VM_bitshift(prog: any)
+	SAFEPARMCOUNT(prog, 2, "VM_bitshift")
+	local n1 = libc.toint(math.abs(R(libc.toint(G_FLOAT(prog, OFS_PARM0)))))
+	local n2 = libc.toint(G_FLOAT(prog, OFS_PARM0 + 3))
+	local r
+	if n1 == 0 then
+		r = n1
+	elseif n2 < 0 then
+		r = bit32.arshift(n1, -n2 % 32)
+		r = if r >= 2147483648 then r - 4294967296 else r
+	else
+		r = bit32.lshift(n1, n2 % 32)
+		r = if r >= 2147483648 then r - 4294967296 else r
+	end
+	SET_G_FLOAT(prog, OFS_RETURN, r)
+end
+
+-- VM_changeyaw / VM_changepitch body (float arithmetic)
+local function changeangle(prog: any, ent: number, idx: number, idealf: string, speedf: string, who: string)
+	if ent == 0 then
+		prvm_cmds.VM_Warning(prog, "%s: can not modify world entity\n", who)
+		return
+	end
+	if prog.ed_free[ent] then
+		prvm_cmds.VM_Warning(prog, "%s: can not modify free entity\n", who)
+		return
+	end
+	local ang = prvm_edict.FieldOfs(prog, "angles") + idx
+	local current = R(mathlib.ANGLEMOD(E_FLOAT(prog, ent, ang)))
+	local ideal = E_FLOAT(prog, ent, prvm_edict.FieldOfs(prog, idealf))
+	local speed = E_FLOAT(prog, ent, prvm_edict.FieldOfs(prog, speedf))
+	if current == ideal then
+		return
+	end
+	local move = R(ideal - current)
+	if ideal > current then
+		if move >= 180 then
+			move = R(move - 360)
+		end
+	else
+		if move <= -180 then
+			move = R(move + 360)
+		end
+	end
+	if move > 0 then
+		if move > speed then
+			move = speed
+		end
+	else
+		if move < -speed then
+			move = -speed
+		end
+	end
+	current = R(current + move)
+	SET_E_FLOAT(prog, ent, ang, R(mathlib.ANGLEMOD(current)))
+end
+
+-- port: prvm_cmds.c VM_changeyaw L5522-5573 @xonotic-v0.8.6
+function prvm_cmds.VM_changeyaw(prog: any)
+	-- this is called (VERY HACKISHLY) by VM_SV_MoveToGoal, so it can not use any parameters
+	local self = buffer.readi32(prog.globals, GlobalOfs(prog, "self") * 4)
+	changeangle(prog, self, 1, "ideal_yaw", "yaw_speed", "changeyaw")
+end
+
+-- port: prvm_cmds.c VM_changepitch L5580-5629 @xonotic-v0.8.6
+function prvm_cmds.VM_changepitch(prog: any)
+	SAFEPARMCOUNT(prog, 1, "VM_changepitch")
+	changeangle(prog, G_EDICTNUM(prog, OFS_PARM0), 0, "idealpitch", "pitch_speed", "changepitch")
+end
+
+-- port: prvm_cmds.c VM_vtos L827-835 @xonotic-v0.8.6
+function prvm_cmds.VM_vtos(prog: any)
+	SAFEPARMCOUNT(prog, 1, "VM_vtos")
+	local v = G_VECTOR(prog, OFS_PARM0)
+	local str = libc.snprintf(512, "'%5.1f %5.1f %5.1f'", v[1], v[2], v[3])
+	SET_G_INT(prog, OFS_RETURN, prvm_edict.PRVM_SetTempString(prog, str))
+end
+
+-- port: prvm_cmds.c VM_etos L845-853 @xonotic-v0.8.6
+function prvm_cmds.VM_etos(prog: any)
+	SAFEPARMCOUNT(prog, 1, "VM_etos")
+	SET_G_INT(
+		prog,
+		OFS_RETURN,
+		prvm_edict.PRVM_SetTempString(prog, string.format("entity %i", G_EDICTNUM(prog, OFS_PARM0)))
+	)
+end
+
+-- port: mathlib.c Math_atov L863-882 @xonotic-v0.8.6 (out: prvm_vec3_t, float)
+local function Math_atov(str: string, out: { number }): number
+	out[1], out[2], out[3] = 0, 0, 0
+	local p = 1
+	local function c(): number
+		return string.byte(str, p) or 0
+	end
+	if c() == 39 then
+		p += 1
+	end
+	local i = 0
+	while i < 3 do
+		while c() == 32 or c() == 9 do
+			p += 1
+		end
+		out[i + 1] = R(libc.atof(string.sub(str, p)))
+		local ch = c()
+		if out[i + 1] == 0 and ch ~= 45 and ch ~= 43 and (ch < 48 or ch > 57) then
+			break -- not a number
+		end
+		while c() ~= 0 and c() ~= 32 and c() ~= 9 and c() ~= 39 do
+			p += 1
+		end
+		if c() == 39 then
+			break
+		end
+		i += 1
+	end
+	return i
+end
+prvm_cmds.Math_atov = Math_atov
+
+-- port: prvm_cmds.c VM_stov L2503-2511 @xonotic-v0.8.6
+function prvm_cmds.VM_stov(prog: any)
+	SAFEPARMCOUNT(prog, 1, "VM_stov")
+	local v = {}
+	Math_atov(prvm_cmds.VM_VarString(prog, 0, VM_STRINGTEMP_LENGTH), v)
+	SET_G_VECTOR(prog, OFS_RETURN, v)
+end
+
+-- port: prvm_cmds.c VM_chr2str L5693-5712 @xonotic-v0.8.6
+function prvm_cmds.VM_chr2str(prog: any)
+	SAFEPARMCOUNTRANGE(prog, 0, 8, "VM_chr2str")
+	local parts = {}
+	local len = 0
+	local i = 0
+	while i < prog.argc and len < 36 do
+		local n, bytes = utf8lib.u8_fromchar(libc.toint(G_FLOAT(prog, OFS_PARM0 + i * 3)), 36)
+		if n > 0 then
+			table.insert(parts, bytes)
+		end
+		len += n
+		i += 1
+	end
+	SET_G_INT(prog, OFS_RETURN, prvm_edict.PRVM_SetTempString(prog, table.concat(parts)))
+end
+
+-- port: prvm_cmds.c VM_strlennocol L2209-2222 @xonotic-v0.8.6
+function prvm_cmds.VM_strlennocol(prog: any)
+	SAFEPARMCOUNT(prog, 1, "VM_strlennocol")
+	local n = utf8lib.u8_COM_StringLengthNoColors(libc.cstr(G_STRING(prog, OFS_PARM0)), 0)
+	SET_G_FLOAT(prog, OFS_RETURN, n)
+end
+
+-- port: prvm_cmds.c VM_isserver L2795-2800 @xonotic-v0.8.6
+function prvm_cmds.VM_isserver(prog: any)
+	SAFEPARMCOUNT(prog, 0, "VM_serverstate")
+	SET_G_FLOAT(prog, OFS_RETURN, if host_cmd.sv_active then 1 else 0)
+end
+
+-- port: prvm_cmds.c VM_wasfreed L5992-5996 @xonotic-v0.8.6
+function prvm_cmds.VM_wasfreed(prog: any)
+	SAFEPARMCOUNT(prog, 1, "VM_wasfreed")
+	SET_G_FLOAT(prog, OFS_RETURN, if prog.ed_free[G_EDICTNUM(prog, OFS_PARM0)] then 1 else 0)
+end
+
+-- port: prvm_cmds.c VM_dprint L765-775 @xonotic-v0.8.6
+function prvm_cmds.VM_dprint(prog: any)
+	SAFEPARMCOUNTRANGE(prog, 1, 8, "VM_dprint")
+	console.Con_DPrint(prvm_cmds.VM_VarString(prog, 0, VM_STRINGTEMP_LENGTH))
+end
+
+local function E_STRING(prog: any, ed: number, f: number): string
+	local t = E_INT(prog, ed, f)
+	if t == 0 then
+		return "" -- if (!t) t = "";
+	end
+	return libc.cstr(prvm_edict.PRVM_GetString(prog, t))
+end
+
+-- port: prvm_cmds.c VM_find L1016-1050 @xonotic-v0.8.6 (builtinsprofile: profiler counter, not ported)
+function prvm_cmds.VM_find(prog: any)
+	SAFEPARMCOUNT(prog, 3, "VM_find")
+	local e = G_EDICTNUM(prog, OFS_PARM0)
+	local f = buffer.readi32(prog.globals, (OFS_PARM0 + 3) * 4)
+	local str = libc.cstr(G_STRING(prog, OFS_PARM0 + 6))
+	e += 1
+	while e < prog.num_edicts do
+		if not prog.ed_free[e] and E_STRING(prog, e, f) == str then
+			RETURN_EDICT(prog, e)
+			return
+		end
+		e += 1
+	end
+	RETURN_EDICT(prog, 0)
+end
+
+-- port: prvm_cmds.c VM_findfloat L1061-1088 @xonotic-v0.8.6
+function prvm_cmds.VM_findfloat(prog: any)
+	SAFEPARMCOUNT(prog, 3, "VM_findfloat")
+	local e = G_EDICTNUM(prog, OFS_PARM0)
+	local f = buffer.readi32(prog.globals, (OFS_PARM0 + 3) * 4)
+	local v = G_FLOAT(prog, OFS_PARM0 + 6)
+	e += 1
+	while e < prog.num_edicts do
+		if not prog.ed_free[e] and E_FLOAT(prog, e, f) == v then
+			RETURN_EDICT(prog, e)
+			return
+		end
+		e += 1
+	end
+	RETURN_EDICT(prog, 0)
+end
+
+-- (prvm_int_t)float
+local function toi(x: number): number
+	return libc.toint(x)
+end
+
+-- port: prvm_cmds.c VM_findflags L1200-1230 @xonotic-v0.8.6
+function prvm_cmds.VM_findflags(prog: any)
+	SAFEPARMCOUNT(prog, 3, "VM_findflags")
+	local e = G_EDICTNUM(prog, OFS_PARM0)
+	local f = buffer.readi32(prog.globals, (OFS_PARM0 + 3) * 4)
+	local v = toi(G_FLOAT(prog, OFS_PARM0 + 6))
+	e += 1
+	while e < prog.num_edicts do
+		if not prog.ed_free[e] then
+			local x = E_FLOAT(prog, e, f)
+			if x ~= 0 and bit32.band(toi(x), v) ~= 0 then
+				RETURN_EDICT(prog, e)
+				return
+			end
+		end
+		e += 1
+	end
+	RETURN_EDICT(prog, 0)
+end
+
+local function chainfield(prog: any, name: string): number
+	local cf = if prog.argc == 3
+		then buffer.readi32(prog.globals, (OFS_PARM0 + 6) * 4)
+		else prvm_edict.FieldOfs(prog, "chain")
+	if cf < 0 then
+		prog.error_cmd(string.format("%s: %s doesnt have the specified chain field !", name, prog.name))
+	end
+	return cf
+end
+
+-- shared loop of VM_findchain / VM_findchainfloat / VM_findchainflags
+local function findchain(prog: any, cf: number, match: (number) -> boolean)
+	local chain = 0
+	for i = 1, prog.num_edicts - 1 do
+		if not prog.ed_free[i] and match(i) then
+			SET_E_INT(prog, i, cf, chain)
+			chain = i
+		end
+	end
+	RETURN_EDICT(prog, chain)
+end
+
+-- port: prvm_cmds.c VM_findchain L1099-1142 @xonotic-v0.8.6
+function prvm_cmds.VM_findchain(prog: any)
+	SAFEPARMCOUNTRANGE(prog, 2, 3, "VM_findchain")
+	local cf = chainfield(prog, "VM_findchain")
+	local f = buffer.readi32(prog.globals, OFS_PARM0 * 4)
+	local str = libc.cstr(G_STRING(prog, OFS_PARM0 + 3))
+	findchain(prog, cf, function(i: number): boolean
+		return E_STRING(prog, i, f) == str
+	end)
+end
+
+-- port: prvm_cmds.c VM_findchainfloat L1154-1190 @xonotic-v0.8.6
+function prvm_cmds.VM_findchainfloat(prog: any)
+	SAFEPARMCOUNTRANGE(prog, 2, 3, "VM_findchainfloat")
+	local cf = chainfield(prog, "VM_findchain")
+	local f = buffer.readi32(prog.globals, OFS_PARM0 * 4)
+	local v = G_FLOAT(prog, OFS_PARM0 + 3)
+	findchain(prog, cf, function(i: number): boolean
+		return E_FLOAT(prog, i, f) == v
+	end)
+end
+
+-- port: prvm_cmds.c VM_findchainflags L1240-1278 @xonotic-v0.8.6
+function prvm_cmds.VM_findchainflags(prog: any)
+	SAFEPARMCOUNTRANGE(prog, 2, 3, "VM_findchainflags")
+	local cf = chainfield(prog, "VM_findchain")
+	local f = buffer.readi32(prog.globals, OFS_PARM0 * 4)
+	local v = toi(G_FLOAT(prog, OFS_PARM0 + 3))
+	findchain(prog, cf, function(i: number): boolean
+		local x = E_FLOAT(prog, i, f)
+		return x ~= 0 and bit32.band(toi(x), v) ~= 0
+	end)
+end
+
 prvm_cmds.BUILTINS = {
 	VM_cvar = prvm_cmds.VM_cvar,
 	VM_cvar_type = prvm_cmds.VM_cvar_type,
@@ -1633,6 +2079,40 @@ prvm_cmds.BUILTINS = {
 	VM_bufstr_set = prvm_cmds.VM_bufstr_set,
 	VM_buf_cvarlist = prvm_cmds.VM_buf_cvarlist,
 	VM_strtolower = prvm_cmds.VM_strtolower,
+	VM_makevectors = prvm_cmds.VM_makevectors,
+	VM_vectorvectors = prvm_cmds.VM_vectorvectors,
+	VM_normalize = prvm_cmds.VM_normalize,
+	VM_vectoyaw = prvm_cmds.VM_vectoyaw,
+	VM_vectoangles = prvm_cmds.VM_vectoangles,
+	VM_ceil = prvm_cmds.VM_ceil,
+	VM_fabs = prvm_cmds.VM_fabs,
+	VM_sin = prvm_cmds.VM_sin,
+	VM_cos = prvm_cmds.VM_cos,
+	VM_sqrt = prvm_cmds.VM_sqrt,
+	VM_asin = prvm_cmds.VM_asin,
+	VM_acos = prvm_cmds.VM_acos,
+	VM_atan = prvm_cmds.VM_atan,
+	VM_tan = prvm_cmds.VM_tan,
+	VM_log = prvm_cmds.VM_log,
+	VM_atan2 = prvm_cmds.VM_atan2,
+	VM_randomvec = prvm_cmds.VM_randomvec,
+	VM_bitshift = prvm_cmds.VM_bitshift,
+	VM_changeyaw = prvm_cmds.VM_changeyaw,
+	VM_changepitch = prvm_cmds.VM_changepitch,
+	VM_vtos = prvm_cmds.VM_vtos,
+	VM_etos = prvm_cmds.VM_etos,
+	VM_stov = prvm_cmds.VM_stov,
+	VM_chr2str = prvm_cmds.VM_chr2str,
+	VM_strlennocol = prvm_cmds.VM_strlennocol,
+	VM_isserver = prvm_cmds.VM_isserver,
+	VM_wasfreed = prvm_cmds.VM_wasfreed,
+	VM_dprint = prvm_cmds.VM_dprint,
+	VM_find = prvm_cmds.VM_find,
+	VM_findfloat = prvm_cmds.VM_findfloat,
+	VM_findflags = prvm_cmds.VM_findflags,
+	VM_findchain = prvm_cmds.VM_findchain,
+	VM_findchainfloat = prvm_cmds.VM_findchainfloat,
+	VM_findchainflags = prvm_cmds.VM_findchainflags,
 	VM_strdecolorize = prvm_cmds.VM_strdecolorize,
 	VM_sprintf = prvm_cmds.VM_sprintf,
 	VM_checkextension = prvm_cmds.VM_checkextension,
