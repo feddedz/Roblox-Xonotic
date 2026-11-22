@@ -933,6 +933,26 @@ function prvm_cmds.VM_argv_end_index(prog: any)
 	SET_G_FLOAT(prog, OFS_RETURN, if t then tokens_endpos[t] else -1)
 end
 
+-- port: prvm_cmds.c VM_infoadd L5861-5877 @xonotic-v0.8.6
+function prvm_cmds.VM_infoadd(prog: any)
+	SAFEPARMCOUNTRANGE(prog, 2, 8, "VM_infoadd")
+	local info = G_STRING(prog, OFS_PARM0)
+	local key = G_STRING(prog, OFS_PARM0 + 3)
+	local value = prvm_cmds.VM_VarString(prog, 2, VM_STRINGTEMP_LENGTH)
+	local temp = tokenize_copy(info) -- strlcpy(temp, info, VM_STRINGTEMP_LENGTH)
+	temp = common.InfoString_SetValue(temp, VM_STRINGTEMP_LENGTH, key, value)
+	SET_G_INT(prog, OFS_RETURN, prvm_edict.PRVM_SetTempString(prog, temp))
+end
+
+-- port: prvm_cmds.c VM_infoget L5881-5894 @xonotic-v0.8.6
+function prvm_cmds.VM_infoget(prog: any)
+	SAFEPARMCOUNT(prog, 2, "VM_infoget")
+	local info = libc.cstr(G_STRING(prog, OFS_PARM0))
+	local key = libc.cstr(G_STRING(prog, OFS_PARM0 + 3))
+	local value = common.InfoString_GetValue(info, key, VM_STRINGTEMP_LENGTH) or ""
+	SET_G_INT(prog, OFS_RETURN, prvm_edict.PRVM_SetTempString(prog, value))
+end
+
 -- C name -> builtin, for the vm_*_builtins tables
 prvm_cmds.BUILTINS = {
 	VM_cvar = prvm_cmds.VM_cvar,
@@ -965,6 +985,8 @@ prvm_cmds.BUILTINS = {
 	VM_tokenize_console = prvm_cmds.VM_tokenize_console,
 	VM_tokenizebyseparator = prvm_cmds.VM_tokenizebyseparator,
 	VM_argv = prvm_cmds.VM_argv,
+	VM_infoadd = prvm_cmds.VM_infoadd,
+	VM_infoget = prvm_cmds.VM_infoget,
 	VM_argv_start_index = prvm_cmds.VM_argv_start_index,
 	VM_argv_end_index = prvm_cmds.VM_argv_end_index,
 	VM_rint = prvm_cmds.VM_rint,

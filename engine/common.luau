@@ -5,7 +5,7 @@ Copyright (C) 1996-1997 Id Software, Inc. (DarkPlaces common.c; GPLv2 or later, 
 --[[
 	Port of common.c @xonotic-v0.8.6. PARTIAL: COM_ParseToken_Console (used by cmd.c).
 	A C `const char *` into a string is (s, i): byte index i (1-based); i > #s reads as the NUL terminator.
-	Also CRC_Block / CRC_Block_CaseInsensitive (CRC-16/CCITT, crctable generated from its polynomial 0x1021).
+	Also InfoString_GetValue / InfoString_SetValue, CRC_Block / CRC_Block_CaseInsensitive (CRC-16/CCITT, crctable generated from its polynomial 0x1021).
 	NOT YET PORTED: the rest of common.c (other tokenizers, sizebuf/MSG_*, COM_CheckParm, ...).
 ]]
 local common = {}
@@ -105,7 +105,287 @@ end
 
 -- port: common.c CRC_Block_CaseInsensitive L189-195 @xonotic-v0.8.6 (tolower: C locale)
 function common.CRC_Block_CaseInsensitive(data: string): number
+	local console = require("./console")
+
+	-- byte at 0-based position of a C string (NUL past the end)
+	local function cb(buf: string, i: number): number
+		return string.byte(buf, i + 1) or 0
+	end
+	local function keymatch(buf: string, pos: number, key: string): boolean
+		-- !memcmp(buffer + pos, key, keylength)
+		for k = 1, #key do
+			if cb(buf, pos + k - 1) ~= string.byte(key, k) then
+				return false
+			end
+		end
+		return true
+	end
+
+	-- port: common.c InfoString_GetValue L2008-2056 @xonotic-v0.8.6 (returns the value or nil for NULL)
+	function common.InfoString_GetValue(buffer: string, key: string?, valuelength: number): string?
+		local k = key or ""
+		local keylength = #k
+		if valuelength < 1 then
+			console.Con_Printf("InfoString_GetValue: no room in value\n")
+			return nil
+		end
+		if string.find(k, "\\", 1, true) then
+			console.Con_Printf(
+				'InfoString_GetValue: key name "%s" contains \\ which is not possible in an infostring\n',
+				k
+			)
+			return nil
+		end
+		if string.find(k, '"', 1, true) then
+			console.Con_Printf(
+				'InfoString_SetValue: key name "%s" contains " which is not allowed in an infostring\n',
+				k
+			)
+			return nil
+		end
+		if k == "" then
+			console.Con_Printf("InfoString_GetValue: can not look up a key with no name\n")
+			return nil
+		end
+		local pos = 0
+		while cb(buffer, pos) == 92 do
+			if
+				keymatch(buffer, pos + 1, k)
+				and (cb(buffer, pos + 1 + keylength) == 0 or cb(buffer, pos + 1 + keylength) == 92)
+			then
+				pos += 1 + keylength -- Skip \key
+				if cb(buffer, pos) == 92 then
+					pos += 1 -- Skip \ before value.
+				end
+				local j = 0
+				while cb(buffer, pos + j) ~= 0 and cb(buffer, pos + j) ~= 92 and j < valuelength - 1 do
+					j += 1
+				end
+				return string.sub(buffer, pos + 1, pos + j)
+			end
+			if cb(buffer, pos) == 92 then
+				pos += 1
+			end
+			pos += 1
+			while cb(buffer, pos) ~= 0 and cb(buffer, pos) ~= 92 do
+				pos += 1
+			end
+			if cb(buffer, pos) == 92 then
+				pos += 1
+			end
+			pos += 1
+			while cb(buffer, pos) ~= 0 and cb(buffer, pos) ~= 92 do
+				pos += 1
+			end
+		end
+		return nil -- the key was not found
+	end
+
+	-- port: common.c InfoString_SetValue L2058-2118 @xonotic-v0.8.6 (returns the new buffer contents)
+	function common.InfoString_SetValue(buffer: string, bufferlength: number, key: string?, value: string?): string
+		local k, v = key or "", value or ""
+		local keylength = #k
+		if string.find(k, "\\", 1, true) or string.find(v, "\\", 1, true) then
+			console.Con_Printf(
+				'InfoString_SetValue: "%s" "%s" contains \\ which is not possible to store in an infostring\n',
+				k,
+				v
+			)
+			return buffer
+		end
+		if string.find(k, '"', 1, true) or string.find(v, '"', 1, true) then
+			console.Con_Printf(
+				'InfoString_SetValue: "%s" "%s" contains " which is not allowed in an infostring\n',
+				k,
+				v
+			)
+			return buffer
+		end
+		if k == "" then
+			console.Con_Printf("InfoString_SetValue: can not set a key with no name\n")
+			return buffer
+		end
+		local pos = 0
+		while cb(buffer, pos) == 92 do
+			if
+				keymatch(buffer, pos + 1, k)
+				and (cb(buffer, pos + 1 + keylength) == 0 or cb(buffer, pos + 1 + keylength) == 92)
+			then
+				break
+			end
+			if cb(buffer, pos) == 92 then
+				pos += 1
+			end
+			while cb(buffer, pos) ~= 0 and cb(buffer, pos) ~= 92 do
+				pos += 1
+			end
+			if cb(buffer, pos) == 92 then
+				pos += 1
+			end
+			while cb(buffer, pos) ~= 0 and cb(buffer, pos) ~= 92 do
+				pos += 1
+			end
+		end
+		-- if we found the key, find the end of it because we will be replacing it
+		local pos2 = pos
+		if cb(buffer, pos) == 92 then
+			pos2 += 1 + keylength
+			if cb(buffer, pos2) == 92 then
+				pos2 += 1
+			end
+			while cb(buffer, pos2) ~= 0 and cb(buffer, pos2) ~= 92 do
+				pos2 += 1
+			end
+		end
+		local rest = string.sub(buffer, pos2 + 1)
+		if bufferlength <= pos + 1 + #k + 1 + #v + #rest then
+			console.Con_Printf('InfoString_SetValue: no room for "%s" "%s" in infostring\n', k, v)
+			return buffer
+		end
+		local head = string.sub(buffer, 1, pos)
+		if v ~= "" then
+			local new = "\\" .. k .. "\\" .. v .. string.sub(rest, 1, 16383)
+			return head .. string.sub(new, 1, bufferlength - pos - 1)
+		end
+		return head .. string.sub(rest, 1, bufferlength - pos - 1) -- just remove the key from the text
+	end
+
 	return common.CRC_Block((string.gsub(data, "%u", string.lower)))
+end
+
+local console = require("./console")
+
+-- byte at 0-based position of a C string (NUL past the end)
+local function cb(buf: string, i: number): number
+	return string.byte(buf, i + 1) or 0
+end
+local function keymatch(buf: string, pos: number, key: string): boolean
+	-- !memcmp(buffer + pos, key, keylength)
+	for k = 1, #key do
+		if cb(buf, pos + k - 1) ~= string.byte(key, k) then
+			return false
+		end
+	end
+	return true
+end
+
+-- port: common.c InfoString_GetValue L2008-2056 @xonotic-v0.8.6 (returns the value or nil for NULL)
+function common.InfoString_GetValue(buffer: string, key: string?, valuelength: number): string?
+	local k = key or ""
+	local keylength = #k
+	if valuelength < 1 then
+		console.Con_Printf("InfoString_GetValue: no room in value\n")
+		return nil
+	end
+	if string.find(k, "\\", 1, true) then
+		console.Con_Printf('InfoString_GetValue: key name "%s" contains \\ which is not possible in an infostring\n', k)
+		return nil
+	end
+	if string.find(k, '"', 1, true) then
+		console.Con_Printf('InfoString_SetValue: key name "%s" contains " which is not allowed in an infostring\n', k)
+		return nil
+	end
+	if k == "" then
+		console.Con_Printf("InfoString_GetValue: can not look up a key with no name\n")
+		return nil
+	end
+	local pos = 0
+	while cb(buffer, pos) == 92 do
+		if
+			keymatch(buffer, pos + 1, k)
+			and (cb(buffer, pos + 1 + keylength) == 0 or cb(buffer, pos + 1 + keylength) == 92)
+		then
+			pos += 1 + keylength -- Skip \key
+			if cb(buffer, pos) == 92 then
+				pos += 1 -- Skip \ before value.
+			end
+			local j = 0
+			while cb(buffer, pos + j) ~= 0 and cb(buffer, pos + j) ~= 92 and j < valuelength - 1 do
+				j += 1
+			end
+			return string.sub(buffer, pos + 1, pos + j)
+		end
+		if cb(buffer, pos) == 92 then
+			pos += 1
+		end
+		pos += 1
+		while cb(buffer, pos) ~= 0 and cb(buffer, pos) ~= 92 do
+			pos += 1
+		end
+		if cb(buffer, pos) == 92 then
+			pos += 1
+		end
+		pos += 1
+		while cb(buffer, pos) ~= 0 and cb(buffer, pos) ~= 92 do
+			pos += 1
+		end
+	end
+	return nil -- the key was not found
+end
+
+-- port: common.c InfoString_SetValue L2058-2118 @xonotic-v0.8.6 (returns the new buffer contents)
+function common.InfoString_SetValue(buffer: string, bufferlength: number, key: string?, value: string?): string
+	local k, v = key or "", value or ""
+	local keylength = #k
+	if string.find(k, "\\", 1, true) or string.find(v, "\\", 1, true) then
+		console.Con_Printf(
+			'InfoString_SetValue: "%s" "%s" contains \\ which is not possible to store in an infostring\n',
+			k,
+			v
+		)
+		return buffer
+	end
+	if string.find(k, '"', 1, true) or string.find(v, '"', 1, true) then
+		console.Con_Printf('InfoString_SetValue: "%s" "%s" contains " which is not allowed in an infostring\n', k, v)
+		return buffer
+	end
+	if k == "" then
+		console.Con_Printf("InfoString_SetValue: can not set a key with no name\n")
+		return buffer
+	end
+	local pos = 0
+	while cb(buffer, pos) == 92 do
+		if
+			keymatch(buffer, pos + 1, k)
+			and (cb(buffer, pos + 1 + keylength) == 0 or cb(buffer, pos + 1 + keylength) == 92)
+		then
+			break
+		end
+		if cb(buffer, pos) == 92 then
+			pos += 1
+		end
+		while cb(buffer, pos) ~= 0 and cb(buffer, pos) ~= 92 do
+			pos += 1
+		end
+		if cb(buffer, pos) == 92 then
+			pos += 1
+		end
+		while cb(buffer, pos) ~= 0 and cb(buffer, pos) ~= 92 do
+			pos += 1
+		end
+	end
+	-- if we found the key, find the end of it because we will be replacing it
+	local pos2 = pos
+	if cb(buffer, pos) == 92 then
+		pos2 += 1 + keylength
+		if cb(buffer, pos2) == 92 then
+			pos2 += 1
+		end
+		while cb(buffer, pos2) ~= 0 and cb(buffer, pos2) ~= 92 do
+			pos2 += 1
+		end
+	end
+	local rest = string.sub(buffer, pos2 + 1)
+	if bufferlength <= pos + 1 + #k + 1 + #v + #rest then
+		console.Con_Printf('InfoString_SetValue: no room for "%s" "%s" in infostring\n', k, v)
+		return buffer
+	end
+	local head = string.sub(buffer, 1, pos)
+	if v ~= "" then
+		local new = "\\" .. k .. "\\" .. v .. string.sub(rest, 1, 16383)
+		return head .. string.sub(new, 1, bufferlength - pos - 1)
+	end
+	return head .. string.sub(rest, 1, bufferlength - pos - 1) -- just remove the key from the text
 end
 
 return common

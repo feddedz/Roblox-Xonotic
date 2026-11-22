@@ -202,5 +202,11 @@ return function(ctx: t.Ctx)
 	setf(0, 3)
 	prvm_cmds.VM_argv(prog)
 	t.eq(ctx, rets(), "c")
+	-- info strings
+	t.eq(ctx, common.InfoString_GetValue("\\a\\1\\bb\\22", "bb", 100), "22")
+	t.eq(ctx, common.InfoString_GetValue("\\a\\1", "x", 100), nil)
+	t.eq(ctx, common.InfoString_SetValue("\\a\\1\\b\\2", 100, "a", "9"), "\\a\\9\\b\\2", "replace keeps order")
+	t.eq(ctx, common.InfoString_SetValue("\\a\\1\\b\\2", 100, "a", ""), "\\b\\2", "empty value removes the key")
+	t.eq(ctx, common.InfoString_SetValue("", 100, "c", "3"), "\\c\\3")
 	cvar.reset()
 end
