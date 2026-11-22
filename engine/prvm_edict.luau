@@ -1563,4 +1563,48 @@ function prvm_edict.PRVM_ED_LoadFromFile(prog: Prog, data: string)
 	prvm_reuseedicts_always_allow = 0
 end
 
+-- port: prvm_edict.c PRVM_ED_PrintNum L746-749 @xonotic-v0.8.6
+function prvm_edict.PRVM_ED_PrintNum(prog: Prog, ent: number, wildcard_fieldname: string?)
+	if ent < 0 or ent >= prog.max_edicts then
+		prog.error_cmd(string.format("PRVM_EDICT_NUM: %s: bad number %i", prog.name, ent))
+	end
+	prvm_edict.PRVM_ED_Print(prog, ent, wildcard_fieldname)
+end
+
+-- port: prvm_edict.c PRVM_ED_Write L697-744 @xonotic-v0.8.6 (f: an engine/fs.luau QFile)
+function prvm_edict.PRVM_ED_Write(prog: Prog, f: any, ed: number)
+	local p = prog :: any
+	local fs = (require :: any)("./fs")
+	fs.FS_Write(f, "{\n")
+	if p.ed_free[ed] then
+		fs.FS_Write(f, "}\n")
+		return
+	end
+	for i = 1, #prog.fielddefs - 1 do
+		local d = prog.fielddefs[i + 1]
+		local name = prvm_edict.PRVM_GetString(prog, d.s_name)
+		if cvarint("developer_entityparsing", 0) ~= 0 then
+			console.Con_Print(string.format("PRVM_ED_Write: at entity %d field %s\n", ed, name))
+		end
+		if #name > 1 and string.sub(name, -2, -2) == "_" then
+			continue -- skip _x, _y, _z vars, and ALSO other _? vars as some mods expect them to be never saved
+		end
+		local t = bit32.band(d.type, bit32.bnot(DEF_SAVEGLOBAL))
+		local b, o = slotofs(prog, ed, d.ofs)
+		local nonzero = false
+		for j = 0, (prvm_type_size[t + 1] or 1) - 1 do
+			if o + j * 4 + 4 <= buffer.len(b) and buffer.readi32(b, o + j * 4) ~= 0 then
+				nonzero = true
+				break
+			end
+		end
+		if not nonzero then
+			continue -- if the value is still all 0, skip the field
+		end
+		fs.FS_Write(f, '"' .. name .. '" ')
+		fs.FS_Write(f, '"' .. prvm_edict.PRVM_UglyValueString(prog, d.type, b, o, 16384) .. '"\n')
+	end
+	fs.FS_Write(f, "}\n")
+end
+
 return prvm_edict

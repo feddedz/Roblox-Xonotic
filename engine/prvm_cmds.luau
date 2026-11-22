@@ -2582,6 +2582,236 @@ prvm_cmds.Sys_DirtyTime = function(): number
 	return os.clock()
 end
 
+local function xfunction_name(prog: any): string
+	local f = prog.functions[(prog.xfunction or 0) + 1]
+	return prvm_edict.PRVM_GetString(prog, if f then f.s_name else 0)
+end
+
+-- port: prvm_cmds.c VM_error L328-339 @xonotic-v0.8.6
+function prvm_cmds.VM_error(prog: any)
+	local str = prvm_cmds.VM_VarString(prog, 0, VM_STRINGTEMP_LENGTH)
+	console.Con_Print(string.format("======%s ERROR in %s:\n%s\n", prog.name, xfunction_name(prog), str))
+	local ed = buffer.readi32(prog.globals, GlobalOfs(prog, "self") * 4)
+	prvm_edict.PRVM_ED_Print(prog, ed, nil)
+	prog.error_cmd(
+		string.format(
+			"%s: Program error in function %s:\n%s\nTip: read above for entity information\n",
+			prog.name,
+			xfunction_name(prog),
+			str
+		)
+	)
+end
+
+-- port: prvm_cmds.c VM_objerror L351-362 @xonotic-v0.8.6
+function prvm_cmds.VM_objerror(prog: any)
+	local str = prvm_cmds.VM_VarString(prog, 0, VM_STRINGTEMP_LENGTH)
+	console.Con_Print("======OBJECT ERROR======\n")
+	local ed = buffer.readi32(prog.globals, GlobalOfs(prog, "self") * 4)
+	prvm_edict.PRVM_ED_Print(prog, ed, nil)
+	prvm_edict.PRVM_ED_Free(prog, ed)
+	console.Con_Print(
+		string.format(
+			"%s OBJECT ERROR in %s:\n%s\nTip: read above for entity information\n",
+			prog.name,
+			xfunction_name(prog),
+			str
+		)
+	)
+end
+
+-- port: prvm_cmds.c VM_eprint L1400-1405 @xonotic-v0.8.6
+function prvm_cmds.VM_eprint(prog: any)
+	SAFEPARMCOUNT(prog, 1, "VM_eprint")
+	prvm_edict.PRVM_ED_PrintNum(prog, G_EDICTNUM(prog, OFS_PARM0), nil)
+end
+
+-- port: prvm_cmds.c VM_coredump L1327-1334 @xonotic-v0.8.6
+function prvm_cmds.VM_coredump(prog: any)
+	SAFEPARMCOUNT(prog, 0, "VM_coredump")
+	cmd.Cbuf_AddText("prvm_edicts ")
+	cmd.Cbuf_AddText(prog.name)
+	cmd.Cbuf_AddText("\n")
+end
+
+-- port: prvm_cmds.c VM_traceon L1372-1377 @xonotic-v0.8.6
+function prvm_cmds.VM_traceon(prog: any)
+	SAFEPARMCOUNT(prog, 0, "VM_traceon")
+	prog.trace = true
+end
+
+-- port: prvm_cmds.c VM_traceoff L1386-1391 @xonotic-v0.8.6
+function prvm_cmds.VM_traceoff(prog: any)
+	SAFEPARMCOUNT(prog, 0, "VM_traceoff")
+	prog.trace = false
+end
+
+-- port: prvm_cmds.c VM_break L598-601 @xonotic-v0.8.6
+function prvm_cmds.VM_break(prog: any)
+	prog.error_cmd(string.format("%s: break statement", prog.name))
+end
+
+-- port: prvm_cmds.c VM_precache_file L1313-1318 @xonotic-v0.8.6
+function prvm_cmds.VM_precache_file(prog: any)
+	SAFEPARMCOUNT(prog, 1, "VM_precache_file")
+	-- precache_file is only used to copy files with qcc, it does nothing
+	SET_G_INT(prog, OFS_RETURN, buffer.readi32(prog.globals, OFS_PARM0 * 4))
+end
+
+-- port: prvm_cmds.c VM_entityfieldtype L2059-2073 @xonotic-v0.8.6
+function prvm_cmds.VM_entityfieldtype(prog: any)
+	local i = libc.toint(G_FLOAT(prog, OFS_PARM0))
+	if i < 0 or i >= #prog.fielddefs then
+		prvm_cmds.VM_Warning(prog, "VM_entityfieldtype: %s: field index out of bounds\n", prog.name)
+		SET_G_FLOAT(prog, OFS_RETURN, -1.0)
+		return
+	end
+	SET_G_FLOAT(prog, OFS_RETURN, prog.fielddefs[i + 1].type)
+end
+
+-- port: prvm_cmds.c VM_getentityfieldstring L2083-2124 @xonotic-v0.8.6
+function prvm_cmds.VM_getentityfieldstring(prog: any)
+	-- put the data into a string
+	local i = libc.toint(G_FLOAT(prog, OFS_PARM0))
+	if i < 0 or i >= #prog.fielddefs then
+		prvm_cmds.VM_Warning(prog, "VM_entityfielddata: %s: field index out of bounds\n", prog.name)
+		SET_G_INT(prog, OFS_RETURN, prvm_edict.PRVM_SetTempString(prog, ""))
+		return
+	end
+	local d = prog.fielddefs[i + 1]
+	local ent = G_EDICTNUM(prog, OFS_PARM0 + 3)
+	if prog.ed_free[ent] then
+		SET_G_INT(prog, OFS_RETURN, prvm_edict.PRVM_SetTempString(prog, ""))
+		prvm_cmds.VM_Warning(prog, "VM_entityfielddata: %s: entity %i is free !\n", prog.name, ent)
+		return
+	end
+	local o = E_OFS(prog, ent, d.ofs)
+	-- if it's 0 or blank, return an empty string
+	local t = bit32.band(d.type, 0x7FFF)
+	local size = ({ 1, 1, 1, 3, 1, 1, 1, 2 })[t + 1] or 1
+	local nonzero = false
+	for j = 0, size - 1 do
+		if o + j * 4 + 4 <= buffer.len(prog.edictsfields) and buffer.readi32(prog.edictsfields, o + j * 4) ~= 0 then
+			nonzero = true
+			break
+		end
+	end
+	if not nonzero then
+		SET_G_INT(prog, OFS_RETURN, prvm_edict.PRVM_SetTempString(prog, ""))
+		return
+	end
+	local str = prvm_edict.PRVM_UglyValueString(prog, d.type, prog.edictsfields, o, 16384)
+	SET_G_INT(prog, OFS_RETURN, prvm_edict.PRVM_SetTempString(prog, str))
+end
+
+-- port: prvm_cmds.c VM_putentityfieldstring L2134-2160 @xonotic-v0.8.6
+function prvm_cmds.VM_putentityfieldstring(prog: any)
+	local i = libc.toint(G_FLOAT(prog, OFS_PARM0))
+	if i < 0 or i >= #prog.fielddefs then
+		prvm_cmds.VM_Warning(prog, "VM_entityfielddata: %s: field index out of bounds\n", prog.name)
+		SET_G_FLOAT(prog, OFS_RETURN, 0)
+		return
+	end
+	local d = prog.fielddefs[i + 1]
+	local ent = G_EDICTNUM(prog, OFS_PARM0 + 3)
+	if prog.ed_free[ent] then
+		prvm_cmds.VM_Warning(prog, "VM_entityfielddata: %s: entity %i is free !\n", prog.name, ent)
+		SET_G_FLOAT(prog, OFS_RETURN, 0)
+		return
+	end
+	-- parse the string into the value
+	local ok = prvm_edict.PRVM_ED_ParseEpair(prog, ent, d, G_STRING(prog, OFS_PARM0 + 6), false)
+	SET_G_FLOAT(prog, OFS_RETURN, if ok then 1 else 0)
+end
+
+-- port: prvm_cmds.c VM_writetofile L1988-2010 @xonotic-v0.8.6 (VM_GetFileHandle L1779-1792)
+function prvm_cmds.VM_writetofile(prog: any)
+	SAFEPARMCOUNT(prog, 2, "VM_writetofile")
+	local index = libc.toint(G_FLOAT(prog, OFS_PARM0))
+	local file = nil
+	if index < 0 or index >= PRVM_MAX_OPENFILES then
+		console.Con_Print(string.format("VM_GetFileHandle: invalid file handle %i used in %s\n", index, prog.name))
+	elseif openfiles(prog)[index] == nil then
+		console.Con_Print(
+			string.format(
+				"VM_GetFileHandle: no such file handle %i (or file has been closed) in %s\n",
+				index,
+				prog.name
+			)
+		)
+	else
+		file = openfiles(prog)[index]
+	end
+	if not file then
+		prvm_cmds.VM_Warning(prog, "VM_writetofile: invalid or closed file handle\n")
+		return
+	end
+	local ent = G_EDICTNUM(prog, OFS_PARM0 + 3)
+	if prog.ed_free[ent] then
+		prvm_cmds.VM_Warning(prog, "VM_writetofile: %s: entity %i is free !\n", prog.name, ent)
+		return
+	end
+	prvm_edict.PRVM_ED_Write(prog, file, ent)
+end
+
+-- port: prvm_cmds.c VM_parseentitydata L2989-3008 @xonotic-v0.8.6
+function prvm_cmds.VM_parseentitydata(prog: any)
+	SAFEPARMCOUNT(prog, 2, "VM_parseentitydata")
+	-- get edict and test it
+	local ent = G_EDICTNUM(prog, OFS_PARM0)
+	if prog.ed_free[ent] then
+		prog.error_cmd(
+			string.format(
+				"VM_parseentitydata: %s: Can only set already spawned entities (entity %i is free)!",
+				prog.name,
+				ent
+			)
+		)
+	end
+	local data = libc.cstr(G_STRING(prog, OFS_PARM0 + 3))
+	-- parse the opening brace
+	local ok, pos = common.COM_ParseToken_Simple(data, 1, false, false, true)
+	if not ok or string.sub(common.com_token, 1, 1) ~= "{" then
+		prog.error_cmd(
+			string.format(
+				"VM_parseentitydata: %s: Couldn't parse entity data:\n%s",
+				prog.name,
+				if pos then string.sub(data, pos) else ""
+			)
+		)
+	end
+	prvm_edict.PRVM_ED_ParseEdict(prog, data, pos, ent)
+end
+
+-- port: prvm_cmds.c VM_loadfromdata L2975-2980 @xonotic-v0.8.6
+function prvm_cmds.VM_loadfromdata(prog: any)
+	SAFEPARMCOUNT(prog, 1, "VM_loadentsfromfile")
+	prvm_edict.PRVM_ED_LoadFromFile(prog, libc.cstr(G_STRING(prog, OFS_PARM0)))
+end
+
+-- port: prvm_cmds.c VM_loadfromfile L3017-3041 @xonotic-v0.8.6
+function prvm_cmds.VM_loadfromfile(prog: any)
+	SAFEPARMCOUNT(prog, 1, "VM_loadfromfile")
+	local filename = libc.cstr(G_STRING(prog, OFS_PARM0))
+	if fs.FS_CheckNastyPath(filename, false) ~= 0 then
+		SET_G_FLOAT(prog, OFS_RETURN, -4)
+		prvm_cmds.VM_Warning(
+			prog,
+			'VM_loadfromfile: %s dangerous or non-portable filename "%s" not allowed. (contains : or \\ or begins with .. or /)\n',
+			prog.name,
+			filename
+		)
+		return
+	end
+	-- not conform with VM_fopen
+	local data = fs.FS_LoadFile(filename, false)
+	if data == nil then
+		SET_G_FLOAT(prog, OFS_RETURN, -1)
+	end
+	-- PRVM_ED_LoadFromFile(prog, NULL) parses nothing
+	prvm_edict.PRVM_ED_LoadFromFile(prog, libc.cstr(data or ""))
+end
+
 prvm_cmds.BUILTINS = {
 	VM_cvar = prvm_cmds.VM_cvar,
 	VM_cvar_type = prvm_cmds.VM_cvar_type,
@@ -2634,6 +2864,21 @@ prvm_cmds.BUILTINS = {
 	VM_bufstr_set = prvm_cmds.VM_bufstr_set,
 	VM_buf_cvarlist = prvm_cmds.VM_buf_cvarlist,
 	VM_strtolower = prvm_cmds.VM_strtolower,
+	VM_error = prvm_cmds.VM_error,
+	VM_objerror = prvm_cmds.VM_objerror,
+	VM_eprint = prvm_cmds.VM_eprint,
+	VM_coredump = prvm_cmds.VM_coredump,
+	VM_traceon = prvm_cmds.VM_traceon,
+	VM_traceoff = prvm_cmds.VM_traceoff,
+	VM_break = prvm_cmds.VM_break,
+	VM_precache_file = prvm_cmds.VM_precache_file,
+	VM_entityfieldtype = prvm_cmds.VM_entityfieldtype,
+	VM_getentityfieldstring = prvm_cmds.VM_getentityfieldstring,
+	VM_putentityfieldstring = prvm_cmds.VM_putentityfieldstring,
+	VM_writetofile = prvm_cmds.VM_writetofile,
+	VM_parseentitydata = prvm_cmds.VM_parseentitydata,
+	VM_loadfromdata = prvm_cmds.VM_loadfromdata,
+	VM_loadfromfile = prvm_cmds.VM_loadfromfile,
 	VM_tokenize = prvm_cmds.VM_tokenize,
 	VM_strpad = prvm_cmds.VM_strpad,
 	VM_strconv = prvm_cmds.VM_strconv,

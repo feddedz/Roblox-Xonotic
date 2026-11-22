@@ -79,6 +79,7 @@ return function(ctx: t.Ctx)
 	)
 	t.ok(ctx, ok, "PRVM_ED_LoadFromFile completes: " .. tostring(err))
 	t.ok(ctx, queued > 50, "entities were allocated")
+	-- the first StartFrame stops in the warpzone setup today (needs getsurfacetexture / brush models, M3)
 	t.ok(ctx, prog.num_edicts > queued, "StartFrame spawned the queued map entities")
 	local cn = prvm_edict.FieldOfs(prog, "classname")
 	t.eq(
@@ -87,4 +88,37 @@ return function(ctx: t.Ctx)
 		"worldspawn",
 		"edict 0 is worldspawn"
 	)
+	-- putentityfieldstring / getentityfieldstring / entityfieldtype on a live entity
+	local prvm_cmds = require("../../engine/prvm_cmds")
+	local function fieldindex(name: string): number
+		local _, i = prvm_edict.PRVM_ED_FindField(prog, name)
+		return (i :: number) - 1
+	end
+	local live1 = 1
+	while prog.ed_free[live1] do
+		live1 += 1
+	end
+	local function put(field: string, value: string): number
+		prog.argc = 3
+		buffer.writef32(prog.globals, 16, fieldindex(field))
+		buffer.writei32(prog.globals, 28, live1)
+		buffer.writei32(prog.globals, 40, prvm_edict.PRVM_SetTempString(prog, value))
+		prvm_cmds.VM_putentityfieldstring(prog)
+		return buffer.readf32(prog.globals, 4)
+	end
+	local function get(field: string): string
+		prog.argc = 2
+		buffer.writef32(prog.globals, 16, fieldindex(field))
+		buffer.writei32(prog.globals, 28, live1)
+		prvm_cmds.VM_getentityfieldstring(prog)
+		return prvm_edict.PRVM_GetString(prog, buffer.readi32(prog.globals, 4))
+	end
+	t.eq(ctx, put("origin", " 1 -2.5 300"), 1)
+	t.eq(ctx, get("origin"), "1 -2.5 300", "vector round trip (%.9g)")
+	t.eq(ctx, put("netname", 'a"b\nc'), 1)
+	t.eq(ctx, get("netname"), 'a\\"b\\nc', "UglyValueString escapes quote and newline")
+	prog.argc = 1
+	buffer.writef32(prog.globals, 16, fieldindex("origin"))
+	prvm_cmds.VM_entityfieldtype(prog)
+	t.eq(ctx, buffer.readf32(prog.globals, 4), 3, "ev_vector")
 end
