@@ -50,7 +50,8 @@ local ok, err = pcall(function()
 	assert(data, "progs.dat missing from game/generated/vfs (run tools/build.sh)")
 	local prog = sv_main.SV_VM_Setup(buffer.fromstring(data))
 	prog.warning = function(_m: string) end
-	req(serverGame:WaitForChild("progs")).install(prog, { qcrt = qcrt, f32 = f32 })
+	local progsmod = req(serverGame:WaitForChild("progs"))
+	progsmod.install(prog, { qcrt = qcrt, f32 = f32 }) -- chunks load on first use (M2-AOT-SHIP)
 	local autocvars = 0
 	for _, def in prog.globaldefs do
 		if string.sub(prvm_edict.PRVM_GetString(prog, def.s_name), 1, 9) == "autocvar_" then
@@ -79,7 +80,28 @@ local ok, err = pcall(function()
 			os.clock() - t3
 		)
 	)
+	line(
+		string.format(
+			"AOT chunks loaded by worldspawn: %d of %d",
+			progsmod.numchunks - prog.aot_state.left,
+			progsmod.numchunks
+		)
+	)
 	line(string.format("total: %.2f s", os.clock() - t0))
+	-- the rest of the compiled QuakeC loads in the background, a few chunks per frame
+	task.spawn(function()
+		local t4 = os.clock()
+		while progsmod.preload(prog, 2) > 0 do
+			task.wait()
+		end
+		print(
+			string.format(
+				"Xonotic: all %d AOT chunks loaded (%.2f s in the background)",
+				progsmod.numchunks,
+				os.clock() - t4
+			)
+		)
+	end)
 end)
 if not ok then
 	line("ERROR: " .. tostring(err))
