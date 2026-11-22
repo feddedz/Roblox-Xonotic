@@ -2327,6 +2327,261 @@ function prvm_cmds.VM_matchpattern(prog: any)
 	SET_G_FLOAT(prog, OFS_RETURN, if match_rule(str, VM_STRINGTEMP_LENGTH, match, l, matchrule) then 1 else 0)
 end
 
+-- port: prvm_cmds.c VM_tokenize L2594-2622 @xonotic-v0.8.6
+function prvm_cmds.VM_tokenize(prog: any)
+	SAFEPARMCOUNT(prog, 1, "VM_tokenize")
+	local str = tokenize_copy(G_STRING(prog, OFS_PARM0))
+	local p: number? = 1
+	num_tokens = 0
+	while true do
+		if num_tokens >= MAXTOKENS then
+			break
+		end
+		-- skip whitespace here to find token start pos
+		local q = p :: number
+		while (string.byte(str, q) or 0) ~= 0 and common.ISWHITESPACE(string.byte(str, q) or 0) do
+			q += 1
+		end
+		tokens_startpos[num_tokens] = q - 1
+		local ok
+		ok, p = common.COM_ParseToken_VM_Tokenize(str, q, false)
+		if not ok then
+			break
+		end
+		tokens_endpos[num_tokens] = (p :: number) - 1
+		tokens[num_tokens] = prvm_edict.PRVM_SetTempString(prog, common.com_token)
+		num_tokens += 1
+	end
+	SET_G_FLOAT(prog, OFS_RETURN, num_tokens)
+end
+
+-- port: prvm_cmds.c VM_strpad L5843-5857 @xonotic-v0.8.6 ("%*s" with -pad: < 0 = left padding)
+function prvm_cmds.VM_strpad(prog: any)
+	SAFEPARMCOUNTRANGE(prog, 1, 8, "VM_strpad")
+	local pad = libc.toint(G_FLOAT(prog, OFS_PARM0))
+	local src = prvm_cmds.VM_VarString(prog, 1, VM_STRINGTEMP_LENGTH)
+	local w = -pad
+	local out
+	if w < 0 then
+		out = libc.format1("-", if w == -2147483648 then 2147483648 else -w, -1, "s", src)
+	else
+		out = libc.format1("", w, -1, "s", src)
+	end
+	if #out > VM_STRINGTEMP_LENGTH - 1 then
+		out = string.sub(out, 1, VM_STRINGTEMP_LENGTH - 1)
+	end
+	SET_G_INT(prog, OFS_RETURN, prvm_edict.PRVM_SetTempString(prog, out))
+end
+
+-- port: prvm_cmds.c chrconv_number L5714-5738 @xonotic-v0.8.6
+local function chrconv_number(i: number, base: number, conv: number): number
+	i -= base
+	if conv == 1 then
+		base = 48
+	elseif conv == 2 then
+		base = 48 + 128
+	elseif conv == 3 then
+		base = 48 - 30
+	elseif conv == 4 then
+		base = 48 + 128 - 30
+	end
+	return i + base
+end
+-- port: prvm_cmds.c chrconv_punct L5739-5755 @xonotic-v0.8.6
+local function chrconv_punct(i: number, base: number, conv: number): number
+	i -= base
+	if conv == 1 then
+		base = 0
+	elseif conv == 2 then
+		base = 128
+	end
+	return i + base
+end
+-- port: prvm_cmds.c chrchar_alpha L5757-5793 @xonotic-v0.8.6
+local function chrchar_alpha(
+	i: number,
+	basec: number,
+	baset: number,
+	convc: number,
+	convt: number,
+	charnum: number
+): number
+	-- convert case and colour seperatly...
+	i -= baset + basec
+	if convt == 1 then
+		baset = 0
+	elseif convt == 2 then
+		baset = 128
+	elseif convt == 5 or convt == 6 then
+		baset = if bit32.band(charnum, 1) == convt - 5 then 128 else 0
+	end
+	if convc == 1 then
+		basec = 97
+	elseif convc == 2 then
+		basec = 65
+	end
+	return i + basec + baset
+end
+
+-- port: prvm_cmds.c VM_strconv L5796-5840 @xonotic-v0.8.6 (results stored in unsigned char)
+function prvm_cmds.VM_strconv(prog: any)
+	SAFEPARMCOUNTRANGE(prog, 3, 8, "VM_strconv")
+	local ccase = libc.toint(G_FLOAT(prog, OFS_PARM0)) -- 0 same, 1 lower, 2 upper
+	local redalpha = libc.toint(G_FLOAT(prog, OFS_PARM0 + 3))
+	local rednum = libc.toint(G_FLOAT(prog, OFS_PARM0 + 6))
+	local res = prvm_cmds.VM_VarString(prog, 3, VM_STRINGTEMP_LENGTH)
+	local out = table.create(#res)
+	for i = 1, #res do
+		local r = string.byte(res, i)
+		local ci = i - 1
+		local v
+		if r >= 48 and r <= 57 then -- normal numbers...
+			v = chrconv_number(r, 48, rednum)
+		elseif r >= 48 + 128 and r <= 57 + 128 then
+			v = chrconv_number(r, 48 + 128, rednum)
+		elseif r >= 48 + 128 - 30 and r <= 57 + 128 - 30 then
+			v = chrconv_number(r, 48 + 128 - 30, rednum)
+		elseif r >= 48 - 30 and r <= 57 - 30 then
+			v = chrconv_number(r, 48 - 30, rednum)
+		elseif r >= 97 and r <= 122 then
+			v = chrchar_alpha(r, 97, 0, ccase, redalpha, ci)
+		elseif r >= 65 and r <= 90 then
+			v = chrchar_alpha(r, 65, 0, ccase, redalpha, ci)
+		elseif r >= 97 + 128 and r <= 122 + 128 then
+			v = chrchar_alpha(r, 97, 128, ccase, redalpha, ci)
+		elseif r >= 65 + 128 and r <= 90 + 128 then
+			v = chrchar_alpha(r, 65, 128, ccase, redalpha, ci)
+		elseif bit32.band(r, 127) < 16 or redalpha == 0 then -- special chars..
+			v = r
+		elseif r < 128 then
+			v = chrconv_punct(r, 0, redalpha)
+		else
+			v = chrconv_punct(r, 128, redalpha)
+		end
+		out[i] = string.char(v % 256)
+	end
+	-- a converted byte can be 0: the C string ends there
+	SET_G_INT(prog, OFS_RETURN, prvm_edict.PRVM_SetTempString(prog, table.concat(out)))
+end
+
+-- port: prvm_cmds.c VM_strireplace L2436-2493 @xonotic-v0.8.6 (tolower: C locale)
+function prvm_cmds.VM_strireplace(prog: any)
+	SAFEPARMCOUNT(prog, 3, "VM_strreplace")
+	local search = libc.cstr(G_STRING(prog, OFS_PARM0))
+	local replace = libc.cstr(G_STRING(prog, OFS_PARM0 + 3))
+	local subject = libc.cstr(G_STRING(prog, OFS_PARM0 + 6))
+	local sl, rl, subl = #search, #replace, #subject
+	local lsearch, lsubject = string.lower(search), string.lower(subject)
+	local out = {}
+	local si = 0
+	local cap = VM_STRINGTEMP_LENGTH - 1
+	local function put(ch: string)
+		if si < cap then
+			table.insert(out, ch)
+			si += 1
+		end
+	end
+	local i = 0
+	while i <= subl - sl do
+		local j = 0
+		while j < sl and string.byte(lsubject, i + j + 1) == string.byte(lsearch, j + 1) do
+			j += 1
+		end
+		if j == sl then
+			for k = 1, rl do
+				if si >= cap then
+					break
+				end
+				put(string.sub(replace, k, k))
+			end
+			if sl > 0 then
+				i += sl - 1
+			else
+				put(string.sub(subject, i + 1, i + 1))
+			end
+		else
+			put(string.sub(subject, i + 1, i + 1))
+		end
+		i += 1
+	end
+	while i < subl do
+		put(string.sub(subject, i + 1, i + 1))
+		i += 1
+	end
+	SET_G_INT(prog, OFS_RETURN, prvm_edict.PRVM_SetTempString(prog, table.concat(out)))
+end
+
+-- port: prvm_cmds.c VM_isfunction L6479-6496 @xonotic-v0.8.6
+function prvm_cmds.VM_isfunction(prog: any)
+	SAFEPARMCOUNT(prog, 1, "VM_isfunction")
+	local str = G_STRING(prog, OFS_PARM0)
+	prvm_cmds.VM_CheckEmptyString(prog, str)
+	SET_G_FLOAT(prog, OFS_RETURN, if prvm_edict.PRVM_ED_FindFunction(prog, libc.cstr(str)) then 1 else 0)
+end
+
+-- port: prvm_cmds.c VM_callfunction L6439-6470 @xonotic-v0.8.6
+function prvm_cmds.VM_callfunction(prog: any)
+	SAFEPARMCOUNTRANGE(prog, 1, 8, "VM_callfunction")
+	local str = libc.cstr(G_STRING(prog, OFS_PARM0 + (prog.argc - 1) * 3))
+	prvm_cmds.VM_CheckEmptyString(prog, str)
+	local func, fnum = prvm_edict.PRVM_ED_FindFunction(prog, str)
+	if not func then
+		prog.error_cmd(string.format("VM_callfunciton: function %s not found !", str))
+	elseif (func :: any).first_statement < 0 then
+		-- negative statements are built in functions
+		local builtinnumber = -(func :: any).first_statement
+		local b = if builtinnumber < prog.numbuiltins then prog.builtins[builtinnumber] else nil
+		if b then
+			b(prog)
+		else
+			prog.error_cmd(
+				string.format(
+					"No such builtin #%i in %s; most likely cause: outdated engine build. Try updating!",
+					builtinnumber,
+					prog.name
+				)
+			)
+		end
+	elseif (fnum :: number) > 0 then
+		prog.argc -= 1
+		local exec = prog.ExecuteProgram
+		if not exec then
+			exec = if prog.aot
+				then require("./_port/qcrt").ExecuteProgram
+				else require("./prvm_exec").PRVM_ExecuteProgram
+		end
+		exec(prog, fnum, "")
+		prog.argc += 1
+	end
+end
+
+-- port: prvm_cmds.c VM_gettime L2881-2919 @xonotic-v0.8.6 (no CONFIG_CD on the dedicated server)
+function prvm_cmds.VM_gettime(prog: any)
+	SAFEPARMCOUNTRANGE(prog, 0, 1, "VM_gettime")
+	local realtime = prvm_edict.realtime
+	if prog.argc == 0 then
+		SET_G_FLOAT(prog, OFS_RETURN, R(realtime))
+		return
+	end
+	local timer_index = libc.toint(G_FLOAT(prog, OFS_PARM0))
+	if timer_index == 0 or timer_index == 3 then -- GETTIME_FRAMESTART, GETTIME_UPTIME
+		SET_G_FLOAT(prog, OFS_RETURN, realtime)
+	elseif timer_index == 1 then -- GETTIME_REALTIME
+		SET_G_FLOAT(prog, OFS_RETURN, prvm_cmds.Sys_DirtyTime())
+	elseif timer_index == 2 then -- GETTIME_HIRES
+		SET_G_FLOAT(prog, OFS_RETURN, prvm_cmds.Sys_DirtyTime() - (prvm_cmds.host_dirtytime or 0))
+	else
+		prvm_cmds.VM_Warning(prog, "VM_gettime: %s: unsupported timer specified, returning realtime\n", prog.name)
+		SET_G_FLOAT(prog, OFS_RETURN, realtime)
+	end
+end
+
+-- sys_shared.c Sys_DirtyTime: seconds since an arbitrary start (os.clock is the monotonic clock in Luau;
+-- host.luau replaces this with the platform clock when it exists)
+prvm_cmds.Sys_DirtyTime = function(): number
+	return os.clock()
+end
+
 prvm_cmds.BUILTINS = {
 	VM_cvar = prvm_cmds.VM_cvar,
 	VM_cvar_type = prvm_cmds.VM_cvar_type,
@@ -2379,6 +2634,13 @@ prvm_cmds.BUILTINS = {
 	VM_bufstr_set = prvm_cmds.VM_bufstr_set,
 	VM_buf_cvarlist = prvm_cmds.VM_buf_cvarlist,
 	VM_strtolower = prvm_cmds.VM_strtolower,
+	VM_tokenize = prvm_cmds.VM_tokenize,
+	VM_strpad = prvm_cmds.VM_strpad,
+	VM_strconv = prvm_cmds.VM_strconv,
+	VM_strireplace = prvm_cmds.VM_strireplace,
+	VM_isfunction = prvm_cmds.VM_isfunction,
+	VM_callfunction = prvm_cmds.VM_callfunction,
+	VM_gettime = prvm_cmds.VM_gettime,
 	VM_buf_copy = prvm_cmds.VM_buf_copy,
 	VM_buf_sort = prvm_cmds.VM_buf_sort,
 	VM_buf_implode = prvm_cmds.VM_buf_implode,
