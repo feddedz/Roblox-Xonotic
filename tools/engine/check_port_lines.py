@@ -20,12 +20,17 @@ PAT = re.compile(r"-- port: (\w+\.c) (\w+) L(\d+)-(\d+)")
 def func_range(lines, func):
     hits = []
     for i, l in enumerate(lines):
-        if re.match(r"^[A-Za-z_].*\b" + re.escape(func) + r"\s*\(", l) and not l.rstrip().endswith(";"):
+        split = re.match(re.escape(func) + r"\s*\(", l)  # return type on the line before (K&R style)
+        if (split or re.match(r"^[A-Za-z_].*\b" + re.escape(func) + r"\s*\(", l)) and not l.rstrip().endswith(";"):
+            if split and i > 0 and re.match(r"^[A-Za-z_][\w\s\*]*$", lines[i - 1]):
+                i0 = i - 1
+            else:
+                i0 = i
             if l.rstrip().endswith("{"):
                 k = i + 1
                 while k < len(lines) and not lines[k].startswith("}"):
                     k += 1
-                hits.append((i + 1, k + 1))
+                hits.append((i0 + 1, k + 1))
                 continue
             j = i
             while j < len(lines) and not lines[j].startswith("{"):
@@ -36,7 +41,7 @@ def func_range(lines, func):
                 k = j
                 while k < len(lines) and not lines[k].startswith("}"):
                     k += 1
-                hits.append((i + 1, k + 1))
+                hits.append((i0 + 1, k + 1))
     return hits
 
 

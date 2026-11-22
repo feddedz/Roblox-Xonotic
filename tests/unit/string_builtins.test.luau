@@ -386,6 +386,12 @@ return function(ctx: t.Ctx)
 	t.eq(ctx, sp("%05.1f|%+d|% d", -2.25, 5, 5), "-02.2|+5| 5")
 	t.eq(ctx, sp("%s|%d", "only"), "only|0", "missing argument -> 0")
 	t.eq(ctx, sp("%e", 1e10), "1.000000e+10")
+	-- strdecolorize (escape_carets)
+	prog.argc = 1
+	setstr(0, "^1red ^x0F0green ^^caret ^q ^xZZ end^")
+	prvm_cmds.VM_strdecolorize(prog)
+	t.eq(ctx, rets(), "red green ^^caret ^q ^^xZZ end^^")
+	t.eq(ctx, select(2, common.COM_StringDecolorize("^1abc", 0, 3, false)), "ab", "out of room")
 	fs.SetProvider(nil)
 	cvar.reset()
 end

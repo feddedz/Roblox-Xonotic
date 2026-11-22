@@ -1574,6 +1574,13 @@ function prvm_cmds.VM_sprintf(prog: any)
 	SET_G_INT(prog, OFS_RETURN, prvm_edict.PRVM_SetTempString(prog, libc.cstr(buffer.readstring(outbuf, 0, o + 1))))
 end
 
+-- port: prvm_cmds.c VM_strdecolorize L2187-2197 @xonotic-v0.8.6
+function prvm_cmds.VM_strdecolorize(prog: any)
+	SAFEPARMCOUNT(prog, 1, "VM_strdecolorize")
+	local _, out = common.COM_StringDecolorize(G_STRING(prog, OFS_PARM0), 0, VM_STRINGTEMP_LENGTH, true)
+	SET_G_INT(prog, OFS_RETURN, prvm_edict.PRVM_SetTempString(prog, out))
+end
+
 prvm_cmds.BUILTINS = {
 	VM_cvar = prvm_cmds.VM_cvar,
 	VM_cvar_type = prvm_cmds.VM_cvar_type,
@@ -1626,6 +1633,7 @@ prvm_cmds.BUILTINS = {
 	VM_bufstr_set = prvm_cmds.VM_bufstr_set,
 	VM_buf_cvarlist = prvm_cmds.VM_buf_cvarlist,
 	VM_strtolower = prvm_cmds.VM_strtolower,
+	VM_strdecolorize = prvm_cmds.VM_strdecolorize,
 	VM_sprintf = prvm_cmds.VM_sprintf,
 	VM_checkextension = prvm_cmds.VM_checkextension,
 	VM_random = prvm_cmds.VM_random,

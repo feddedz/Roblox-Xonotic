@@ -430,4 +430,100 @@ function common.COM_ToUpperString(input: string, size_out: number): string
 	return caseString(input, size_out, true)
 end
 
+-- port: common.c COM_StringDecolorize L1945-2006 @xonotic-v0.8.6 (returns ok, out)
+function common.COM_StringDecolorize(
+	input: string,
+	size_in: number,
+	size_out: number,
+	escape_carets: boolean
+): (boolean, string)
+	local out = {}
+	if size_out < 1 then
+		return false, ""
+	end
+	local function isx(c: number): boolean
+		return (c >= 48 and c <= 57) or (c >= 97 and c <= 102) or (c >= 65 and c <= 70)
+	end
+	local e = if size_in ~= 0 then size_in + 1 else -1 -- 1-based index of end (NULL: never)
+	local i = 1
+	local function at(k: number): number
+		if k == e then
+			return 0
+		end
+		return string.byte(input, k) or 0
+	end
+	local full = false
+	local function APPEND(ch: number): boolean
+		size_out -= 1
+		if size_out ~= 0 then
+			table.insert(out, string.char(ch))
+			return true
+		end
+		full = true
+		return false
+	end
+	while true do
+		local c = at(i)
+		if c == 0 then
+			return true, table.concat(out)
+		elseif c == 94 then -- STRING_COLOR_TAG
+			i += 1
+			local d = at(i)
+			if d == 120 then -- STRING_COLOR_RGB_TAG_CHAR
+				if
+					i + 1 ~= e
+					and isx(at(i + 1))
+					and i + 2 ~= e
+					and isx(at(i + 2))
+					and i + 3 ~= e
+					and isx(at(i + 3))
+				then
+					i += 3
+				else
+					if not APPEND(94) then
+						break
+					end
+					if escape_carets and not APPEND(94) then
+						break
+					end
+					if not APPEND(120) then
+						break
+					end
+				end
+			elseif d == 0 then -- ends with unfinished color code!
+				if not APPEND(94) then
+					break
+				end
+				-- finish the code by appending another caret when escaping
+				if escape_carets and not APPEND(94) then
+					break
+				end
+				return true, table.concat(out)
+			elseif d == 94 then -- escaped ^
+				if not APPEND(94) then
+					break
+				end
+				-- append a ^ twice when escaping
+				if escape_carets and not APPEND(94) then
+					break
+				end
+			elseif d < 48 or d > 57 then -- not a color code (0-9: color code, dropped)
+				if not APPEND(94) then
+					break
+				end
+				if not APPEND(d) then
+					break
+				end
+			end
+		else
+			if not APPEND(c) then
+				break
+			end
+		end
+		i += 1
+	end
+	local _ = full
+	return false, table.concat(out)
+end
+
 return common
