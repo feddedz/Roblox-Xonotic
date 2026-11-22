@@ -435,6 +435,12 @@ Data pk3 sha256 (full table + sizes: `assets/manifest/pk3-{standard,high}.tsv`):
   again twice (word bleep, then mid "your"..mid "to" bleep): probably matched to the rejected recording;
   stopped retrying (account strikes). meet.ogg approved after pitch +3% (D-023, DIFF-006). Still open: heavymetal.ogg (instrumental, likely a false
   copyright match; original + pitch +3% both rejected) → appeal, or owner decides on a bigger change.
+- **Q-014 (2026-11-22, Claude-Anvil; [needs Studio]) AOT load cost vs speed.** Headless (Lune, no native codegen):
+  requiring all 215 server chunks (37 MB Luau) takes 17.7 s; the interpreter runs the same QC ~1.5× slower but
+  loads progs.dat in 0.1 s. Lazy chunk loading (M2-AOT-SHIP) saves only ~20% on the server (Xonotic's first
+  StartFrame touches 169/215 chunks). Please time in Studio: server Play → BOOT REPORT "SV_VM_Setup + AOT install"
+  and the first frame. If Roblox is as slow, options: (a) interpreter at startup + AOT chunks preloaded in
+  the background (preload(prog, n) per frame), (b) structured control flow (M2-AOT-STRUCT, ≈ −30% code).
 <!-- /§QUESTIONS -->
 
 <!-- §GOTCHAS -->

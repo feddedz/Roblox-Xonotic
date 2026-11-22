@@ -2546,7 +2546,7 @@ function prvm_cmds.VM_callfunction(prog: any)
 		prog.argc -= 1
 		local exec = prog.ExecuteProgram
 		if not exec then
-			exec = if prog.aot
+			exec = if prog.aot and (prog.aot[fnum] or prog.aot_load)
 				then require("./_port/qcrt").ExecuteProgram
 				else require("./prvm_exec").PRVM_ExecuteProgram
 		end

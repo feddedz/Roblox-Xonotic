@@ -82,7 +82,7 @@ function qcrt.call(prog: any, fn: number, argc: number, st: number)
 		end
 	else
 		EnterFunction(prog, fn)
-		prog.aot[fn](prog)
+		qcrt.aotfn(prog, fn)(prog)
 	end
 end
 
@@ -192,6 +192,15 @@ function qcrt.storepv(prog: any, A: number, B: number, st: number)
 	writei32(E, p * 4 + 8, readi32(G, A + 8))
 end
 
+-- compiled function fnum; its chunk is required on first use (prog.aot_load, game/generated/<prog>/init.luau)
+function qcrt.aotfn(prog: any, fnum: number): (any) -> ()
+	local fn = prog.aot[fnum]
+	if fn == nil and prog.aot_load then
+		fn = prog.aot_load(fnum)
+	end
+	return fn
+end
+
 -- Equivalent of PRVM_ExecuteProgram for compiled programs (prvm_exec.c SVVM_ExecuteProgram L952-1054).
 function qcrt.ExecuteProgram(prog: any, fnum: number, errormessage: string)
 	if fnum == 0 or fnum >= prog.numfunctions or fnum < 0 then
@@ -203,7 +212,7 @@ function qcrt.ExecuteProgram(prog: any, fnum: number, errormessage: string)
 	prog.jc = 0
 	EnterFunction(prog, fnum)
 	func.callcount += 1
-	prog.aot[fnum](prog)
+	qcrt.aotfn(prog, fnum)(prog)
 	prog.jc = savedjc
 	prog.tempstringsbuf.cursize = restorevm_tempstringsbuf_cursize
 end

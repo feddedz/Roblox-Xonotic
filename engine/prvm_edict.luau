@@ -1057,7 +1057,7 @@ function prvm_edict.ExecuteProgram(prog: Prog, fnum: number, errormessage: strin
 	local p = prog :: any
 	if p.ExecuteProgram then
 		p.ExecuteProgram(prog, fnum, errormessage)
-	elseif p.aot and p.aot[fnum] then
+	elseif p.aot and (p.aot[fnum] or p.aot_load) then
 		(require :: any)("./_port/qcrt").ExecuteProgram(prog, fnum, errormessage)
 	else
 		(require :: any)("./prvm_exec").PRVM_ExecuteProgram(prog, fnum, errormessage)
