@@ -808,6 +808,131 @@ function prvm_cmds.VM_strncasecmp(prog: any)
 	end
 end
 
+-- Tokenizer state shared by tokenize* / argv* (prvm_cmds.c L2586-2593: static, shared by all VMs)
+local MAXTOKENS = VM_STRINGTEMP_LENGTH // 2
+local num_tokens = 0
+local tokens: { [number]: number } = {}
+local tokens_startpos: { [number]: number } = {}
+local tokens_endpos: { [number]: number } = {}
+
+-- strlcpy(tokenize_string, s, sizeof(tokenize_string))
+local function tokenize_copy(s: string): string
+	s = libc.cstr(s)
+	if #s > VM_STRINGTEMP_LENGTH - 1 then
+		s = string.sub(s, 1, VM_STRINGTEMP_LENGTH - 1)
+	end
+	return s
+end
+
+-- port: prvm_cmds.c VM_tokenize_console L2625-2653 @xonotic-v0.8.6
+function prvm_cmds.VM_tokenize_console(prog: any)
+	SAFEPARMCOUNT(prog, 1, "VM_tokenize")
+	local str = tokenize_copy(G_STRING(prog, OFS_PARM0))
+	local p: number? = 1
+	num_tokens = 0
+	while true do
+		if num_tokens >= MAXTOKENS then
+			break
+		end
+		local q = p :: number
+		while (string.byte(str, q) or 0) ~= 0 and common.ISWHITESPACE(string.byte(str, q) or 0) do
+			q += 1
+		end
+		tokens_startpos[num_tokens] = q - 1
+		local ok
+		ok, p = common.COM_ParseToken_Console(str, q)
+		if not ok then
+			break
+		end
+		tokens_endpos[num_tokens] = (p :: number) - 1
+		tokens[num_tokens] = prvm_edict.PRVM_SetTempString(prog, common.com_token)
+		num_tokens += 1
+	end
+	SET_G_FLOAT(prog, OFS_RETURN, num_tokens)
+end
+
+-- port: prvm_cmds.c VM_tokenizebyseparator L2669-2731 @xonotic-v0.8.6
+function prvm_cmds.VM_tokenizebyseparator(prog: any)
+	SAFEPARMCOUNTRANGE(prog, 2, 8, "VM_tokenizebyseparator")
+	local str = tokenize_copy(G_STRING(prog, OFS_PARM0))
+	local separators = {}
+	for j = 1, prog.argc - 1 do
+		local sep = libc.cstr(G_STRING(prog, OFS_PARM0 + j * 3))
+		if sep ~= "" then
+			table.insert(separators, sep)
+		end
+	end
+	num_tokens = 0
+	local tokentextlen = 0 -- j: bytes used in tokentext[MAX_INPUTLINE]
+	local p = 1
+	local n = #str
+	while num_tokens < MAXTOKENS do
+		tokens_startpos[num_tokens] = p - 1
+		local p0 = p
+		local tok = {}
+		while p <= n do
+			local hit = nil
+			for _, sep in separators do
+				if string.sub(str, p, p + #sep - 1) == sep then
+					hit = sep
+					break
+				end
+			end
+			if hit then
+				p += #hit
+				break
+			end
+			if tokentextlen < VM_STRINGTEMP_LENGTH - 1 then
+				table.insert(tok, string.sub(str, p, p))
+				tokentextlen += 1
+			end
+			p += 1
+			p0 = p
+		end
+		tokens_endpos[num_tokens] = p0 - 1
+		if tokentextlen >= VM_STRINGTEMP_LENGTH then
+			break
+		end
+		tokentextlen += 1
+		tokens[num_tokens] = prvm_edict.PRVM_SetTempString(prog, table.concat(tok))
+		num_tokens += 1
+		if p > n then
+			break
+		end
+	end
+	SET_G_FLOAT(prog, OFS_RETURN, num_tokens)
+end
+
+local function tokenindex(prog: any): number?
+	SAFEPARMCOUNT(prog, 1, "VM_argv")
+	local t = libc.toint(G_FLOAT(prog, OFS_PARM0))
+	if t < 0 then
+		t += num_tokens
+	end
+	if t >= 0 and t < num_tokens then
+		return t
+	end
+	return nil
+end
+
+-- port: prvm_cmds.c VM_argv L2735-2750 @xonotic-v0.8.6
+function prvm_cmds.VM_argv(prog: any)
+	local t = tokenindex(prog)
+	SET_G_INT(prog, OFS_RETURN, if t then tokens[t] else 0)
+end
+
+-- port: prvm_cmds.c VM_argv_start_index L2753-2768 @xonotic-v0.8.6
+function prvm_cmds.VM_argv_start_index(prog: any)
+	local t = tokenindex(prog)
+	SET_G_FLOAT(prog, OFS_RETURN, if t then tokens_startpos[t] else -1)
+end
+
+-- port: prvm_cmds.c VM_argv_end_index L2771-2786 @xonotic-v0.8.6
+function prvm_cmds.VM_argv_end_index(prog: any)
+	local t = tokenindex(prog)
+	SET_G_FLOAT(prog, OFS_RETURN, if t then tokens_endpos[t] else -1)
+end
+
 -- C name -> builtin, for the vm_*_builtins tables
 prvm_cmds.BUILTINS = {
 	VM_cvar = prvm_cmds.VM_cvar,
@@ -837,6 +962,11 @@ prvm_cmds.BUILTINS = {
 	VM_bound = prvm_cmds.VM_bound,
 	VM_localcmd = prvm_cmds.VM_localcmd,
 	VM_vlen = prvm_cmds.VM_vlen,
+	VM_tokenize_console = prvm_cmds.VM_tokenize_console,
+	VM_tokenizebyseparator = prvm_cmds.VM_tokenizebyseparator,
+	VM_argv = prvm_cmds.VM_argv,
+	VM_argv_start_index = prvm_cmds.VM_argv_start_index,
+	VM_argv_end_index = prvm_cmds.VM_argv_end_index,
 	VM_rint = prvm_cmds.VM_rint,
 	VM_numentityfields = prvm_cmds.VM_numentityfields,
 	VM_strncasecmp = prvm_cmds.VM_strncasecmp,
