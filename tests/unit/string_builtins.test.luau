@@ -351,6 +351,41 @@ return function(ctx: t.Ctx)
 	setstr(0, "maps/zzz.bsp")
 	prvm_cmds.VM_whichpack(prog)
 	t.eq(ctx, buffer.readi32(prog.globals, 4), 0, "not found -> string_null")
+	-- sprintf (utf8_enable 1)
+	local function sp(fmt: string, ...: any): string
+		local args = { ... }
+		prog.argc = 1 + #args
+		setstr(0, fmt)
+		for k, a in args do
+			if type(a) == "string" then
+				setstr(k, a)
+			elseif type(a) == "table" then
+				for q = 0, 2 do
+					buffer.writef32(prog.globals, (4 + 3 * k + q) * 4, a[q + 1])
+				end
+			else
+				setf(k, a)
+			end
+		end
+		prvm_cmds.VM_sprintf(prog)
+		return rets()
+	end
+	t.eq(ctx, sp("%d|%5.2f|%s|%-4s|", 3.7, 3.14159, "ab", "x"), "3| 3.14|ab|x   |")
+	t.eq(ctx, sp("%i", 1), "1065353216", "%i reads the argument's int bits")
+	t.eq(ctx, sp("%x|%X", -1, 255), "ffffffffffffffff|FF")
+	t.eq(ctx, sp("%v", { 1, 2.5, -3 }), "1 2.5 -3")
+	t.eq(ctx, sp("%3$s %1$s", "a", "b", "c"), "c a", "positional")
+	t.eq(ctx, sp("[%*d]", 4, 7), "[   7]", "width from argument")
+	t.eq(ctx, sp("[%*d]", -4, 7), "[7   ]", "negative width: left")
+	t.eq(ctx, sp("[%5s]", "^1ab"), "[   ^1ab]", "color codes do not count")
+	t.eq(ctx, sp("[%+5s]", "^1ab"), "[ ^1ab]", "+ flag: color codes count")
+	t.eq(ctx, sp("[%-3s]", "é"), "[é  ]", "width in characters")
+	t.eq(ctx, sp("%c%c", 65, 233), "Aé")
+	t.eq(ctx, sp("100%% %.3s", "abcdef"), "100% abc")
+	t.eq(ctx, sp("a%qb", 1), "a", "invalid directive stops")
+	t.eq(ctx, sp("%05.1f|%+d|% d", -2.25, 5, 5), "-02.2|+5| 5")
+	t.eq(ctx, sp("%s|%d", "only"), "only|0", "missing argument -> 0")
+	t.eq(ctx, sp("%e", 1e10), "1.000000e+10")
 	fs.SetProvider(nil)
 	cvar.reset()
 end

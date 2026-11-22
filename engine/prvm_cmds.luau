@@ -1293,6 +1293,287 @@ function prvm_cmds.VM_whichpack(prog: any)
 	SET_G_INT(prog, OFS_RETURN, if pack then prvm_edict.PRVM_SetTempString(prog, pack) else 0)
 end
 
+-- port: prvm_cmds.c VM_sprintf L6506-6827 @xonotic-v0.8.6
+-- outbuf is a byte buffer with C pointer o; dpsnprintf returns -1 on truncation and o moves back by one,
+-- as in C. INT_LOSSLESS_FORMAT_SIZE "j": integers are intmax_t (64-bit).
+local MAX_INPUTLINE = 16384
+local PRINTF_ALTERNATE, PRINTF_ZEROPAD, PRINTF_LEFT, PRINTF_SPACEPOSITIVE, PRINTF_SIGNPOSITIVE = 1, 2, 4, 8, 16
+function prvm_cmds.VM_sprintf(prog: any)
+	local s = libc.cstr(G_STRING(prog, OFS_PARM0))
+	local outbuf = buffer.create(MAX_INPUTLINE)
+	local o, e = 0, MAX_INPUTLINE
+	local argpos = 1
+	local function ch(i: number): number
+		return string.byte(s, i) or 0
+	end
+	local function isdig(c: number): boolean
+		return c >= 48 and c <= 57
+	end
+	-- dpsnprintf(o, end - o, ...) of an already formatted string
+	local function dp(str: string): number
+		local room = e - o
+		if #str >= room then
+			buffer.writestring(outbuf, o, str, room - 1)
+			buffer.writeu8(outbuf, o + room - 1, 0)
+			return -1
+		end
+		buffer.writestring(outbuf, o, str)
+		if o + #str < e then
+			buffer.writeu8(outbuf, o + #str, 0)
+		end
+		return #str
+	end
+	local function inargs(a: number): boolean
+		return a >= 1 and a < prog.argc
+	end
+	local function GETARG_FLOAT(a: number): number
+		return if inargs(a) then G_FLOAT(prog, OFS_PARM0 + 3 * a) else 0
+	end
+	local function GETARG_INT(a: number): number
+		return if inargs(a) then buffer.readi32(prog.globals, (OFS_PARM0 + 3 * a) * 4) else 0
+	end
+	local function GETARG_VEC(a: number, k: number, isfloat: boolean): number
+		if not inargs(a) then
+			return 0
+		end
+		local off = (OFS_PARM0 + 3 * a + k) * 4
+		return if isfloat then buffer.readf32(prog.globals, off) else buffer.readi32(prog.globals, off)
+	end
+	local function GETARG_STRING(a: number): string
+		return if inargs(a) then libc.cstr(G_STRING(prog, OFS_PARM0 + 3 * a)) else ""
+	end
+	-- strtol(s, &err, 10) on a digit run, cast to int
+	local function strtol_int(i: number): (number, number)
+		local _, j = libc.strtol10(s, i)
+		return libc.atoi(string.sub(s, i, j - 1)), j
+	end
+	local function invalid(s0: number)
+		prvm_cmds.VM_Warning(prog, "VM_sprintf: invalid directive in %s: %s\n", prog.name, string.sub(s, s0))
+	end
+
+	local i = 1
+	while true do
+		local s0 = i
+		local c = ch(i)
+		if c == 0 then
+			break -- finished
+		end
+		local verbatim = c ~= 37
+		if c == 37 then
+			i += 1
+			if ch(i) == 37 then
+				verbatim = true
+			end
+		end
+		if verbatim then
+			if o < e - 1 then
+				buffer.writeu8(outbuf, o, ch(i))
+				o += 1
+			end
+			i += 1
+			continue
+		end
+		-- complete directive format: %3$*1$.*2$ld
+		local width, precision, thisarg, flags, isfloat = -1, -1, -1, 0, -1
+		local stop = false
+		-- is number following?
+		if isdig(ch(i)) then
+			local err
+			width, err = strtol_int(i)
+			if ch(err) == 36 then -- '$'
+				thisarg = width
+				width = -1
+				i = err + 1
+			else
+				if ch(i) == 48 then
+					flags = bit32.bor(flags, PRINTF_ZEROPAD)
+					if width == 0 then
+						width = -1 -- it was just a flag
+					end
+				end
+				i = err
+			end
+		end
+		if width < 0 then
+			while true do
+				local f = ch(i)
+				if f == 35 then
+					flags = bit32.bor(flags, PRINTF_ALTERNATE)
+				elseif f == 48 then
+					flags = bit32.bor(flags, PRINTF_ZEROPAD)
+				elseif f == 45 then
+					flags = bit32.bor(flags, PRINTF_LEFT)
+				elseif f == 32 then
+					flags = bit32.bor(flags, PRINTF_SPACEPOSITIVE)
+				elseif f == 43 then
+					flags = bit32.bor(flags, PRINTF_SIGNPOSITIVE)
+				else
+					break -- noflags
+				end
+				i += 1
+			end
+			if ch(i) == 42 then -- '*'
+				i += 1
+				if isdig(ch(i)) then
+					local err
+					width, err = strtol_int(i)
+					if ch(err) ~= 36 then
+						invalid(s0)
+						break
+					end
+					i = err + 1
+				else
+					width = argpos
+					argpos += 1
+				end
+				width = libc.toint(GETARG_FLOAT(width))
+				if width < 0 then
+					flags = bit32.bor(flags, PRINTF_LEFT)
+					width = if width == -2147483648 then width else -width
+				end
+			elseif isdig(ch(i)) then
+				local err
+				width, err = strtol_int(i)
+				i = err
+				if width < 0 then
+					flags = bit32.bor(flags, PRINTF_LEFT)
+					width = if width == -2147483648 then width else -width
+				end
+			end
+			-- otherwise width stays -1
+		end
+		if ch(i) == 46 then -- '.'
+			i += 1
+			if ch(i) == 42 then
+				i += 1
+				if isdig(ch(i)) then
+					local err
+					precision, err = strtol_int(i)
+					if ch(err) ~= 36 then
+						invalid(s0)
+						break
+					end
+					i = err + 1
+				else
+					precision = argpos
+					argpos += 1
+				end
+				precision = libc.toint(GETARG_FLOAT(precision))
+			elseif isdig(ch(i)) then
+				local err
+				precision, err = strtol_int(i)
+				i = err
+			else
+				invalid(s0)
+				break
+			end
+		end
+		while true do
+			local l = ch(i)
+			if l == 104 then -- h
+				isfloat = 1
+			elseif l == 108 or l == 76 then -- l L
+				isfloat = 0
+			elseif l ~= 106 and l ~= 122 and l ~= 116 then -- j z t: no effect
+				break -- nolength
+			end
+			i += 1
+		end
+		-- now s points to the final directive char and is no longer changed
+		local d = string.char(ch(i))
+		if isfloat < 0 then
+			isfloat = if d == "i" then 0 else 1
+		end
+		local fl = isfloat == 1
+		if thisarg < 0 then
+			thisarg = argpos
+			argpos += 1
+		end
+		if o < e - 1 then
+			local fs_ = ""
+			if d ~= "s" and d ~= "c" and bit32.band(flags, PRINTF_ALTERNATE) ~= 0 then
+				fs_ ..= "#"
+			end
+			if bit32.band(flags, PRINTF_ZEROPAD) ~= 0 then
+				fs_ ..= "0"
+			end
+			if bit32.band(flags, PRINTF_LEFT) ~= 0 then
+				fs_ ..= "-"
+			end
+			if bit32.band(flags, PRINTF_SPACEPOSITIVE) ~= 0 then
+				fs_ ..= " "
+			end
+			if bit32.band(flags, PRINTF_SIGNPOSITIVE) ~= 0 then
+				fs_ ..= "+"
+			end
+			if width < 0 then -- not set
+				width = 0
+			end
+			-- "%*d" with a negative int width means left-aligned |width| (INT_MIN: C's own UB, treated so too)
+			local w, ff = width, fs_
+			if w < 0 then
+				w = -w
+				if not string.find(ff, "-", 1, true) then
+					ff ..= "-"
+				end
+			end
+			local p = if precision >= 0 then precision else -1
+			if d == "d" or d == "i" then
+				o += dp(
+					libc.format1(ff, w, p, "d", if fl then libc.toint64(GETARG_FLOAT(thisarg)) else GETARG_INT(thisarg))
+				)
+			elseif d == "o" or d == "u" or d == "x" or d == "X" then
+				local v = if fl then libc.touint64bits(GETARG_FLOAT(thisarg)) else GETARG_INT(thisarg)
+				o += dp(libc.format1(ff, w, p, d, v))
+			elseif d == "e" or d == "E" or d == "f" or d == "F" or d == "g" or d == "G" then
+				o += dp(libc.format1(ff, w, p, d, if fl then GETARG_FLOAT(thisarg) else GETARG_INT(thisarg)))
+			elseif d == "v" or d == "V" then
+				local g = if d == "v" then "g" else "G"
+				local parts = {}
+				for k = 0, 2 do
+					parts[k + 1] = libc.format1(ff, w, p, g, GETARG_VEC(thisarg, k, fl))
+				end
+				o += dp(table.concat(parts, " "))
+			elseif d == "c" then
+				local u = (if fl then libc.toint64(GETARG_FLOAT(thisarg)) else GETARG_INT(thisarg)) % 4294967296
+				if bit32.band(flags, PRINTF_ALTERNATE) ~= 0 then
+					o += dp(libc.format1(ff, w, -1, "c", u % 256))
+				else
+					local buf = utf8lib.u8_encodech(if u >= 2147483648 then u - 4294967296 else u) or ""
+					if precision < 0 then -- not set
+						precision = e - o - 1
+					end
+					o += dp(utf8lib.u8_strpad(buf, bit32.band(flags, PRINTF_LEFT) ~= 0, width, precision))
+				end
+			elseif d == "s" then
+				if bit32.band(flags, PRINTF_ALTERNATE) ~= 0 then
+					o += dp(libc.format1(ff, w, p, "s", GETARG_STRING(thisarg)))
+				else
+					if precision < 0 then -- not set
+						precision = e - o - 1
+					end
+					local left = bit32.band(flags, PRINTF_LEFT) ~= 0
+					if bit32.band(flags, PRINTF_SIGNPOSITIVE) ~= 0 then
+						o += dp(utf8lib.u8_strpad(GETARG_STRING(thisarg), left, width, precision))
+					else
+						o += dp(utf8lib.u8_strpad_colorcodes(GETARG_STRING(thisarg), left, width, precision))
+					end
+				end
+			else
+				invalid(s0)
+				stop = true
+			end
+		end
+		if stop then
+			break
+		end
+		i += 1
+	end
+	-- finished:
+	buffer.writeu8(outbuf, o, 0)
+	SET_G_INT(prog, OFS_RETURN, prvm_edict.PRVM_SetTempString(prog, libc.cstr(buffer.readstring(outbuf, 0, o + 1))))
+end
+
 prvm_cmds.BUILTINS = {
 	VM_cvar = prvm_cmds.VM_cvar,
 	VM_cvar_type = prvm_cmds.VM_cvar_type,
@@ -1345,6 +1626,7 @@ prvm_cmds.BUILTINS = {
 	VM_bufstr_set = prvm_cmds.VM_bufstr_set,
 	VM_buf_cvarlist = prvm_cmds.VM_buf_cvarlist,
 	VM_strtolower = prvm_cmds.VM_strtolower,
+	VM_sprintf = prvm_cmds.VM_sprintf,
 	VM_checkextension = prvm_cmds.VM_checkextension,
 	VM_random = prvm_cmds.VM_random,
 	VM_strftime = prvm_cmds.VM_strftime,

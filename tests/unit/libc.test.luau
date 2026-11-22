@@ -81,4 +81,48 @@ return function(ctx: t.Ctx)
 	end
 	t.eq(ctx, ns, 451, "strftime vectors")
 	t.eq(ctx, libc.strftime("%Y-%m-%d", libc.gmtime(0), 5), "", "does not fit -> 0")
+	-- one printf conversion (libc.format1) against glibc, intmax_t / double values
+	local function hexfloat(v: string): number
+		if v == "inf" then
+			return math.huge
+		elseif v == "-inf" then
+			return -math.huge
+		elseif v == "nan" then
+			return math.abs(0 / 0) -- 0/0 is the x86 default NaN, which has the sign bit set
+		elseif v == "-nan" then
+			return -math.abs(0 / 0)
+		end
+		local sign, int, frac, ex = string.match(v, "^(%-?)0x(%x)%.?(%x*)p([+-]%d+)$")
+		assert(int, "bad hex float " .. v)
+		local m = tonumber(int :: string, 16) :: number
+		for k = 1, #(frac :: string) do
+			m += (tonumber(string.sub(frac :: string, k, k), 16) :: number) / 16 ^ k
+		end
+		local r = m * 2 ^ (tonumber(ex) :: number)
+		return if sign == "-" then -r else r
+	end
+	local np, bad = 0, 0
+	for line in string.gmatch(t.read("tests/vectors/printf.tsv"), "[^\n]+") do
+		local fl, w, p, c, v, hex = string.match(line, "^([^\t]*)\t(%d+)\t(%-?%d+)\t(.)\t([^\t]+)\t(%x*)$")
+		assert(fl, "bad printf vector " .. line)
+		local want = string.gsub(hex :: string, "%x%x", function(h)
+			return string.char(tonumber(h, 16) :: number)
+		end)
+		local val = if string.find("dxXou", c :: string, 1, true) then tonumber(v) :: number else hexfloat(v :: string)
+		local got = libc.format1(fl :: string, tonumber(w) :: number, tonumber(p) :: number, c :: string, val)
+		if got ~= want and bad < 10 then
+			t.eq(
+				ctx,
+				got,
+				want,
+				string.format("%%%s*.%sj%s w=%s %s", fl :: string, p :: string, c :: string, w :: string, v :: string)
+			)
+		end
+		if got ~= want then
+			bad += 1
+		end
+		np += 1
+	end
+	t.eq(ctx, bad, 0, "printf vectors mismatching")
+	t.eq(ctx, np, 19000, "printf vectors")
 end

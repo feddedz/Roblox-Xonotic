@@ -535,4 +535,99 @@ function libc.localtime(t: number): Tm
 	return totm(os.date("*t", t), t, zone, gmtoff)
 end
 
+-- (intmax_t)(double) on x86-64 (cvttsd2si): truncation; NaN / out of range -> INT64_MIN.
+function libc.toint64(x: number): number
+	if x ~= x or x >= 2 ^ 63 or x < -(2 ^ 63) then
+		return -(2 ^ 63)
+	end
+	local t = if x < 0 then math.ceil(x) else math.floor(x)
+	return t + 0
+end
+
+-- (uintmax_t)(double) as gcc emits it on x86-64, returned as the int64 with the same bits:
+-- x < 2^63: cvttsd2si(x); else cvttsd2si(x - 2^63) ^ 2^63 (>= 2^64 gives 0).
+function libc.touint64bits(x: number): number
+	if x ~= x or x < 2 ^ 63 then
+		return libc.toint64(x)
+	end
+	local r = libc.toint64(x - 2 ^ 63)
+	if r == -(2 ^ 63) then
+		return 0
+	end
+	return r - 2 ^ 63 -- bits r ^ 0x8000000000000000 as int64 (r >= 0 here)
+end
+
+-- One C printf conversion, as glibc prints it: flags (subset of "#0- +"), width (>= 0), precision
+-- (-1 = none), conv, value (d i o u x X: an int64 value as a number, bits for unsigned conversions;
+-- e E f F g G: a double; c: a byte; s: a string). Luau string.format is C's for these (it calls
+-- snprintf) but refuses widths/precisions over 99; those are padded here.
+function libc.format1(flags: string, width: number, prec: number, conv: string, value: any): string
+	local bigw = width > 99
+	local bigp = prec > 99
+	if bigp and (conv == "e" or conv == "E" or conv == "f" or conv == "F" or conv == "g" or conv == "G") then
+		print("NOT YET PORTED: printf precision > 99 for %" .. conv)
+		prec = 99
+		bigp = false
+	end
+	local spec = "%" .. flags
+	if not bigw and width > 0 then
+		spec ..= tostring(width)
+	end
+	local body: string
+	if bigp then
+		-- integer / string precision > 99
+		if conv == "s" then
+			body = string.sub(value, 1, prec)
+		else
+			local digits = string.format("%" .. (if string.find(flags, "#", 1, true) then "#" else "") .. conv, value)
+			local sign = ""
+			local c1 = string.sub(digits, 1, 1)
+			if c1 == "-" then
+				sign, digits = "-", string.sub(digits, 2)
+			elseif (conv == "d" or conv == "i") and string.find(flags, "+", 1, true) then
+				sign = "+"
+			elseif (conv == "d" or conv == "i") and string.find(flags, " ", 1, true) then
+				sign = " "
+			end
+			local prefix = ""
+			if string.sub(digits, 1, 2) == "0x" or string.sub(digits, 1, 2) == "0X" then
+				prefix, digits = string.sub(digits, 1, 2), string.sub(digits, 3)
+			end
+			if #digits < prec then
+				digits = string.rep("0", prec - #digits) .. digits
+			end
+			body = sign .. prefix .. digits
+		end
+		if not bigw and #body < width then
+			body = if string.find(flags, "-", 1, true)
+				then body .. string.rep(" ", width - #body)
+				else string.rep(" ", width - #body) .. body
+		end
+	else
+		if prec >= 0 then
+			spec ..= "." .. tostring(prec)
+		end
+		body = string.format(spec .. conv, value)
+	end
+	if bigw and #body < width then
+		local pad = width - #body
+		if string.find(flags, "-", 1, true) then
+			body ..= string.rep(" ", pad)
+		elseif
+			string.find(flags, "0", 1, true)
+			and conv ~= "s"
+			and conv ~= "c"
+			and not (prec >= 0 and string.find("diouxX", conv, 1, true))
+			and not string.find(body, "[inIN][naNA]")
+		then
+			-- zero padding goes after the sign and the 0x prefix
+			local lead = string.match(body, "^[-+ ]?0[xX]") or string.match(body, "^[-+ ]?") or ""
+			body = lead .. string.rep("0", pad) .. string.sub(body, #lead + 1)
+		else
+			body = string.rep(" ", pad) .. body
+		end
+	end
+	return body
+end
+
 return libc

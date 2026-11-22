@@ -315,4 +315,143 @@ function utf8lib.u8_tolower(ch: number): number
 	return u8_case.u8_tolower[ch] or ch
 end
 
+-- port: utf8lib.c u8_encodech L705-715 @xonotic-v0.8.6 (returns the bytes, or nil)
+function utf8lib.u8_encodech(ch: number): string?
+	local n, bytes = utf8lib.u8_fromchar(ch, 16)
+	if n > 0 then
+		return bytes
+	end
+	return nil
+end
+
+-- port: utf8lib.c colorcode_skipwidth L229-250 @xonotic-v0.8.6
+local function ishex(c: number): boolean
+	return (c >= 48 and c <= 57) or (c >= 97 and c <= 102) or (c >= 65 and c <= 70)
+end
+local function colorcode_skipwidth(s: string, p: number): number
+	if at(s, p) == 94 then -- STRING_COLOR_TAG '^'
+		local c1 = at(s, p + 1)
+		if c1 <= 57 and c1 >= 48 then -- ^[0-9] found
+			return 2
+		elseif c1 == 120 and ishex(at(s, p + 2)) and ishex(at(s, p + 3)) and ishex(at(s, p + 4)) then
+			return 5
+		elseif c1 == 94 then
+			return 1 -- special case, do NOT call colorcode_skipwidth for next char
+		end
+	end
+	return 0
+end
+
+local SIZE = 2 ^ 64
+local function size_t(n: number): number
+	return if n < 0 then n + SIZE else n
+end
+
+-- port: utf8lib.c u8_strnlen_colorcodes L300-341 @xonotic-v0.8.6
+local function u8_strnlen_colorcodes(s: string, n: number): number
+	local p = 1
+	local len = 0
+	while at(s, p) ~= 0 and n ~= 0 do
+		local w = colorcode_skipwidth(s, p)
+		n = size_t(n - w)
+		p += w
+		if w > 1 then -- == 1 means single caret
+			continue
+		end
+		local c = at(s, p)
+		-- ascii char, skip u8_analyze
+		if c < 0x80 or not enabled() then
+			len += 1
+			p += 1
+			n = size_t(n - 1)
+			continue
+		end
+		-- invalid, skip u8_analyze
+		if c < 0xC2 then
+			p += 1
+			n = size_t(n - 1)
+			continue
+		end
+		local ok, st, ln = u8_analyze(s, p, n)
+		if not ok then
+			break
+		end
+		-- valid character, see if it's still inside the range specified by n:
+		if n < st + ln then
+			return len
+		end
+		len += 1
+		n -= st + ln
+		p += st + ln
+	end
+	return len
+end
+
+-- port: utf8lib.c u8_bytelen_colorcodes L387-425 @xonotic-v0.8.6
+local function u8_bytelen_colorcodes(s: string, n: number): number
+	local p = 1
+	local len = 0
+	while at(s, p) ~= 0 and n ~= 0 do
+		local w = colorcode_skipwidth(s, p)
+		len += w
+		p += w
+		if w > 1 then -- == 1 means single caret
+			continue
+		end
+		local c = at(s, p)
+		if c < 0x80 or not enabled() then
+			len += 1
+			p += 1
+			n -= 1
+			continue
+		end
+		if c < 0xC2 then
+			p += 1
+			len += 1
+			continue
+		end
+		local ok, st, ln = u8_analyze(s, p, U8_ANALYZE_INFINITY)
+		if not ok then
+			break
+		end
+		n -= 1
+		p += st + ln
+		len += st + ln
+	end
+	return len
+end
+
+-- "%*s%.*s%*s" with lpad, "", prec, in, rpad, "" (prec in bytes)
+local function pad3(lpad: number, prec: number, s: string, rpad: number): string
+	return string.rep(" ", lpad) .. string.sub(s, 1, prec) .. string.rep(" ", rpad)
+end
+
+-- port: utf8lib.c u8_strpad L889-905 @xonotic-v0.8.6 (returns the full formatted string; the caller
+-- applies dpsnprintf's outsize truncation)
+function utf8lib.u8_strpad(s: string, leftalign: boolean, minwidth: number, maxwidth: number): string
+	s = string.match(s, "^[^%z]*") :: string
+	if not enabled() then
+		-- "%*.*s", leftalign ? -(int)minwidth : (int)minwidth, (int)maxwidth
+		local body = if maxwidth >= 0 then string.sub(s, 1, maxwidth) else s
+		local w = minwidth - #body
+		if w <= 0 then
+			return body
+		end
+		return if leftalign then body .. string.rep(" ", w) else string.rep(" ", w) .. body
+	end
+	local l = utf8lib.u8_bytelen(s, 1, maxwidth)
+	local actual_width = utf8lib.u8_strnlen(s, 1, l)
+	local pad = if actual_width >= minwidth then 0 else minwidth - actual_width
+	return pad3(if leftalign then 0 else pad, l, s, if leftalign then pad else 0)
+end
+
+-- port: utf8lib.c u8_strpad_colorcodes L907-916 @xonotic-v0.8.6 (see u8_strpad)
+function utf8lib.u8_strpad_colorcodes(s: string, leftalign: boolean, minwidth: number, maxwidth: number): string
+	s = string.match(s, "^[^%z]*") :: string
+	local l = u8_bytelen_colorcodes(s, maxwidth)
+	local actual_width = u8_strnlen_colorcodes(s, l)
+	local pad = if actual_width >= minwidth then 0 else minwidth - actual_width
+	return pad3(if leftalign then 0 else pad, l, s, if leftalign then pad else 0)
+end
+
 return utf8lib
