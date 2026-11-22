@@ -16,24 +16,22 @@ Every section except §MAP and §DIFFS stays under ~60 lines; detail lives in `d
 | §GOTCHAS | Verified limits (with date) and hard-won lessons. |
 
 <!-- §STATUS -->
-## §STATUS (rewritten 2026-11-21 late, Claude-Anvil)
-- **Owner's account: 2nd 1-day suspension (G-045).** Ready for after it: every texture reviewed + fixed (D-025/DIFF-008),
-  `assets/manifest/upload-ready.tsv`; order: (1) tools/upload/patch_metadata.py (G-047), (2) owner archives the old
-  assets in assets/manifest/replace-after-review.tsv, (3) gated upload `tools/upload/run_unattended.sh` (8,537 files).
-- **Assets on Roblox:** sounds 804/805 approved (13 bleeped D-022, meet pitch D-023, heavymetal appeal); textures
-  1,752 uploaded (43 of them on the gore list), 55 gore held back (assets/optional/gore/textures.tsv), 9,103 waiting.
-- **Studio-ready:** `tools/build.sh` + `rojo build` → 18 MB place; pressing Play runs Host_Init, the quake.rc config
-  chain (6,075 cvars), SV_VM_Setup + AOT QuakeC, worldspawn, and prints a BOOT REPORT (README step 4).
-- **M2-RUNNER (claimed, Claude-Anvil):** settings complete; strings (utf8lib, tempstrings, zone strings), edicts,
-  string buffers, copyentity ported: **spawnfunc_worldspawn completes** with real cvars, interp == AOT; 42 builtins
-  still stubs; SV_SpawnServer/entity lump need M3 (docs/subsystems/server-runner.md).
-- **Tests:** 10 Lune files, 22 Python tests; StyLua/Selene clean; check_port_lines 0 wrong.
-- **Elsewhere (do not take):** REF-DP, M3-BSPLOAD. **PRs:** #1 (open), #2 (this branch, contains #1).
-- **Owner points:** Q-007 gore, Q-009, Q-010, Q-011 server settings, Q-012 key (saved), Q-013 heavymetal, gore/URL images.
-- **Next:** owner runs Studio Play and sends the BOOT REPORT; M2-RUNNER string builtins; image review step before uploads.
-<!-- /§STATUS -->
+## §STATUS (rewritten 2026-11-22, Claude-Anvil)
+- **Owner's account clear (unbanned 2026-11-22 08:00 UTC).** All 3,201 uploaded assets renamed to neutral names
+  (G-047). Gated texture upload (`tools/upload/run_unattended.sh`, batches of 300, stops at Rejected/403/45-min review)
+  at 3,296 approved; paused because textures/cp_glow.jpg sat in review > 45 min — relaunch once it is Approved.
+  Owner still to archive the old flagged images (72623604865243, 93867009513964, assets/manifest/replace-after-review.tsv).
+- **Assets on Roblox:** sounds 804/805 approved (heavymetal appeal, Q-013); textures 3,296 approved, ~7,600 to go.
+- **M2-RUNNER done:** stormkeep's entity lump loads (PRVM_ED_LoadFromFile) and the first StartFrame runs the real
+  worldspawn and spawns every map entity (4,041 edicts) with compiled QC. ~110 builtins ported (strings, buffers,
+  files, search, sprintf, strftime, glibc rand, mathlib, find*, ...). Left stubbed: world/model/sound/trace/network
+  builtins (need M3/M4: setorigin, setmodel, setsize, precache_*, trace*, AddStat, findradius, ...).
+- **Studio-ready:** `tools/build.sh` + `rojo build`; Play prints a BOOT REPORT (README step 4).
+- **Tests:** 14 Lune files (new glibc/C reference vectors: rand, strftime, printf 19,000, mathlib bit-exact), Python OK,
+  StyLua/Selene clean, check_port_lines 0 wrong. Full run > 120 s (qcaot_diff 69 s).
+- **Owner points:** Q-007 gore, Q-009, Q-010, Q-011, Q-013 heavymetal; Studio BOOT REPORT still wanted.
+- **Next:** M3-BSPLOAD (model_brush.c Q3 BSP) → world.c links/traces → the stubbed world builtins; M2-FSWRITE.
 
-<!-- §RULES -->
 ## §RULES (condensed from the owner's brief; absolute)
 
 **Goal.** Xonotic on Roblox one-to-one: no difference in gameplay or visuals (code, assets, engine
@@ -136,7 +134,8 @@ before working. One claimed task per subsystem at a time. Details per task in th
 | GAMEPASSES | Game passes (DIFF-003) | blocked (Q-009), much later | — | Q-009 |
 | M2-AOT-SHIP | Ship generated code: build step + Rojo mapping + 190k-char modules done (D-020); **[needs Studio]** confirm rojo serve/publish with 380 modules, client load time + memory | partial | tools/qcaot/, game/generated/ | M2-AOT |
 | M2-INTERP-DEBUG | Port tracing/profiling/coverage/watchpoints of prvm_exec.c (console commands use them) | open | engine/prvm_exec.luau | M2-INTERP | tools/qcaot/, game/generated/ | M2-PROGS |
-| M2-RUNNER | Headless runner: rest of PRVM_Prog_Load (required fields/globals of svvm, field lookup), edict alloc, strings, all builtins stubbed + logged; done = server QC runs worldspawn on a stock map | partial, claimed by Claude-Anvil 2026-11-21 (string builtins next; settings done — cvar.c/cmd.c, dedicated Host_Init registrations, quake.rc chain, autocvars, cvar builtins; next: string builtins, edicts, docs/subsystems/server-runner.md) | tests/, engine/prvm_*.luau, engine/sv_main.luau, engine/svvm_cmds.luau | M2-AOT, M2-INTERP |
+| M2-RUNNER | Headless runner: rest of PRVM_Prog_Load (required fields/globals of svvm, field lookup), edict alloc, strings, all builtins stubbed + logged; done = server QC runs worldspawn on a stock map | done (Claude-Anvil 2026-11-22: stormkeep entities load, first StartFrame spawns them; world builtins stubbed for M3/M4) | tests/, engine/prvm_*.luau, engine/sv_main.luau, engine/svvm_cmds.luau | M2-AOT, M2-INTERP |
+| M2-FSWRITE | Persist files QC writes (fopen append/write, fs.realfiles in engine/fs.luau) across server restarts (Roblox DataStore or similar); in memory today | open | engine/fs.luau, platform/ | M2-RUNNER |
 | M2-DEBUG | Rebuild progs.dat from qcsrc with the pinned gmqcc; prove byte-identical; emit line-number debug info | open | tools/qcaot/ | M2-PROGS |
 | REF-CVARLIST | From REF-DP's dedicated server after startup: `cvarlist` (name/value/default/flags) and `cmdlist` → tests/reference/cvars/; diff against engine/host.luau's result (validates tools/engine/gen_cvars.py and the config chain) | open | tests/reference/cvars/, tests/integration/ | REF-DP, M2-RUNNER |
 | REF-DP | Instrumented DarkPlaces (from release source) that records traces, server frames, net messages, particles | open | tools/darkplaces-ref/ | M0-PIN |
@@ -490,4 +489,7 @@ One line each; **details and sources: `docs/gotchas.md`** (add to both). Roblox 
 - **G-045** 2026-11-21: second 1-day suspension (off-site link text in textures: "xonotic.org", phone-number-like text on walls). Uploads stopped until the account is clear AND text areas are blurred (D-024).
 - **G-046** (creator-docs 2026-11-21) Image upload: png/jpeg/bmp/tga, < 8000×8000, not updatable via Open Cloud (a changed image is a new asset). texture-specifications: "Roblox supports up to 4096×4096 pixel texture resolutions" (engine streams lower mips first); the same page still says 1024×1024 for texture *maps* (G-004 conflict) → [needs Studio] check that a 2048² image keeps full detail. Xonotic -high: 10,662 textures ≤ 1024, 242 ≤ 2048, 6 > 2048.
 - **G-047** All 805 audio + 2,396 image uploads so far carry "xonotic.org" in their *description* and the file path (words like "blood") in their display name: likely extra off-platform/gore triggers. Uploaders now use neutral names ("Xonotic texture <sha12>") and descriptions without a domain. **First thing after the suspension ends:** PATCH every existing asset's displayName/description (Open Cloud `PATCH /assets/v1/assets/{id}`, asset:write) before any new upload.
+- **G-048** (creator-docs os.yaml, read 2026-11-22) Roblox `os.date` accepts exactly "*t" (local) and "!*t" (UTC) as table formats; engine/_port/libc.luau builds strftime/gmtime/localtime on those. Luau `string.format` is C's (snprintf) but refuses widths/precisions > 99 (libc.format1 pads those).
+- **G-049** Xonotic spawns map entities lazily: its engine-called SV_OnEntityPreSpawnFunction (qcsrc/lib/_all.inc) sets `__spawnfunc_expecting`, so PRVM_ED_LoadFromFile only queues them; the first StartFrame runs the world constructor (real worldspawn), which spawns the queue. Engine-called functions read `this` from leftover OFS_PARM0 or `self`, so builtins must leave parameter globals exactly as DP does.
+- **G-050** qsort in buf_sort: comparators are inconsistent for NULL/empty strings, so the result depends on the algorithm. Ported as glibc's msort (top-down merge sort, glibc ≤ 2.37 as at the 0.8.6 release); newer glibc may order empty strings differently.
 <!-- /§GOTCHAS -->
