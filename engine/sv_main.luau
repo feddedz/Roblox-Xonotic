@@ -12,6 +12,8 @@ local prvm_edict = require("./prvm_edict")
 local prvm_offsets = require("./prvm_offsets")
 local svvm_cmds = require("./svvm_cmds")
 local host_cmd = require("./host_cmd")
+local cvar = require("./cvar")
+local libc = require("./_port/libc")
 
 local sv_main = {}
 
@@ -102,6 +104,35 @@ function sv_main.SVVM_free_edict(prog: any, e: number)
 	notPorted("VM_RemoveEdictSkeleton, World_Physics_Remove*, csqc entity versions in SVVM_free_edict")
 end
 
+-- sv.time and current_skill (server.h / sv_main.c L3377: set by SV_SpawnServer, M4)
+sv_main.sv = { time = 0 }
+sv_main.current_skill = 0
+prvm_edict.sv_time = function(): number
+	return sv_main.sv.time
+end
+
+local SPAWNFLAG_NOT_EASY, SPAWNFLAG_NOT_MEDIUM, SPAWNFLAG_NOT_HARD, SPAWNFLAG_NOT_DEATHMATCH = 256, 512, 1024, 2048 -- server.h L381-384
+
+-- port: sv_main.c SVVM_load_edict L3714-3734 @xonotic-v0.8.6 (gamemode is GAME_XONOTIC, not Transfusion)
+function sv_main.SVVM_load_edict(prog: any, ent: number): boolean
+	-- remove things from different skill levels or deathmatch
+	local sf = prvm_edict.FieldOfs(prog, "spawnflags")
+	local flags = libc.toint(buffer.readf32(prog.edictsfields, (ent * prog.entityfields + sf) * 4))
+	local dm = cvar.Cvar_FindVar("deathmatch")
+	if dm and dm.integer ~= 0 then
+		if bit32.band(flags, SPAWNFLAG_NOT_DEATHMATCH) ~= 0 then
+			return false
+		end
+	elseif
+		(sv_main.current_skill <= 0 and bit32.band(flags, SPAWNFLAG_NOT_EASY) ~= 0)
+		or (sv_main.current_skill == 1 and bit32.band(flags, SPAWNFLAG_NOT_MEDIUM) ~= 0)
+		or (sv_main.current_skill >= 2 and bit32.band(flags, SPAWNFLAG_NOT_HARD) ~= 0)
+	then
+		return false
+	end
+	return true
+end
+
 local MAX_EDICTS = 32768 -- quakedef.h (non-DP_SMALLMEMORY)
 
 -- port: sv_main.c SV_VM_Setup L3736-3924 @xonotic-v0.8.6 (PARTIAL, see header)
@@ -114,6 +145,7 @@ function sv_main.SV_VM_Setup(progsdata: buffer, opts: { onStub: ((number, string
 	prog.extensionstring = require("./_port/extensions").sv
 	prog.init_edict = sv_main.SVVM_init_edict
 	prog.free_edict = sv_main.SVVM_free_edict
+	prog.load_edict = sv_main.SVVM_load_edict
 	prog.begin_increase_edicts = function(_p: any)
 		notPorted("SVVM_begin_increase_edicts: World_UnlinkEdict of all edicts (world.c)")
 	end

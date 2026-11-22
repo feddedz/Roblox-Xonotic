@@ -622,4 +622,97 @@ function common.COM_ParseToken_VM_Tokenize(s: string, data: number?, returnnewli
 	return true, d
 end
 
+-- port: common.c COM_ParseToken_Simple L1000-1104 @xonotic-v0.8.6 (data: 1-based index, nil = NULL)
+function common.COM_ParseToken_Simple(
+	s: string,
+	data: number?,
+	returnnewline: boolean,
+	parsebackslash: boolean,
+	parsecomments: boolean
+): (boolean, number?)
+	local MAXLEN = 16384 - 1 -- sizeof(com_token) - 1
+	common.com_token = ""
+	if not data then
+		return false, nil
+	end
+	local d = data :: number
+	local out = {}
+	local function put(c: number)
+		if #out < MAXLEN then
+			table.insert(out, string.char(c))
+		end
+	end
+	local function isnl(c: number): boolean
+		return c == 10 or c == 13
+	end
+	while true do -- skipwhite:
+		while ISWHITESPACE(at(s, d)) and (not isnl(at(s, d)) or not returnnewline) do
+			if at(s, d) == 0 then
+				return false, nil -- end of file
+			end
+			d += 1
+		end
+		-- handle Windows line ending
+		if at(s, d) == 13 and at(s, d + 1) == 10 then
+			d += 1
+		end
+		if parsecomments and at(s, d) == 47 and at(s, d + 1) == 47 then
+			while at(s, d) ~= 0 and not isnl(at(s, d)) do
+				d += 1
+			end
+			continue
+		elseif parsecomments and at(s, d) == 47 and at(s, d + 1) == 42 then
+			d += 1
+			while at(s, d) ~= 0 and (at(s, d) ~= 42 or at(s, d + 1) ~= 47) do
+				d += 1
+			end
+			if at(s, d) ~= 0 then
+				d += 1
+			end
+			if at(s, d) ~= 0 then
+				d += 1
+			end
+			continue
+		end
+		break
+	end
+	local c0 = at(s, d)
+	if c0 == 34 then
+		-- quoted string
+		d += 1
+		while at(s, d) ~= 0 and at(s, d) ~= 34 do
+			local c = at(s, d)
+			if c == 92 and parsebackslash then
+				d += 1
+				c = at(s, d)
+				if c == 110 then
+					c = 10
+				elseif c == 116 then
+					c = 9
+				elseif c == 0 then
+					break -- C reads past the terminator here; stop at the end of the data instead
+				end
+			end
+			put(c)
+			d += 1
+		end
+		common.com_token = table.concat(out)
+		if at(s, d) == 34 then
+			d += 1
+		end
+		return true, d
+	elseif c0 == 13 or c0 == 10 then
+		-- \r: translate Mac line ending to UNIX; \n: single character
+		common.com_token = "\n"
+		return true, d + 1
+	end
+	-- regular word
+	while not ISWHITESPACE(at(s, d)) do
+		put(at(s, d))
+		d += 1
+	end
+	common.com_token = table.concat(out)
+	return true, d
+end
+
 return common

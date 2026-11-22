@@ -30,6 +30,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 ]]
 
 local cvar = require("./cvar")
+local console = require("./console")
 
 local prvm_edict = {}
 
@@ -425,7 +426,7 @@ function prvm_edict.PRVM_ED_ClearEdict(prog: Prog, e: number)
 	end
 end
 
-local prvm_reuseedicts_always_allow = 0 -- prvm_edict.c L48 (set by PRVM_ED_LoadFromFile, not ported yet)
+local prvm_reuseedicts_always_allow = 0 -- prvm_edict.c L48 (set by PRVM_ED_LoadFromFile)
 
 -- port: prvm_edict.c PRVM_ED_CanAlloc L231-244 @xonotic-v0.8.6
 function prvm_edict.PRVM_ED_CanAlloc(prog: Prog, e: number): boolean
@@ -1039,6 +1040,527 @@ function prvm_edict.PRVM_ED_FindFunction(prog: Prog, name: string)
 		end
 	end
 	return nil
+end
+
+-- Entity text: field/value strings, epair parsing, entity lump loading -------------------------------
+
+local ev_void, ev_entity, ev_field, ev_function, ev_pointer = 0, 4, 5, 6, 7
+local prvm_type_size = { 1, 1, 1, 3, 1, 1, 1, 2 } -- prvm_edict.c L28 (index type + 1; 64-bit: void * = 2 slots)
+
+-- sv.time as PRVM_ED_LoadFromFile reads it (sv_main.luau sets this)
+prvm_edict.sv_time = function(): number
+	return 0
+end
+
+-- prog->ExecuteProgram (SVVM_ExecuteProgram for the server): compiled code if installed, else the interpreter
+function prvm_edict.ExecuteProgram(prog: Prog, fnum: number, errormessage: string)
+	local p = prog :: any
+	if p.ExecuteProgram then
+		p.ExecuteProgram(prog, fnum, errormessage)
+	elseif p.aot and p.aot[fnum] then
+		(require :: any)("./_port/qcrt").ExecuteProgram(prog, fnum, errormessage)
+	else
+		(require :: any)("./prvm_exec").PRVM_ExecuteProgram(prog, fnum, errormessage)
+	end
+end
+
+-- 4-byte slot readers for a field (ent ~= nil) or a global (ent == nil) at ofs
+local function slotofs(prog: Prog, ent: number?, ofs: number): (buffer, number)
+	if ent then
+		return prog.edictsfields, (ent * prog.entityfields + ofs) * 4
+	end
+	return prog.globals, ofs * 4
+end
+
+-- port: prvm_edict.c PRVM_ED_FieldAtOfs L341-353 @xonotic-v0.8.6
+function prvm_edict.PRVM_ED_FieldAtOfs(prog: Prog, ofs: number): any
+	for _, def in prog.fielddefs do
+		if def.ofs == ofs then
+			return def
+		end
+	end
+	return nil
+end
+
+local function trunc(str: string, linelength: number): string
+	return if #str > linelength - 1 then string.sub(str, 1, linelength - 1) else str
+end
+
+-- port: prvm_edict.c PRVM_ValueString L421-469 @xonotic-v0.8.6 (FLOAT_LOSSLESS_FORMAT "%.9g": 32-bit prvm)
+function prvm_edict.PRVM_ValueString(prog: Prog, etype: number, b: buffer, o: number, linelength: number): string
+	local t = bit32.band(etype, bit32.bnot(DEF_SAVEGLOBAL))
+	local line
+	if t == ev_string then
+		line = libc.cstr(prvm_edict.PRVM_GetString(prog, buffer.readi32(b, o)))
+	elseif t == ev_entity then
+		local n = buffer.readi32(b, o)
+		if n < 0 or n >= prog.max_edicts then
+			line = string.format("entity %i (invalid!)", n)
+		else
+			line = string.format("entity %i", n)
+		end
+	elseif t == ev_function then
+		local f = prog.functions[buffer.readi32(b, o) + 1]
+		line = prvm_edict.PRVM_GetString(prog, if f then f.s_name else 0) .. "()"
+	elseif t == ev_field then
+		local def = prvm_edict.PRVM_ED_FieldAtOfs(prog, buffer.readi32(b, o))
+		line = "." .. prvm_edict.PRVM_GetString(prog, if def then def.s_name else 0)
+	elseif t == ev_void then
+		line = "void"
+	elseif t == ev_float then
+		-- LordHavoc: changed from %5.1f to %10.4f
+		line = string.format("%.9g", buffer.readf32(b, o))
+	elseif t == ev_vector then
+		line =
+			string.format("'%.9g %.9g %.9g'", buffer.readf32(b, o), buffer.readf32(b, o + 4), buffer.readf32(b, o + 8))
+	elseif t == ev_pointer then
+		line = "pointer"
+	else
+		line = string.format("bad type %i", t)
+	end
+	return trunc(line, linelength)
+end
+
+-- port: prvm_edict.c PRVM_UglyValueString L479-549 @xonotic-v0.8.6
+function prvm_edict.PRVM_UglyValueString(prog: Prog, etype: number, b: buffer, o: number, linelength: number): string
+	local t = bit32.band(etype, bit32.bnot(DEF_SAVEGLOBAL))
+	if t == ev_string then
+		-- Parse the string a bit to turn special characters
+		-- (like newline, specifically) into escape codes,
+		-- this fixes saving games from various mods
+		local str = libc.cstr(prvm_edict.PRVM_GetString(prog, buffer.readi32(b, o)))
+		local out = {}
+		local i = 0
+		local k = 1
+		while i < linelength - 2 and k <= #str do
+			local c = string.byte(str, k)
+			if c == 10 then
+				table.insert(out, "\\n")
+				i += 2
+			elseif c == 13 then
+				table.insert(out, "\\r")
+				i += 2
+			elseif c == 92 then
+				table.insert(out, "\\\\")
+				i += 2
+			elseif c == 34 then
+				table.insert(out, '\\"')
+				i += 2
+			else
+				table.insert(out, string.char(c))
+				i += 1
+			end
+			k += 1
+		end
+		return table.concat(out)
+	end
+	local line
+	if t == ev_entity then
+		line = string.format("%i", buffer.readi32(b, o))
+	elseif t == ev_function then
+		local f = prog.functions[buffer.readi32(b, o) + 1]
+		line = prvm_edict.PRVM_GetString(prog, if f then f.s_name else 0)
+	elseif t == ev_field then
+		local def = prvm_edict.PRVM_ED_FieldAtOfs(prog, buffer.readi32(b, o))
+		line = "." .. prvm_edict.PRVM_GetString(prog, if def then def.s_name else 0)
+	elseif t == ev_void then
+		line = "void"
+	elseif t == ev_float then
+		line = string.format("%.9g", buffer.readf32(b, o))
+	elseif t == ev_vector then
+		line = string.format("%.9g %.9g %.9g", buffer.readf32(b, o), buffer.readf32(b, o + 4), buffer.readf32(b, o + 8))
+	else
+		line = string.format("bad type %i", t)
+	end
+	return trunc(line, linelength)
+end
+
+local function isws(c: number): boolean
+	return c == 0 or c == 32 or c == 9 or c == 13 or c == 10
+end
+
+-- port: prvm_edict.c PRVM_ED_ParseEpair L949-1048 @xonotic-v0.8.6 (ent: edict number, nil = globals)
+function prvm_edict.PRVM_ED_ParseEpair(prog: Prog, ent: number?, key: any, s: string, parsebackslash: boolean): boolean
+	local p = prog :: any
+	s = libc.cstr(s)
+	local b, o = slotofs(prog, ent, key.ofs)
+	local t = bit32.band(key.type, bit32.bnot(DEF_SAVEGLOBAL))
+	local function at(i: number): number
+		return string.byte(s, i) or 0
+	end
+	if t == ev_string then
+		local l = #s + 1
+		local out = {}
+		local i = 1
+		while i <= #s do
+			local c = at(i)
+			if c == 92 and at(i + 1) ~= 0 and parsebackslash then
+				i += 1
+				c = at(i)
+				if c == 110 then
+					c = 10
+				elseif c == 114 then
+					c = 13
+				end
+			end
+			table.insert(out, string.char(c))
+			i += 1
+		end
+		buffer.writei32(b, o, prvm_edict.PRVM_AllocString(prog, l, table.concat(out)))
+	elseif t == ev_float then
+		local i = 1
+		while at(i) ~= 0 and isws(at(i)) do
+			i += 1
+		end
+		buffer.writef32(b, o, libc.atof(string.sub(s, i)))
+	elseif t == ev_vector then
+		local i = 1
+		for k = 0, 2 do
+			while at(i) ~= 0 and isws(at(i)) do
+				i += 1
+			end
+			if at(i) == 0 then
+				break
+			end
+			buffer.writef32(b, o + k * 4, libc.atof(string.sub(s, i)))
+			while not isws(at(i)) do
+				i += 1
+			end
+			if at(i) == 0 then
+				break
+			end
+		end
+	elseif t == ev_entity then
+		local i = 1
+		while at(i) ~= 0 and isws(at(i)) do
+			i += 1
+		end
+		local n = libc.atoi(string.sub(s, i))
+		if n >= p.limit_edicts then
+			console.Con_Print(
+				string.format(
+					"PRVM_ED_ParseEpair: ev_entity reference too large (edict %u >= MAX_EDICTS %u) on %s\n",
+					n % 4294967296,
+					p.limit_edicts,
+					prog.name
+				)
+			)
+		end
+		while n >= prog.max_edicts do
+			local before = prog.max_edicts
+			prvm_edict.PRVM_MEM_IncreaseEdicts(prog)
+			if prog.max_edicts == before then
+				-- C loops forever here (limit reached); PRVM_EDICT_NUM would then fail
+				break
+			end
+		end
+		-- if IncreaseEdicts was called the base pointer needs to be updated
+		b, o = slotofs(prog, ent, key.ofs)
+		if n < 0 or n >= prog.max_edicts then
+			prog.error_cmd(string.format("PRVM_EDICT_NUM: %s: bad number %i", prog.name, n))
+		end
+		buffer.writei32(b, o, n)
+	elseif t == ev_field then
+		if at(1) ~= 46 then
+			console.Con_DPrint(string.format("PRVM_ED_ParseEpair: Bogus field name %s in %s\n", s, prog.name))
+			return false
+		end
+		local def = prvm_edict.PRVM_ED_FindField(prog, string.sub(s, 2))
+		if not def then
+			console.Con_DPrint(string.format("PRVM_ED_ParseEpair: Can't find field %s in %s\n", s, prog.name))
+			return false
+		end
+		buffer.writei32(b, o, (def :: any).ofs)
+	elseif t == ev_function then
+		local _, fnum = prvm_edict.PRVM_ED_FindFunction(prog, s)
+		if not fnum then
+			console.Con_Print(string.format("PRVM_ED_ParseEpair: Can't find function %s in %s\n", s, prog.name))
+			return false
+		end
+		buffer.writei32(b, o, fnum)
+	else
+		console.Con_Print(
+			string.format(
+				'PRVM_ED_ParseEpair: Unknown key->type %i for key "%s" on %s\n',
+				key.type,
+				prvm_edict.PRVM_GetString(prog, key.s_name),
+				prog.name
+			)
+		)
+		return false
+	end
+	return true
+end
+
+-- port: prvm_edict.c PRVM_ED_Print L614-687 @xonotic-v0.8.6
+function prvm_edict.PRVM_ED_Print(prog: Prog, ed: number, wildcard_fieldname: string?)
+	local p = prog :: any
+	if p.ed_free[ed] then
+		console.Con_Print(string.format("%s: FREE\n", prog.name))
+		return
+	end
+	local MAX_INPUTLINE = 16384
+	local tempstring = string.format("\n%s EDICT %i:\n", prog.name, ed)
+	local function cat(x: string)
+		tempstring = trunc(tempstring .. x, MAX_INPUTLINE)
+	end
+	local function clip(name: string): string
+		if #name > 260 - 4 then
+			return string.sub(name, 1, 256) .. "..."
+		end
+		return name
+	end
+	for i = 1, #prog.fielddefs - 1 do
+		local d = prog.fielddefs[i + 1]
+		local name = prvm_edict.PRVM_GetString(prog, d.s_name)
+		local n = #name
+		local last = string.sub(name, -1)
+		if n > 1 and string.sub(name, -2, -2) == "_" and (last == "x" or last == "y" or last == "z") then
+			continue -- skip _x, _y, _z vars
+		end
+		-- Check Field Name Wildcard
+		if wildcard_fieldname then
+			local filematch = (require :: any)("./filematch")
+			if not filematch.matchpattern(name, wildcard_fieldname, true) then
+				continue
+			end
+		end
+		local t = bit32.band(d.type, bit32.bnot(DEF_SAVEGLOBAL))
+		local b, o = slotofs(prog, ed, d.ofs)
+		local size = prvm_type_size[t + 1] or 1
+		local nonzero = false
+		for j = 0, size - 1 do
+			if o + j * 4 + 4 <= buffer.len(b) and buffer.readi32(b, o + j * 4) ~= 0 then
+				nonzero = true
+				break
+			end
+		end
+		if not nonzero then
+			continue -- if the value is still all 0, skip the field
+		end
+		name = clip(name)
+		cat(name)
+		for _ = #name, 13 do
+			cat(" ")
+		end
+		cat(" ")
+		cat(clip(prvm_edict.PRVM_ValueString(prog, d.type, b, o, MAX_INPUTLINE)))
+		cat("\n")
+		if #tempstring >= MAX_INPUTLINE // 2 then
+			console.Con_Print(tempstring)
+			tempstring = ""
+		end
+	end
+	if tempstring ~= "" then
+		console.Con_Print(tempstring)
+	end
+end
+
+-- port: prvm_edict.c PRVM_ED_ParseEdict L1242-1331 @xonotic-v0.8.6 (returns the new data index)
+function prvm_edict.PRVM_ED_ParseEdict(prog: Prog, data: string, pos: number?, ent: number): number?
+	local p = prog :: any
+	local common = (require :: any)("./common")
+	local init = false
+	while true do
+		-- parse key
+		local ok
+		ok, pos = common.COM_ParseToken_Simple(data, pos, false, false, true)
+		if not ok then
+			prog.error_cmd("PRVM_ED_ParseEdict: EOF without closing brace")
+		end
+		if cvarint("developer_entityparsing", 0) ~= 0 then
+			console.Con_Print(string.format('Key: "%s"', common.com_token))
+		end
+		local tok = common.com_token
+		if string.sub(tok, 1, 1) == "}" then
+			break
+		end
+		-- anglehack is to allow QuakeEd to write single scalar angles
+		-- and allow them to be turned into vectors. (FIXME...)
+		local anglehack = false
+		if tok == "angle" then
+			tok = "angles"
+			anglehack = true
+		end
+		-- FIXME: change light to _light to get rid of this hack
+		if tok == "light" then
+			tok = "light_lev" -- hack for single light def
+		end
+		local keyname = string.sub(tok, 1, 255)
+		-- another hack to fix keynames with trailing spaces
+		keyname = string.gsub(keyname, " +$", "")
+		-- parse value
+		ok, pos = common.COM_ParseToken_Simple(data, pos, false, false, true)
+		if not ok then
+			prog.error_cmd("PRVM_ED_ParseEdict: EOF without closing brace")
+		end
+		if cvarint("developer_entityparsing", 0) ~= 0 then
+			console.Con_Print(string.format(' "%s"\n', common.com_token))
+		end
+		local value = common.com_token
+		if string.sub(value, 1, 1) == "}" then
+			prog.error_cmd("PRVM_ED_ParseEdict: closing brace without data")
+		end
+		init = true
+		-- ignore attempts to set key "" (this problem occurs in nehahra neh1m8.bsp)
+		if keyname == "" then
+			continue
+		end
+		-- keynames with a leading underscore are used for utility comments,
+		-- and are immediately discarded by quake
+		if string.sub(keyname, 1, 1) == "_" then
+			continue
+		end
+		local key = prvm_edict.PRVM_ED_FindField(prog, keyname)
+		if not key then
+			console.Con_DPrint(string.format("%s: '%s' is not a field\n", prog.name, keyname))
+			continue
+		end
+		if anglehack then
+			value = "0 " .. string.sub(value, 1, 31) .. " 0"
+		end
+		if not prvm_edict.PRVM_ED_ParseEpair(prog, ent, key, value, keyname ~= "wad") then
+			prog.error_cmd("PRVM_ED_ParseEdict: parse error")
+		end
+	end
+	if not init then
+		p.ed_free[ent] = true
+		p.ed_freetime[ent] = prvm_edict.realtime
+	end
+	return pos
+end
+
+-- port: prvm_edict.c PRVM_ED_LoadFromFile L1349-1478 @xonotic-v0.8.6
+function prvm_edict.PRVM_ED_LoadFromFile(prog: Prog, data: string)
+	local p = prog :: any
+	local common = (require :: any)("./common")
+	local parsed, inhibited, spawned, died = 0, 0, 0, 0
+	prvm_reuseedicts_always_allow = prvm_edict.realtime
+	local isserver = prog.name == "server"
+	local function serverfunction(name: string): number
+		if not isserver then
+			return 0
+		end
+		local _, fnum = prvm_edict.PRVM_ED_FindFunction(prog, name)
+		return fnum or 0
+	end
+	local function global(name: string): number
+		local d = prvm_edict.PRVM_ED_FindGlobal(prog, name)
+		return if d then (d :: any).ofs else -1
+	end
+	local selfofs, timeofs = global("self"), global("time")
+	local function setself(ent: number)
+		if timeofs >= 0 then
+			buffer.writef32(prog.globals, timeofs * 4, prvm_edict.sv_time())
+		end
+		buffer.writei32(prog.globals, selfofs * 4, ent)
+	end
+	local pre = serverfunction("SV_OnEntityPreSpawnFunction")
+	local nospawn = serverfunction("SV_OnEntityNoSpawnFunction")
+	local post = serverfunction("SV_OnEntityPostSpawnFunction")
+	local classname = prvm_edict.FieldOfs(prog, "classname")
+	local reqofs = global("require_spawnfunc_prefix")
+	local pos: number? = 1
+	-- parse ents
+	while true do
+		-- parse the opening brace
+		local ok
+		ok, pos = common.COM_ParseToken_Simple(data, pos, false, false, true)
+		if not ok then
+			break
+		end
+		if string.sub(common.com_token, 1, 1) ~= "{" then
+			prog.error_cmd(
+				string.format("PRVM_ED_LoadFromFile: %s: found %s when expecting {", prog.name, common.com_token)
+			)
+		end
+		-- CHANGED: this is not conform to PR_LoadFromFile
+		local ent
+		if p.loadintoworld then
+			p.loadintoworld = false
+			ent = 0
+		else
+			ent = prvm_edict.PRVM_ED_Alloc(prog)
+		end
+		-- clear it
+		if ent ~= 0 then -- hack
+			buffer.fill(prog.edictsfields, ent * prog.entityfields * 4, 0, prog.entityfields * 4)
+		end
+		pos = prvm_edict.PRVM_ED_ParseEdict(prog, data, pos, ent)
+		parsed += 1
+		-- remove the entity ?
+		if p.load_edict and not p.load_edict(prog, ent) then
+			prvm_edict.PRVM_ED_Free(prog, ent)
+			inhibited += 1
+			continue
+		end
+		if pre ~= 0 then
+			setself(ent)
+			prvm_edict.ExecuteProgram(prog, pre, "QC function SV_OnEntityPreSpawnFunction is missing")
+		end
+		if p.ed_free[ent] then
+			inhibited += 1
+			continue
+		end
+		-- immediately call spawn function, but only if there is a self global and a classname
+		if not p.ed_free[ent] then
+			local cn = if classname >= 0
+				then buffer.readi32(prog.edictsfields, (ent * prog.entityfields + classname) * 4)
+				else 0
+			if cn == 0 then
+				console.Con_Print("No classname for:\n")
+				prvm_edict.PRVM_ED_Print(prog, ent, nil)
+				prvm_edict.PRVM_ED_Free(prog, ent)
+				continue
+			end
+			-- look for the spawn function
+			local funcname = prvm_edict.PRVM_GetString(prog, cn)
+			local _, fnum = prvm_edict.PRVM_ED_FindFunction(prog, string.sub("spawnfunc_" .. funcname, 1, 1023))
+			if not fnum then
+				if reqofs < 0 or buffer.readf32(prog.globals, reqofs * 4) == 0 then
+					_, fnum = prvm_edict.PRVM_ED_FindFunction(prog, funcname)
+				end
+			end
+			if not fnum then
+				-- check for OnEntityNoSpawnFunction
+				if nospawn ~= 0 then
+					setself(ent)
+					prvm_edict.ExecuteProgram(prog, nospawn, "QC function SV_OnEntityNoSpawnFunction is missing")
+				else
+					if cvarint("developer", 0) > 0 then -- don't confuse non-developers with errors
+						console.Con_Print("No spawn function for:\n")
+						prvm_edict.PRVM_ED_Print(prog, ent, nil)
+					end
+					prvm_edict.PRVM_ED_Free(prog, ent)
+					continue -- not included in "inhibited" count
+				end
+			else
+				setself(ent)
+				prvm_edict.ExecuteProgram(prog, fnum, "")
+			end
+		end
+		if not p.ed_free[ent] and post ~= 0 then
+			setself(ent)
+			prvm_edict.ExecuteProgram(prog, post, "QC function SV_OnEntityPostSpawnFunction is missing")
+		end
+		spawned += 1
+		if p.ed_free[ent] then
+			died += 1
+		end
+	end
+	console.Con_DPrint(
+		string.format(
+			"%s: %i new entities parsed, %i new inhibited, %i (%i new) spawned (whereas %i removed self, %i stayed)\n",
+			prog.name,
+			parsed,
+			inhibited,
+			prog.num_edicts,
+			spawned,
+			died,
+			spawned - died
+		)
+	)
+	prvm_reuseedicts_always_allow = 0
 end
 
 return prvm_edict
