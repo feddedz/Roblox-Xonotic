@@ -104,11 +104,12 @@ function sv_main.SVVM_free_edict(prog: any, e: number)
 	notPorted("VM_RemoveEdictSkeleton, World_Physics_Remove*, csqc entity versions in SVVM_free_edict")
 end
 
--- sv.time and current_skill (server.h / sv_main.c L3377: set by SV_SpawnServer, M4)
-sv_main.sv = { time = 0 }
+-- sv (engine/server.luau) and current_skill (sv_main.c L3377): set by SV_SpawnServer, M4
+local server = require("./server")
+sv_main.sv = server.sv
 sv_main.current_skill = 0
 prvm_edict.sv_time = function(): number
-	return sv_main.sv.time
+	return server.sv.time
 end
 
 local SPAWNFLAG_NOT_EASY, SPAWNFLAG_NOT_MEDIUM, SPAWNFLAG_NOT_HARD, SPAWNFLAG_NOT_DEATHMATCH = 256, 512, 1024, 2048 -- server.h L381-384

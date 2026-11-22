@@ -715,4 +715,181 @@ function common.COM_ParseToken_Simple(
 	return true, d
 end
 
+-- protocolversion_t (common.h L125-143)
+common.PROTOCOL = {
+	UNKNOWN = 0,
+	DARKPLACES7 = 1,
+	DARKPLACES6 = 2,
+	DARKPLACES5 = 3,
+	DARKPLACES4 = 4,
+	DARKPLACES3 = 5,
+	DARKPLACES2 = 6,
+	DARKPLACES1 = 7,
+	QUAKEDP = 8,
+	NEHAHRAMOVIE = 9,
+	QUAKE = 10,
+	QUAKEWORLD = 11,
+	NEHAHRABJP = 12,
+	NEHAHRABJP2 = 13,
+	NEHAHRABJP3 = 14,
+}
+local P = common.PROTOCOL
+
+-- sizebuf_t (common.h): data is a buffer of maxsize bytes
+export type SizeBuf = { data: buffer, maxsize: number, cursize: number, allowoverflow: boolean, overflowed: boolean }
+function common.SZ_New(maxsize: number): SizeBuf
+	return { data = buffer.create(maxsize), maxsize = maxsize, cursize = 0, allowoverflow = false, overflowed = false }
+end
+
+-- port: common.c SZ_Clear L582-585 @xonotic-v0.8.6
+function common.SZ_Clear(buf: SizeBuf)
+	buf.cursize = 0
+end
+
+-- port: common.c SZ_GetSpace L587-608 @xonotic-v0.8.6 (returns the byte offset; Host_Error raises)
+function common.SZ_GetSpace(buf: SizeBuf, length: number): number
+	if buf.cursize + length > buf.maxsize then
+		if not buf.allowoverflow then
+			error("SZ_GetSpace: overflow without allowoverflow set", 0)
+		end
+		if length > buf.maxsize then
+			error(string.format("SZ_GetSpace: %i is > full buffer size", length), 0)
+		end
+		buf.overflowed = true
+		local console = require("./console")
+		console.Con_Print("SZ_GetSpace: overflow\n")
+		common.SZ_Clear(buf)
+	end
+	local o = buf.cursize
+	buf.cursize += length
+	return o
+end
+
+-- port: common.c SZ_Write L610-613 @xonotic-v0.8.6
+function common.SZ_Write(buf: SizeBuf, data: string)
+	buffer.writestring(buf.data, common.SZ_GetSpace(buf, #data), data)
+end
+
+-- port: common.c MSG_WriteChar L270-276 @xonotic-v0.8.6
+function common.MSG_WriteChar(sb: SizeBuf, c: number)
+	buffer.writeu8(sb.data, common.SZ_GetSpace(sb, 1), c % 256)
+end
+-- port: common.c MSG_WriteByte L278-284 @xonotic-v0.8.6
+common.MSG_WriteByte = common.MSG_WriteChar
+
+-- port: common.c MSG_WriteShort L286-293 @xonotic-v0.8.6
+function common.MSG_WriteShort(sb: SizeBuf, c: number)
+	buffer.writeu16(sb.data, common.SZ_GetSpace(sb, 2), c % 65536)
+end
+
+-- port: common.c MSG_WriteLong L295-304 @xonotic-v0.8.6
+function common.MSG_WriteLong(sb: SizeBuf, c: number)
+	buffer.writeu32(sb.data, common.SZ_GetSpace(sb, 4), c % 4294967296)
+end
+
+-- port: common.c MSG_WriteFloat L306-319 @xonotic-v0.8.6
+function common.MSG_WriteFloat(sb: SizeBuf, f: number)
+	buffer.writef32(sb.data, common.SZ_GetSpace(sb, 4), f)
+end
+
+-- port: common.c MSG_WriteString L321-327 @xonotic-v0.8.6
+function common.MSG_WriteString(sb: SizeBuf, s: string?)
+	local str = if s then string.match(s, "^[^%z]*") :: string else ""
+	if str == "" then
+		common.MSG_WriteChar(sb, 0)
+	else
+		common.SZ_Write(sb, str .. "\0")
+	end
+end
+
+-- port: common.c MSG_WriteUnterminatedString L329-333 @xonotic-v0.8.6
+function common.MSG_WriteUnterminatedString(sb: SizeBuf, s: string?)
+	local str = if s then string.match(s, "^[^%z]*") :: string else ""
+	if str ~= "" then
+		common.SZ_Write(sb, str)
+	end
+end
+
+-- (int)(double) truncation, x86 out-of-range -> INT_MIN
+local function cint(x: number): number
+	if x ~= x or x >= 2147483648 or x <= -2147483649 then
+		return -2147483648
+	end
+	return if x < 0 then math.ceil(x) else math.floor(x)
+end
+
+-- port: common.c MSG_WriteCoord13i L335-341 @xonotic-v0.8.6
+function common.MSG_WriteCoord13i(sb: SizeBuf, f: number)
+	common.MSG_WriteShort(sb, if f >= 0 then cint(f * 8.0 + 0.5) else cint(f * 8.0 - 0.5))
+end
+-- port: common.c MSG_WriteCoord16i L343-349 @xonotic-v0.8.6
+function common.MSG_WriteCoord16i(sb: SizeBuf, f: number)
+	common.MSG_WriteShort(sb, if f >= 0 then cint(f + 0.5) else cint(f - 0.5))
+end
+-- port: common.c MSG_WriteCoord32f L351-354 @xonotic-v0.8.6
+common.MSG_WriteCoord32f = common.MSG_WriteFloat
+
+-- port: common.c MSG_WriteCoord L356-366 @xonotic-v0.8.6 (DARKPLACES1 and the default branch are the same in C)
+-- selene: allow(if_same_then_else)
+function common.MSG_WriteCoord(sb: SizeBuf, f: number, protocol: number)
+	if
+		protocol == P.QUAKE
+		or protocol == P.QUAKEDP
+		or protocol == P.NEHAHRAMOVIE
+		or protocol == P.NEHAHRABJP
+		or protocol == P.NEHAHRABJP2
+		or protocol == P.NEHAHRABJP3
+		or protocol == P.QUAKEWORLD
+	then
+		common.MSG_WriteCoord13i(sb, f)
+	elseif protocol == P.DARKPLACES1 then
+		common.MSG_WriteCoord32f(sb, f)
+	elseif protocol == P.DARKPLACES2 or protocol == P.DARKPLACES3 or protocol == P.DARKPLACES4 then
+		common.MSG_WriteCoord16i(sb, f)
+	else
+		common.MSG_WriteCoord32f(sb, f)
+	end
+end
+
+-- port: common.c MSG_WriteVector L368-373 @xonotic-v0.8.6
+function common.MSG_WriteVector(sb: SizeBuf, v: { number }, protocol: number)
+	common.MSG_WriteCoord(sb, v[1], protocol)
+	common.MSG_WriteCoord(sb, v[2], protocol)
+	common.MSG_WriteCoord(sb, v[3], protocol)
+end
+
+-- port: common.c MSG_WriteAngle8i L376-382 @xonotic-v0.8.6
+function common.MSG_WriteAngle8i(sb: SizeBuf, f: number)
+	local v = if f >= 0 then cint(f * (256.0 / 360.0) + 0.5) else cint(f * (256.0 / 360.0) - 0.5)
+	common.MSG_WriteByte(sb, bit32.band(v, 255))
+end
+-- port: common.c MSG_WriteAngle16i L384-390 @xonotic-v0.8.6
+function common.MSG_WriteAngle16i(sb: SizeBuf, f: number)
+	local v = if f >= 0 then cint(f * (65536.0 / 360.0) + 0.5) else cint(f * (65536.0 / 360.0) - 0.5)
+	common.MSG_WriteShort(sb, bit32.band(v, 65535))
+end
+-- port: common.c MSG_WriteAngle32f L392-395 @xonotic-v0.8.6
+common.MSG_WriteAngle32f = common.MSG_WriteFloat
+
+-- port: common.c MSG_WriteAngle L397-403 @xonotic-v0.8.6
+function common.MSG_WriteAngle(sb: SizeBuf, f: number, protocol: number)
+	if
+		protocol == P.QUAKE
+		or protocol == P.QUAKEDP
+		or protocol == P.NEHAHRAMOVIE
+		or protocol == P.NEHAHRABJP
+		or protocol == P.NEHAHRABJP2
+		or protocol == P.NEHAHRABJP3
+		or protocol == P.DARKPLACES1
+		or protocol == P.DARKPLACES2
+		or protocol == P.DARKPLACES3
+		or protocol == P.DARKPLACES4
+		or protocol == P.QUAKEWORLD
+	then
+		common.MSG_WriteAngle8i(sb, f)
+	else
+		common.MSG_WriteAngle16i(sb, f)
+	end
+end
+
 return common

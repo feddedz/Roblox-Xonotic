@@ -88,6 +88,29 @@ return function(ctx: t.Ctx)
 		"worldspawn",
 		"edict 0 is worldspawn"
 	)
+	-- server state the world spawn filled (precache lists, stats, light styles, signon)
+	local server = require("../../engine/server")
+	local nsounds, nstats, nstyles = 0, 0, 0
+	for _ in server.sv.sound_precache do
+		nsounds += 1
+	end
+	for _ in server.vm_customstats do
+		nstats += 1
+	end
+	for _ in server.sv.lightstyles do
+		nstyles += 1
+	end
+	print(
+		string.format(
+			"  server state: %d sounds precached, %d custom stats, %d light styles, signon %d bytes",
+			nsounds,
+			nstats,
+			nstyles,
+			server.sv.signon.cursize
+		)
+	)
+	t.ok(ctx, nsounds > 100, "sounds precached")
+	t.ok(ctx, nstats > 50, "custom stats registered")
 	-- putentityfieldstring / getentityfieldstring / entityfieldtype on a live entity
 	local prvm_cmds = require("../../engine/prvm_cmds")
 	local function fieldindex(name: string): number
