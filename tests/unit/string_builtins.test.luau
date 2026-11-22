@@ -555,6 +555,42 @@ return function(ctx: t.Ctx)
 	setstr(2, "hello world, World")
 	prvm_cmds.VM_strireplace(prog)
 	t.eq(ctx, rets(), "hello there, there")
+	-- buf_writefile -> buf_loadfile round trip
+	fs.realfiles = {}
+	prog.argc = 0
+	prvm_cmds.VM_buf_create(prog)
+	local wb = retf()
+	for _, line in { "one", "two" } do
+		prog.argc = 3
+		setf(0, wb)
+		setstr(1, line)
+		setf(2, 1)
+		prvm_cmds.VM_bufstr_add(prog)
+	end
+	prog.argc = 2
+	setstr(0, "lines.txt")
+	setf(1, 2)
+	prvm_cmds.VM_fopen(prog)
+	local fh = retf()
+	setf(0, fh)
+	setf(1, wb)
+	prvm_cmds.VM_buf_writefile(prog)
+	prog.argc = 1
+	prvm_cmds.VM_fclose(prog)
+	t.eq(ctx, fs.realfiles["data/lines.txt"], "one\ntwo\n")
+	prog.argc = 0
+	prvm_cmds.VM_buf_create(prog)
+	local rb = retf()
+	prog.argc = 2
+	setstr(0, "lines.txt")
+	setf(1, rb)
+	prvm_cmds.VM_buf_loadfile(prog)
+	t.eq(ctx, retf(), 1)
+	setf(0, rb)
+	setstr(1, ",")
+	prvm_cmds.VM_buf_implode(prog)
+	t.eq(ctx, rets(), ",one,two")
+	fs.realfiles = {}
 	fs.SetProvider(nil)
 	cvar.reset()
 end

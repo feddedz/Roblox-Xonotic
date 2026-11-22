@@ -2812,6 +2812,131 @@ function prvm_cmds.VM_loadfromfile(prog: any)
 	prvm_edict.PRVM_ED_LoadFromFile(prog, libc.cstr(data or ""))
 end
 
+-- port: prvm_cmds.c VM_buf_loadfile L5093-5166 @xonotic-v0.8.6
+function prvm_cmds.VM_buf_loadfile(prog: any)
+	SAFEPARMCOUNT(prog, 2, "VM_buf_loadfile")
+	-- get file
+	local filename = libc.cstr(G_STRING(prog, OFS_PARM0))
+	local file = fs.FS_OpenVirtualFile(string.sub("data/" .. filename, 1, 1023), false)
+	if file == nil then
+		file = fs.FS_OpenVirtualFile(string.sub(filename, 1, 1023), false)
+	end
+	if file == nil then
+		if developer_extra() then
+			prvm_cmds.VM_Warning(prog, "VM_buf_loadfile: failed to open file %s in %s\n", filename, prog.name)
+		end
+		SET_G_FLOAT(prog, OFS_RETURN, 0)
+		return
+	end
+	-- get string buffer
+	local n = libc.toint(G_FLOAT(prog, OFS_PARM0 + 3))
+	local sb = RecordAtIndex(prog, n)
+	if not sb then
+		prvm_cmds.VM_Warning(prog, "VM_buf_loadfile: invalid buffer %i used in %s\n", n, prog.name)
+		SET_G_FLOAT(prog, OFS_RETURN, 0)
+		return
+	end
+	-- read file (append to the end of buffer)
+	local strindex = sb.num_strings
+	while true do
+		-- read line
+		local out = {}
+		local c
+		while true do
+			c = fs.FS_Getc(file)
+			if c == 13 or c == 10 or c < 0 then
+				break
+			end
+			if #out < VM_STRINGTEMP_LENGTH - 1 then
+				table.insert(out, string.char(c))
+			end
+		end
+		-- remove \n following \r
+		if c == 13 then
+			c = fs.FS_Getc(file)
+			if c ~= 10 then
+				fs.FS_UnGetc(file, c % 256)
+			end
+		end
+		-- add and continue
+		if c >= 0 or #out > 0 then
+			BufStr_Expand(sb, strindex)
+			sb.num_strings = math.max(sb.num_strings, strindex + 1)
+			sb.strings[strindex] = libc.cstr(table.concat(out))
+			strindex = sb.num_strings
+		else
+			break
+		end
+	end
+	-- close file
+	fs.FS_Close(file)
+	SET_G_FLOAT(prog, OFS_RETURN, 1)
+end
+
+-- port: prvm_cmds.c VM_buf_writefile L5176-5248 @xonotic-v0.8.6
+function prvm_cmds.VM_buf_writefile(prog: any)
+	SAFEPARMCOUNTRANGE(prog, 2, 4, "VM_buf_writefile")
+	-- get file
+	local filenum = libc.toint(G_FLOAT(prog, OFS_PARM0))
+	if filenum < 0 or filenum >= PRVM_MAX_OPENFILES then
+		prvm_cmds.VM_Warning(prog, "VM_buf_writefile: invalid file handle %i used in %s\n", filenum, prog.name)
+		return
+	end
+	local file = openfiles(prog)[filenum]
+	if file == nil then
+		prvm_cmds.VM_Warning(
+			prog,
+			"VM_buf_writefile: no such file handle %i (or file has been closed) in %s\n",
+			filenum,
+			prog.name
+		)
+		return
+	end
+	-- get string buffer
+	local n = libc.toint(G_FLOAT(prog, OFS_PARM0 + 3))
+	local sb = RecordAtIndex(prog, n)
+	if not sb then
+		prvm_cmds.VM_Warning(prog, "VM_buf_writefile: invalid buffer %i used in %s\n", n, prog.name)
+		SET_G_FLOAT(prog, OFS_RETURN, 0)
+		return
+	end
+	-- get start and end parms
+	local strindex, strnum
+	if prog.argc > 3 then
+		strindex = libc.toint(G_FLOAT(prog, OFS_PARM0 + 6))
+		strnum = libc.toint(G_FLOAT(prog, OFS_PARM0 + 9))
+	elseif prog.argc > 2 then
+		strindex = libc.toint(G_FLOAT(prog, OFS_PARM0 + 6))
+		strnum = sb.num_strings - strindex
+	else
+		strindex = 0
+		strnum = sb.num_strings
+	end
+	if strindex < 0 or strindex >= sb.num_strings then
+		prvm_cmds.VM_Warning(prog, "VM_buf_writefile: wrong start string index %i used in %s\n", strindex, prog.name)
+		SET_G_FLOAT(prog, OFS_RETURN, 0)
+		return
+	end
+	if strnum < 0 then
+		prvm_cmds.VM_Warning(prog, "VM_buf_writefile: wrong strings count %i used in %s\n", strnum, prog.name)
+		SET_G_FLOAT(prog, OFS_RETURN, 0)
+		return
+	end
+	-- write
+	while strindex < sb.num_strings and strnum ~= 0 do
+		local str = sb.strings[strindex]
+		if str then
+			if #str > 0 then
+				fs.FS_Write(file, str)
+			end
+			fs.FS_Write(file, "\n")
+		end
+		strindex += 1
+		strnum -= 1
+	end
+	SET_G_FLOAT(prog, OFS_RETURN, 1)
+end
+
 prvm_cmds.BUILTINS = {
 	VM_cvar = prvm_cmds.VM_cvar,
 	VM_cvar_type = prvm_cmds.VM_cvar_type,
@@ -2864,6 +2989,8 @@ prvm_cmds.BUILTINS = {
 	VM_bufstr_set = prvm_cmds.VM_bufstr_set,
 	VM_buf_cvarlist = prvm_cmds.VM_buf_cvarlist,
 	VM_strtolower = prvm_cmds.VM_strtolower,
+	VM_buf_loadfile = prvm_cmds.VM_buf_loadfile,
+	VM_buf_writefile = prvm_cmds.VM_buf_writefile,
 	VM_error = prvm_cmds.VM_error,
 	VM_objerror = prvm_cmds.VM_objerror,
 	VM_eprint = prvm_cmds.VM_eprint,
