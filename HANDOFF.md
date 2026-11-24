@@ -16,21 +16,24 @@ Every section except §MAP and §DIFFS stays under ~60 lines; detail lives in `d
 | §GOTCHAS | Verified limits (with date) and hard-won lessons. |
 
 <!-- §STATUS -->
-## §STATUS (rewritten 2026-11-22, Claude-Anvil)
-- **Owner's account moderated again (13:40 UTC 2026-11-22, Open Cloud 'User is moderated'); uploads stopped.** Earlier: unbanned 08:00 UTC. All 3,201 uploaded assets renamed to neutral names
-  (G-047). Gated texture upload (`tools/upload/run_unattended.sh`, batches of 300, stops at Rejected/403/45-min review)
-  at 3,296 approved; paused because textures/cp_glow.jpg sat in review > 45 min — relaunch once it is Approved.
-  Owner still to archive the old flagged images (72623604865243, 93867009513964, assets/manifest/replace-after-review.tsv).
-- **Assets on Roblox:** sounds 804/805 approved (heavymetal appeal, Q-013); textures 3,296 approved, ~7,600 to go.
-- **M2-RUNNER done:** stormkeep's entity lump loads (PRVM_ED_LoadFromFile) and the first StartFrame runs the real
-  worldspawn and spawns every map entity (4,041 edicts) with compiled QC. ~110 builtins ported (strings, buffers,
-  files, search, sprintf, strftime, glibc rand, mathlib, find*, ...). Left stubbed: world/model/sound/trace/network
-  builtins (need M3/M4: setorigin, setmodel, setsize, precache_*, trace*, AddStat, findradius, ...).
-- **Studio-ready:** `tools/build.sh` + `rojo build`; Play prints a BOOT REPORT (README step 4).
-- **Tests:** 14 Lune files (new glibc/C reference vectors: rand, strftime, printf 19,000, mathlib bit-exact), Python OK,
-  StyLua/Selene clean, check_port_lines 0 wrong. Full run > 120 s (qcaot_diff 69 s).
-- **Owner points:** Q-007 gore, Q-009, Q-010, Q-011, Q-013 heavymetal; Studio BOOT REPORT still wanted.
-- **Next:** M3-BSPLOAD (model_brush.c Q3 BSP) → world.c links/traces → the stubbed world builtins; M2-FSWRITE.
+## §STATUS (rewritten 2026-11-24, Claude-Anvil)
+- **Owner's account: clear again** after a child-safety ban (2026-11-22 13:40 UTC) over textures/cp_glow.jpg
+  (letters "CP" = Control Point, read as CSAM slang; appeal granted, G-051). **Uploads stopped. Do not upload
+  anything until the owner says so, and only after the fixes below.**
+- **Owner to archive 28 live assets:** assets/manifest/archive-now.tsv (blood decal, CP textures, swastika-shaped
+  minimap, author credits/"Nexuiz" text, SS-rune-like text, real photo, ...).
+- **Strict re-review done (2026-11-23):** remaining 7,637 images → 275 flagged (2 high, 54 medium):
+  assets/manifest/review/upload_findings_{a..f}.tsv; live 3,273 → 119 flagged: live_findings_{a..c}.tsv.
+  Sheets: tools/upload/review_sheets.py. **Fixes NOT done** (task UPLOAD-FIX3): write
+  tools/upload/content_fix3.py → work/upload/fixed3/, add fixed3 first in tools/upload/build_ready.py, rebuild
+  upload-ready.tsv, show the owner before/after, then gated upload in batches of 100.
+- **Assets on Roblox:** sounds 804/805; textures 3,296 (28 to archive).
+- **M2-RUNNER done** (stormkeep entities load, first StartFrame spawns them; world builtins wait on M3).
+  ~170 builtins ported; server state (engine/server.luau), SZ/MSG writes, mathlib bit-exact.
+- **M2-AOT-SHIP (claimed, Claude-Anvil):** lazy chunk loading + background preload; Q-014 (startup 17.7 s).
+- **Tests:** 14 Lune files, all pass; StyLua/Selene clean; check_port_lines 0 wrong.
+- **Stale claims:** M3-BSPLOAD and REF-DP branches have only claim commits from 2026-11-20 — owner to reassign.
+- **Next:** UPLOAD-FIX3 → owner OK → upload; M3-BSPLOAD (if reassigned) → world builtins.
 
 ## §RULES (condensed from the owner's brief; absolute)
 
@@ -136,6 +139,7 @@ before working. One claimed task per subsystem at a time. Details per task in th
 | M2-INTERP-DEBUG | Port tracing/profiling/coverage/watchpoints of prvm_exec.c (console commands use them) | open | engine/prvm_exec.luau | M2-INTERP | tools/qcaot/, game/generated/ | M2-PROGS |
 | M2-RUNNER | Headless runner: rest of PRVM_Prog_Load (required fields/globals of svvm, field lookup), edict alloc, strings, all builtins stubbed + logged; done = server QC runs worldspawn on a stock map | done (Claude-Anvil 2026-11-22: stormkeep entities load, first StartFrame spawns them; world builtins stubbed for M3/M4) | tests/, engine/prvm_*.luau, engine/sv_main.luau, engine/svvm_cmds.luau | M2-AOT, M2-INTERP |
 | M2-FSWRITE | Persist files QC writes (fopen append/write, fs.realfiles in engine/fs.luau) across server restarts (Roblox DataStore or similar); in memory today | open | engine/fs.luau, platform/ | M2-RUNNER |
+| UPLOAD-FIX3 | Fix the 275 images flagged by the 2026-11-23 strict review (assets/manifest/review/upload_findings_*.tsv) as subtly as possible (D-025): all high+medium, plus low items with names/brands/blood/symbols/ambiguous letters or digits; keep harmless signage; matching _norm/_gloss/_alpha; owner sees before/after; then gated upload (batches of 100, stop on Reviewing > 45 min, Rejected or 403) | open | tools/upload/, work/upload/fixed3 | — |
 | M2-DEBUG | Rebuild progs.dat from qcsrc with the pinned gmqcc; prove byte-identical; emit line-number debug info | open | tools/qcaot/ | M2-PROGS |
 | REF-CVARLIST | From REF-DP's dedicated server after startup: `cvarlist` (name/value/default/flags) and `cmdlist` → tests/reference/cvars/; diff against engine/host.luau's result (validates tools/engine/gen_cvars.py and the config chain) | open | tests/reference/cvars/, tests/integration/ | REF-DP, M2-RUNNER |
 | REF-DP | Instrumented DarkPlaces (from release source) that records traces, server frames, net messages, particles | open | tools/darkplaces-ref/ | M0-PIN |
@@ -498,4 +502,5 @@ One line each; **details and sources: `docs/gotchas.md`** (add to both). Roblox 
 - **G-048** (creator-docs os.yaml, read 2026-11-22) Roblox `os.date` accepts exactly "*t" (local) and "!*t" (UTC) as table formats; engine/_port/libc.luau builds strftime/gmtime/localtime on those. Luau `string.format` is C's (snprintf) but refuses widths/precisions > 99 (libc.format1 pads those).
 - **G-049** Xonotic spawns map entities lazily: its engine-called SV_OnEntityPreSpawnFunction (qcsrc/lib/_all.inc) sets `__spawnfunc_expecting`, so PRVM_ED_LoadFromFile only queues them; the first StartFrame runs the world constructor (real worldspawn), which spawns the queue. Engine-called functions read `this` from leftover OFS_PARM0 or `self`, so builtins must leave parameter globals exactly as DP does.
 - **G-050** qsort in buf_sort: comparators are inconsistent for NULL/empty strings, so the result depends on the algorithm. Ported as glibc's msort (top-down merge sort, glibc ≤ 2.37 as at the 0.8.6 release); newer glibc may order empty strings differently.
+- **G-051** (2026-11-22) Roblox moderation flagged textures/cp_glow.jpg (big letters "CP" meaning Control Point) as child-safety and moderated the account (appeal granted). Review for *ambiguous* letters/numbers too (CP, SS, 88, 14, 69, 420), symbol look-alikes (map layouts, rotated crosses, sun crosses), real names/handles and other games' names — not only URLs/gore. A batch item stuck in "Reviewing" for hours preceded the ban: treat a long review as a warning.
 <!-- /§GOTCHAS -->

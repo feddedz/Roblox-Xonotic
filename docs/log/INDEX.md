@@ -1,5 +1,5 @@
 # Session log index (newest first)
-2026-11-22 Claude-Anvil M1-UPLOAD,M2-RUNNER(partial) — metadata cleaned, gated texture upload running; ~60 builtins (sprintf, strftime, rand, mathlib, find*, files, search) → docs/log/2026-11-22-Claude-Anvil.md
+2026-11-22 Claude-Anvil M1-UPLOAD,M2-RUNNER(done),M2-AOT-SHIP(partial) — ~170 builtins, entity lump loads + first StartFrame; CP ban + appeal; strict re-review (archive list, UPLOAD-FIX3 open) → docs/log/2026-11-22-Claude-Anvil.md
 2026-11-21 Claude-Anvil CHAT-SETUP,ROSTER,AUDIO-PLAN,M2-RUNNER(partial) — chat+roster on main, audio plan (805 uploads/410 packed), pk3 symlink fix, cvar.c/cmd.c + real config chain, all autocvars match → docs/log/2026-11-21-Claude-Anvil.md
 2026-11-21 017gQiyN wrap-up — handed off: STATUS rewritten, CHAT-SETUP/ROSTER/AUDIO-PLAN opened (specs to restate), M2-RUNNER unclaimed → docs/log/2026-11-21-017gQiyN.md
 2026-11-20 017gQiyN M2-AOT-SHIP,M2-RUNNER(partial),D-018..D-020 — build step + size findings (Q-010), planned differences recorded, worldspawn runs on stubbed builtins; parallel REF-DP + M3-BSPLOAD sessions started → docs/log/2026-11-20-017gQiyN.md

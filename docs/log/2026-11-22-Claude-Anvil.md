@@ -46,3 +46,11 @@ None.
 ## Next step
 Buffer builtins (buf_copy/sort/implode, bufstr_add/free/find, buf_loadfile/writefile), strpad, strconv, strireplace,
 matchpattern, tokenize, entity field string builtins, error/objerror/eprint, callfunction/isfunction; then world builtins (M3/M4).
+
+## Update 2026-11-22 .. 11-24
+- More builtins (error/objerror/eprint, field strings, buf_loadfile/writefile, precache_sound, lightstyle, AddStat,
+  ambientsound), PRVM_ED_LoadFromFile & co., engine/server.luau, SZ/MSG writes. M2-RUNNER done.
+- M2-AOT-SHIP: lazy chunk loading (saves ~20% on the server; Q-014).
+- Upload: cp_glow.jpg sat in review 4 h, then the account was moderated (child safety, "CP" letters). Appeal granted.
+- Strict re-review with 9 agents: 275 flagged in the remaining set, 119 in the live set; 28 live assets to archive
+  (assets/manifest/archive-now.tsv). Fix agents stopped by the owner before writing anything → task UPLOAD-FIX3.

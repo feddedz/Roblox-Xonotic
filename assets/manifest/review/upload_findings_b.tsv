@@ -1,0 +1,38 @@
+# n	vpath	issue	severity(high/medium/low)	what exactly (location/text)	suggested subtle fix
+2367	textures/evil3_floors/cemdrk_oddtile_bldb.jpg	gore	high	brain-like chunk (pale wrinkled lump ~40px) sitting in a large dark blood pool, upper-centre of tile	paint the lump over with grey concrete rubble/debris; desaturate pool to neutral oil-black; upload under a neutral asset name (no "bld")
+2410	textures/evil3_floors/woodvfloor3_brain.jpg	gore	high	pale brain-like chunk at top-centre-right inside a large dark blood splatter on wood planks; filename literally "_brain"	replace lump with wood splinters/rubble, recolour splatter to neutral dark water/oil stain with softer outline; rename asset
+1989	textures/evil1_floors/br_tiles_blood.jpg	blood	medium	large dark splatter with droplet spray on left-centre of green tiles; filename "_blood"	recolour to grey-green grime, blur spray droplets into a soft dirt patch; neutral asset name
+1991	textures/evil1_floors/br_tiles_brkblood.jpg	blood	medium	dark splatter spray top-right next to broken tiles; filename "_brkblood"	same as 1989: soften droplets into dirt, neutral grey/green; neutral asset name
+1998	textures/evil1_floors/carpet_drty_blood.jpg	blood	medium	brown-red splatter with radiating spray, lower-left on carpet; filename "_blood"	shift hue to neutral brown-grey mud, blur spray edges; neutral asset name
+1999	textures/evil1_floors/carpet_drty_blood2.jpg	blood	medium	two brown-red radiating splatters (tiled) on carpet; filename "_blood2"	shift hue to neutral brown-grey mud, blur spray edges; neutral asset name
+2225	textures/evil2_basefloor/flr_b-w_drty_bbig.jpg	blood	medium	black splatter with spray lower-left on pinkish-tinted checker tiles; filename "bbig"	desaturate pink tint, turn splat into soft soot/scorch patch
+2226	textures/evil2_basefloor/flr_b-w_drty_bld.jpg	blood	medium	large black blood pool with spray across centre of pinkish checker floor; filename "_bld"	desaturate pink tint, convert pool to soft soot/oil stain with smoothed edges; neutral asset name
+2227	textures/evil2_basefloor/flr_b-w_drty_bld2.jpg	blood	medium	black splatter with spray centre-right on pinkish checker floor; filename "_bld2"	desaturate, convert to soft soot/oil stain; neutral asset name
+2364	textures/evil3_floors/cemdrk_oddtile_bld.jpg	blood	medium	large dark red-brown pool with spray over dark tiles; filename "_bld"	neutral grey/green oil stain, soften spray; neutral asset name
+2349	textures/evil3_floors/bdirt_blood.jpg	blood	medium	dark reddish-brown stain blotches on cracked dirt; filename "bdirt_blood"	desaturate to dark mud/damp patch; neutral asset name
+2406	textures/evil3_floors/wd_tile_drk_bld.jpg	blood	medium	large dark reddish splatter with droplets on wood tile; filename "_bld"	neutral dark water/oil stain, soften droplets; neutral asset name
+2249	textures/evil2_basewall/cementwall_btm_gore.jpg	blood/gore	medium	faint pinkish-red smear band across lower half of cement wall; filename "_gore"	desaturate the pink band to grey grime; neutral asset name
+2519	textures/evil3_walls/mtlwll_twrn2drtyhfx.jpg	text/tag	medium	stencil text "[HFX]" (clan/author-style tag) across upper panel	paint out or replace with generic stencil (e.g. hazard stripes / blank panel)
+2520	textures/evil3_walls/mtlwll_twrn2drtyhfx_gloss.jpg	text/tag	medium	gloss map of 2519, same "[HFX]" stencil faintly visible	remove the text area to match 2519 fix
+2312	textures/evil2_misc/barrel_rst_sign.jpg	brand-like logo/text	medium	barrel label: cotton-boll seal logo in rounded box with text "100% katoen" (real-world textile label / Cotton-seal-like trademark)	replace logo with generic hazard pictogram or blank label
+2237	textures/evil2_basefloor/flr_tmtl_drk_bld.jpg	blood	low	faint dark stain centre-right on dark metal mesh; filename "_drk_bld"	barely visible; just neutral asset name (optionally desaturate)
+1990	textures/evil1_floors/br_tiles_blood_bump.jpg	filename only	low	bump map of br_tiles_blood; image is plain tile grid, but name contains "blood"	upload under neutral asset name
+1992	textures/evil1_floors/br_tiles_brkblood_bump.jpg	filename only	low	bump map of br_tiles_brkblood; no visible blood, name contains "blood"	upload under neutral asset name
+2000	textures/evil1_floors/carpet_drty_blood2_bump.jpg	filename only	low	bump map of carpet_drty_blood2; noise only, name contains "blood"	upload under neutral asset name
+2250	textures/evil2_basewall/cementwall_btm_gore_bump.jpg	filename only	low	bump map of cementwall_btm_gore; name contains "gore"	upload under neutral asset name
+2365	textures/evil3_floors/cemdrk_oddtile_bld_bump.jpg	filename only	low	bump map of cemdrk_oddtile_bld; plain tile lines	upload under neutral asset name
+2366	textures/evil3_floors/cemdrk_oddtile_bld_gloss.jpg	filename only	low	gloss map of cemdrk_oddtile_bld; no blood shape visible	upload under neutral asset name
+2368	textures/evil3_floors/cemdrk_oddtile_bldb_gloss.jpg	filename only	low	gloss map of cemdrk_oddtile_bldb; no brain/blood shape visible	upload under neutral asset name
+2191	textures/evil1_walls/crude_1.jpg	possible blood look	low	dark red-brown rust drips running down wall (could read as blood drips)	shift drips slightly toward orange/brown rust hue
+2192	textures/evil1_walls/crude_2.jpg	possible blood look	low	darker variant of 2191, red-brown drips	shift drips slightly toward orange/brown rust hue
+2061	textures/evil1_metals/de-r_mtl_gloss.jpg	ambiguous symbol	low	gloss map (near-black) hides a smeared crossed/hooked stroke shape; after contrast stretch it vaguely resembles a broken hooked cross	blur or erase the stroke shape in the gloss map
+2169	textures/evil1_walls/cementwall_btm_jericho.jpg	text	low	scrawled graffiti word "jericho" lower-centre (possibly an author handle)	smudge into illegible scratches
+2171	textures/evil1_walls/cementwall_btm_jericho_gloss.jpg	text	low	gloss map of 2169, "jericho" graffiti faintly visible	match 2169 fix
+2182	textures/evil1_walls/cementwall_jericho.jpg	text	low	stencil word "JERICHO" centre-right (possibly an author handle)	smudge/erase stencil text
+2183	textures/evil1_walls/cementwall_jericho_gloss.jpg	text	low	gloss map of 2182, "JERICHO" stencil visible	match 2182 fix
+2313	textures/evil2_misc/barrel_rst_sign2.jpg	text	low	"Cl" (chlorine laundry symbol) in triangle on barrel	benign; optionally replace with generic hazard triangle "!"
+2314	textures/evil2_misc/barrel_rst_sign3.jpg	text	low	faint "Cl" in triangle on barrel (variant of 2313)	benign; optionally replace with generic hazard triangle "!"
+2114	textures/evil1_misc/ta_wrnsign.jpg	text	low	sign "TOXIC AREA / RESTRICTED ACCESS"	benign warning text; keep unless being ultra-cautious
+1971	textures/erebus.jpg	text	low	player-model skin: small chest text "EREBUS" plus circular emblem (model name)	benign; keep unless being ultra-cautious
+1978	textures/erebusfullbright.jpg	text	low	fullbright variant of erebus skin with same "EREBUS" chest text	benign; keep unless being ultra-cautious
+# reviewed sheets s036-s071: 36 flagged
