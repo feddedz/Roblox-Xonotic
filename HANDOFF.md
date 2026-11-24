@@ -27,8 +27,9 @@ Every section except §MAP and §DIFFS stays under ~60 lines; detail lives in `d
   Sheets: tools/upload/review_sheets.py. **Fixes done, NOT uploaded** (UPLOAD-FIX3, Claude-Quartz, DIFF-009):
   tools/upload/content_fix3.py → work/upload/fixed3/ (124 files fixed, 153 kept with reasons:
   assets/manifest/review/content_{fixes3,kept3}.tsv); fixed3 is first in build_ready.py; upload-ready.tsv rebuilt
-  (122 rows fixed3). Before/after sheets: tools/upload/fix3_sheets.py → work/review_fix3/. **Waiting for the
-  owner's OK on the sheets**; then gated upload `--batch 100` (stop on Rejected / 403 / Reviewing > 45 min).
+  (122 rows fixed3). Before/after sheets: tools/upload/fix3_sheets.py → work/review_fix3/. **Owner approved the
+  sheets 2026-11-24. Still nothing uploaded: no ROBLOX_API_KEY on the owner's PC yet.** Then gated upload
+  `--batch 100` (stop on Rejected / 403 / Reviewing > 45 min): tools/upload/run_unattended.ps1 (Windows) or .sh.
 - **Assets on Roblox:** sounds 804/805; textures 3,296 (28 to archive).
 - **M2-RUNNER done** (stormkeep entities load, first StartFrame spawns them; world builtins wait on M3).
   ~170 builtins ported; server state (engine/server.luau), SZ/MSG writes, mathlib bit-exact.

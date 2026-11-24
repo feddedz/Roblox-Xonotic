@@ -43,7 +43,12 @@ None new (D-025 + the owner's brief of 2026-11-24 applied).
 - Reading box coordinates off a scaled preview gave wrong boxes twice; always read the ruler ticks.
 - e7wgrate: a small triangle of the old star tip stays painted on the bottom plate (colour map only).
 
+## After the owner's approval (2026-11-24)
+- Owner approved the sheets. Dry run: 3,296 done, 7,634 to upload. Nothing uploaded yet: no ROBLOX_API_KEY here.
+- run_unattended.sh now takes [batch] (default 100); new Windows twin run_unattended.ps1 (log in
+  work/upload/run.log, commits roblox-images.tsv every 10 min); upload_images.py reads one owned asset before
+  uploading, so a missing or blocked key stops before any upload. Not run end to end (no key).
+
 ## Next step
-Owner approves the sheets → `tools/upload/run_unattended.sh 876999276 6` with `--batch 100` (the script must
-pass --batch 100 to upload_images.py; today it does not pass it). Needs ROBLOX_API_KEY on this PC or a cloud
-session. Stop on Rejected, 403, or Reviewing > 45 min.
+Owner sets ROBLOX_API_KEY (Windows user variable) → `powershell -File tools/upload/run_unattended.ps1 -UserId
+876999276 -Jobs 6 -Batch 100`. Stop on Rejected, 403, or Reviewing > 45 min (the uploader does this itself).
