@@ -1,0 +1,154 @@
+# n	vpath	severity	issue	kept unchanged because
+236	textures/e8/e8evilspacetxt.jpg	low	word text	map title stencil 'EVILSPACE': harmless signage, no name/brand/code
+237	textures/e8/e8evilspacetxt_alpha.jpg	low	word text	map title stencil 'EVILSPACE': harmless signage, no name/brand/code
+238	textures/e8/e8evilspacetxt_bump.jpg	low	word text	map title stencil 'EVILSPACE': harmless signage, no name/brand/code
+1218	textures/egyptsoc_trim/128-05e.jpg	low	spread-wing eagle (heraldic-eagle resemblance)	colourful Egyptian vulture (Nekhbet) relief holding rings: clearly ancient-Egyptian art, not a heraldic eagle emblem; no text or symbol
+1219	textures/egyptsoc_trim/128-05e_norm.jpg	low	spread-wing eagle (heraldic-eagle resemblance)	colourful Egyptian vulture (Nekhbet) relief holding rings: clearly ancient-Egyptian art, not a heraldic eagle emblem; no text or symbol
+1220	textures/egyptsoc_trim/128-05e_norm_alpha.jpg	low	spread-wing eagle (heraldic-eagle resemblance)	colourful Egyptian vulture (Nekhbet) relief holding rings: clearly ancient-Egyptian art, not a heraldic eagle emblem; no text or symbol
+1221	textures/egyptsoc_trim/128-05f.jpg	low	spread-wing eagle (heraldic-eagle resemblance)	colourful Egyptian vulture (Nekhbet) relief holding rings: clearly ancient-Egyptian art, not a heraldic eagle emblem; no text or symbol
+1222	textures/egyptsoc_trim/128-05f_norm.jpg	low	spread-wing eagle (heraldic-eagle resemblance)	colourful Egyptian vulture (Nekhbet) relief holding rings: clearly ancient-Egyptian art, not a heraldic eagle emblem; no text or symbol
+1223	textures/egyptsoc_trim/128-05f_norm_alpha.jpg	low	spread-wing eagle (heraldic-eagle resemblance)	colourful Egyptian vulture (Nekhbet) relief holding rings: clearly ancient-Egyptian art, not a heraldic eagle emblem; no text or symbol
+1224	textures/egyptsoc_trim/128-05g.jpg	low	spread-wing eagle (heraldic-eagle resemblance)	colourful Egyptian vulture (Nekhbet) relief holding rings: clearly ancient-Egyptian art, not a heraldic eagle emblem; no text or symbol
+1225	textures/egyptsoc_trim/128-05g_norm.jpg	low	spread-wing eagle (heraldic-eagle resemblance)	colourful Egyptian vulture (Nekhbet) relief holding rings: clearly ancient-Egyptian art, not a heraldic eagle emblem; no text or symbol
+1226	textures/egyptsoc_trim/128-05g_norm_alpha.jpg	low	spread-wing eagle (heraldic-eagle resemblance)	colourful Egyptian vulture (Nekhbet) relief holding rings: clearly ancient-Egyptian art, not a heraldic eagle emblem; no text or symbol
+1227	textures/egyptsoc_trim/128-05h.jpg	low	spread-wing eagle (heraldic-eagle resemblance)	colourful Egyptian vulture (Nekhbet) relief holding rings: clearly ancient-Egyptian art, not a heraldic eagle emblem; no text or symbol
+1228	textures/egyptsoc_trim/128-05h_norm.jpg	low	spread-wing eagle (heraldic-eagle resemblance)	colourful Egyptian vulture (Nekhbet) relief holding rings: clearly ancient-Egyptian art, not a heraldic eagle emblem; no text or symbol
+1229	textures/egyptsoc_trim/128-05h_norm_alpha.jpg	low	spread-wing eagle (heraldic-eagle resemblance)	colourful Egyptian vulture (Nekhbet) relief holding rings: clearly ancient-Egyptian art, not a heraldic eagle emblem; no text or symbol
+1971	textures/erebus.jpg	low	text	small chest text 'EREBUS' = the player model's own name
+1978	textures/erebusfullbright.jpg	low	text	small chest text 'EREBUS' = the player model's own name
+1990	textures/evil1_floors/br_tiles_blood_bump.jpg	low	filename only	pixels are harmless; only the file name has the word, and uploads use neutral names ('Xonotic texture <sha12>', G-047)
+1992	textures/evil1_floors/br_tiles_brkblood_bump.jpg	low	filename only	pixels are harmless; only the file name has the word, and uploads use neutral names ('Xonotic texture <sha12>', G-047)
+2000	textures/evil1_floors/carpet_drty_blood2_bump.jpg	low	filename only	pixels are harmless; only the file name has the word, and uploads use neutral names ('Xonotic texture <sha12>', G-047)
+2114	textures/evil1_misc/ta_wrnsign.jpg	low	text	'TOXIC AREA / RESTRICTED ACCESS': harmless hazard sign
+2169	textures/evil1_walls/cementwall_btm_jericho.jpg	low	text	graffiti/stencil word 'JERICHO' is a place name used as wall decoration, not a person's handle, brand or code
+2171	textures/evil1_walls/cementwall_btm_jericho_gloss.jpg	low	text	graffiti/stencil word 'JERICHO' is a place name used as wall decoration, not a person's handle, brand or code
+2182	textures/evil1_walls/cementwall_jericho.jpg	low	text	graffiti/stencil word 'JERICHO' is a place name used as wall decoration, not a person's handle, brand or code
+2183	textures/evil1_walls/cementwall_jericho_gloss.jpg	low	text	graffiti/stencil word 'JERICHO' is a place name used as wall decoration, not a person's handle, brand or code
+2191	textures/evil1_walls/crude_1.jpg	low	possible blood look	rust drips were already shifted to rust-orange/brown in the earlier pass (content_fix.py); they read as rust
+2192	textures/evil1_walls/crude_2.jpg	low	possible blood look	rust drips were already shifted to rust-orange/brown in the earlier pass (content_fix.py); they read as rust
+2250	textures/evil2_basewall/cementwall_btm_gore_bump.jpg	low	filename only	pixels are harmless; only the file name has the word, and uploads use neutral names ('Xonotic texture <sha12>', G-047)
+2313	textures/evil2_misc/barrel_rst_sign2.jpg	low	text	'Cl' in a triangle = chlorine hazard label: harmless signage
+2314	textures/evil2_misc/barrel_rst_sign3.jpg	low	text	'Cl' in a triangle = chlorine hazard label: harmless signage
+2365	textures/evil3_floors/cemdrk_oddtile_bld_bump.jpg	low	filename only	pixels are harmless; only the file name has the word, and uploads use neutral names ('Xonotic texture <sha12>', G-047)
+2366	textures/evil3_floors/cemdrk_oddtile_bld_gloss.jpg	low	filename only	pixels are harmless; only the file name has the word, and uploads use neutral names ('Xonotic texture <sha12>', G-047)
+2368	textures/evil3_floors/cemdrk_oddtile_bldb_gloss.jpg	low	filename only	pixels are harmless; only the file name has the word, and uploads use neutral names ('Xonotic texture <sha12>', G-047)
+3257	textures/evil6_support/e6panelsym.jpg	low	unidentified emblem/logo	embossed round emblem is an abstract squiggle: no letters, no known logo, no symbol resemblance at full size
+3263	textures/evil6_support/e6vpanel.jpg	low	unidentified emblem/logo	embossed round emblem is an abstract squiggle: no letters, no known logo, no symbol resemblance at full size
+3264	textures/evil6_support/e6vpanelsupprt.jpg	low	unidentified emblem/logo	embossed round emblem is an abstract squiggle: no letters, no known logo, no symbol resemblance at full size
+3495	textures/evil8_fx/e8_jumppad02.jpg	low	faint readable text	faint jump-pad stencil ('JMP-3'-like): harmless signage, no flagged letter/digit combination
+3497	textures/evil8_fx/e8_jumppad02_gloss.jpg	low	faint readable text	faint jump-pad stencil ('JMP-3'-like): harmless signage, no flagged letter/digit combination
+3499	textures/evil8_fx/e8_jumppad02_norm.jpg	low	faint readable text	faint jump-pad stencil ('JMP-3'-like): harmless signage, no flagged letter/digit combination
+3500	textures/evil8_fx/e8_jumppad02_norm_alpha.jpg	low	faint readable text	faint jump-pad stencil ('JMP-3'-like): harmless signage, no flagged letter/digit combination
+3501	textures/evil8_fx/e8_jumppad02r.jpg	low	faint readable text	faint jump-pad stencil ('JMP-3'-like): harmless signage, no flagged letter/digit combination
+3503	textures/evil8_fx/e8_jumppad02w.jpg	low	faint readable text	faint jump-pad stencil ('JMP-3'-like): harmless signage, no flagged letter/digit combination
+3515	textures/evil8_fx/e8evilspacetxt.jpg	low	readable word	map title stencil 'EVILSPACE': harmless signage, no name/brand/code
+4833	textures/eye.jpg	low	disembodied bloodshot eye	plain stylised eyeball; veins were already made pale grey (gore_fix.py), no blood
+4834	textures/eyeblood.jpg	low	asset name contains 'blood'	pixels are harmless; only the file name has the word, and uploads use neutral names ('Xonotic texture <sha12>', G-047)
+4837	textures/facility114invx/ceiling/ceiling00inv.jpg	low	small readable UI text	tiny HUD strip words 'SPACE-TIME SYNTHESIS', 'NO USE', 'D12': harmless sci-fi labels
+4842	textures/facility114invx/ceiling/ceiling00invr.jpg	low	small readable UI text	tiny HUD strip words 'SPACE-TIME SYNTHESIS', 'NO USE', 'D12': harmless sci-fi labels
+4844	textures/facility114invx/ceiling/ceiling01inv.jpg	low	Chinese text	Chinese sentence meaning 'This roof is not safe.': harmless warning sign
+4848	textures/facility114invx/ceiling/ceiling01invr.jpg	low	Chinese text	Chinese sentence meaning 'This roof is not safe.': harmless warning sign
+4901	textures/facility114invx/wall/corridor02inv.jpg	low	readable joke text	joke notice 'THE MANAGEMENT IS NOT RESPONSIBLE FOR ANY ACCIDENTS ...' / 'DO NOT PRESS': harmless signage (the decapitation sentence was removed in the earlier pass)
+4904	textures/facility114invx/wall/corridor02invr.jpg	low	readable joke text	joke notice 'THE MANAGEMENT IS NOT RESPONSIBLE FOR ANY ACCIDENTS ...' / 'DO NOT PRESS': harmless signage (the decapitation sentence was removed in the earlier pass)
+4921	textures/facility114x/ceiling/ceiling00.jpg	low	small readable UI text	tiny HUD strip words 'SPACE-TIME SYNTHESIS', 'NO USE', 'D12': harmless sci-fi labels
+4923	textures/facility114x/ceiling/ceiling00b.jpg	low	small readable UI text	tiny HUD strip words 'SPACE-TIME SYNTHESIS', 'NO USE', 'D12': harmless sci-fi labels
+4925	textures/facility114x/ceiling/ceiling00r.jpg	low	small readable UI text	tiny HUD strip words 'SPACE-TIME SYNTHESIS', 'NO USE', 'D12': harmless sci-fi labels
+4927	textures/facility114x/ceiling/ceiling01.jpg	low	Chinese text	Chinese sentence meaning 'This roof is not safe.': harmless warning sign
+4929	textures/facility114x/ceiling/ceiling01b.jpg	low	Chinese text	Chinese sentence meaning 'This roof is not safe.': harmless warning sign
+4931	textures/facility114x/ceiling/ceiling01r.jpg	low	Chinese text	Chinese sentence meaning 'This roof is not safe.': harmless warning sign
+4985	textures/facility114x/wall/corridor02.jpg	low	readable joke text	joke notice 'THE MANAGEMENT IS NOT RESPONSIBLE FOR ANY ACCIDENTS ...' / 'DO NOT PRESS': harmless signage (the decapitation sentence was removed in the earlier pass)
+5009	textures/final_rage/nd-lava.jpg	low	editor text	editor marker text 'LAVA NODRAW': harmless
+5023	textures/flamethrower.jpg	low	brand-like text	'AT CORP' / 'MACHINEGUN AMMO' stencils: fictional in-game maker and item label, not a real brand
+5024	textures/flamethrower_gloss.jpg	low	brand-like text	'AT CORP' / 'MACHINEGUN AMMO' stencils: fictional in-game maker and item label, not a real brand
+5030	textures/flesh1.jpg	low	asset name 'flesh'	pixels are harmless; only the file name has the word, and uploads use neutral names ('Xonotic texture <sha12>', G-047)
+5072	textures/glsight01_glow.jpg	low	readable HUD text	scope HUD text 'TYPE: IMPACT / RANGE: 2000M ...': harmless game UI
+5073	textures/glsight02_glow.jpg	low	readable HUD text	scope HUD text 'TYPE: IMPACT / RANGE: 2000M ...': harmless game UI
+5074	textures/glsight03_glow.jpg	low	readable HUD text	scope HUD text 'TYPE: IMPACT / RANGE: 2000M ...': harmless game UI
+5136	textures/ignishead.jpg	low	unwrapped human face/skin + text	fictional character's face sheet; the red marks were already made charcoal (gore_fix.py); 'IGNIS' = model name
+5142	textures/ignisheadfb.jpg	low	unwrapped human face/skin + text	fictional character's face sheet; the red marks were already made charcoal (gore_fix.py); 'IGNIS' = model name
+5145	textures/items/a_bullets.jpg	low	text/brand-like	'AT CORP' / 'MACHINEGUN AMMO' stencils: fictional in-game maker and item label, not a real brand
+5151	textures/items/explosiveammo.jpg	low	readable text	stencil 'EXPLOSIVES' on an ammo crate: harmless item label
+5241	textures/logos/logo02/logo02_black.jpg	low	trademark/brand name	XONOTIC wordmark / 'Hello XONOTIC!' (the game's own name), no URL: kept as the owner said
+5242	textures/logos/logo02/logo02_black_alpha.jpg	low	trademark/brand name	XONOTIC wordmark / 'Hello XONOTIC!' (the game's own name), no URL: kept as the owner said
+5243	textures/logos/logo02/logo02_blue.jpg	low	trademark/brand name	XONOTIC wordmark / 'Hello XONOTIC!' (the game's own name), no URL: kept as the owner said
+5244	textures/logos/logo02/logo02_blueg.jpg	low	trademark/brand name	XONOTIC wordmark / 'Hello XONOTIC!' (the game's own name), no URL: kept as the owner said
+5245	textures/logos/logo02/logo02_blueg_glow.jpg	low	trademark/brand name	XONOTIC wordmark / 'Hello XONOTIC!' (the game's own name), no URL: kept as the owner said
+5246	textures/logos/logo02/logo02_cyan.jpg	low	trademark/brand name	XONOTIC wordmark / 'Hello XONOTIC!' (the game's own name), no URL: kept as the owner said
+5247	textures/logos/logo02/logo02_cyang.jpg	low	trademark/brand name	XONOTIC wordmark / 'Hello XONOTIC!' (the game's own name), no URL: kept as the owner said
+5248	textures/logos/logo02/logo02_cyang_glow.jpg	low	trademark/brand name	XONOTIC wordmark / 'Hello XONOTIC!' (the game's own name), no URL: kept as the owner said
+5249	textures/logos/logo02/logo02_green.jpg	low	trademark/brand name	XONOTIC wordmark / 'Hello XONOTIC!' (the game's own name), no URL: kept as the owner said
+5250	textures/logos/logo02/logo02_greeng.jpg	low	trademark/brand name	XONOTIC wordmark / 'Hello XONOTIC!' (the game's own name), no URL: kept as the owner said
+5251	textures/logos/logo02/logo02_greeng_glow.jpg	low	trademark/brand name	XONOTIC wordmark / 'Hello XONOTIC!' (the game's own name), no URL: kept as the owner said
+5252	textures/logos/logo02/logo02_purple.jpg	low	trademark/brand name	XONOTIC wordmark / 'Hello XONOTIC!' (the game's own name), no URL: kept as the owner said
+5253	textures/logos/logo02/logo02_purpleg.jpg	low	trademark/brand name	XONOTIC wordmark / 'Hello XONOTIC!' (the game's own name), no URL: kept as the owner said
+5254	textures/logos/logo02/logo02_purpleg_glow.jpg	low	trademark/brand name	XONOTIC wordmark / 'Hello XONOTIC!' (the game's own name), no URL: kept as the owner said
+5255	textures/logos/logo02/logo02_red.jpg	low	trademark/brand name	XONOTIC wordmark / 'Hello XONOTIC!' (the game's own name), no URL: kept as the owner said
+5256	textures/logos/logo02/logo02_redg.jpg	low	trademark/brand name	XONOTIC wordmark / 'Hello XONOTIC!' (the game's own name), no URL: kept as the owner said
+5257	textures/logos/logo02/logo02_redg_glow.jpg	low	trademark/brand name	XONOTIC wordmark / 'Hello XONOTIC!' (the game's own name), no URL: kept as the owner said
+5258	textures/logos/logo02/logo02_white.jpg	low	trademark/brand name	XONOTIC wordmark / 'Hello XONOTIC!' (the game's own name), no URL: kept as the owner said
+5259	textures/logos/logo02/logo02_yellow.jpg	low	trademark/brand name	XONOTIC wordmark / 'Hello XONOTIC!' (the game's own name), no URL: kept as the owner said
+5260	textures/logos/logo02/logo02_yellowg_glow.jpg	low	trademark/brand name	XONOTIC wordmark / 'Hello XONOTIC!' (the game's own name), no URL: kept as the owner said
+5422	textures/map_implosion/terminal_blue2.jpg	low	trademark name	XONOTIC wordmark / 'Hello XONOTIC!' (the game's own name), no URL: kept as the owner said
+5424	textures/map_implosion/xonoticdecal.jpg	low	trademark/brand name	XONOTIC wordmark / 'Hello XONOTIC!' (the game's own name), no URL: kept as the owner said
+5425	textures/map_implosion/xonoticdecal_glow.jpg	low	trademark/brand name	XONOTIC wordmark / 'Hello XONOTIC!' (the game's own name), no URL: kept as the owner said
+5609	textures/morphed/flagred.jpg	low	possible hate-symbol association	team-red banner with an abstract symmetric black emblem: no cross, hooked shape, disc or text; the same banner exists in the other team colours
+5743	textures/ons_text.jpg	low	meme/quote text	Onslaught HUD strings with 'CONTROL POINT' fully spelled (no 'CP'), plus two harmless pop-culture quotes
+5970	textures/phillipk2x/decals/pk02_dec_num08.jpg	low	number that could combine into hate code	a single digit '8' floor-number decal: one digit is not a code
+5971	textures/phillipk2x/decals/pk02_dec_num08_alpha.jpg	low	number that could combine into hate code	a single digit '8' floor-number decal: one digit is not a code
+6379	textures/savdm6ish/light3_7.jpg	low	religious symbol	plain Latin cross light panel (church/graveyard style): an ordinary religious symbol, not a hate symbol
+6380	textures/savdm6ish/light3_7_luma.jpg	low	religious symbol	plain Latin cross light panel (church/graveyard style): an ordinary religious symbol, not a hate symbol
+6403	textures/screens/screen_airlock1.jpg	low	random letter noise	same noise layer as the other screens, read at 2x: the big word (UNLOCKED / DISABLED) covers the 'FK' line starts and the 'KK'; what stays visible are long random strings, no word or code stands alone
+6405	textures/screens/screen_door1.jpg	low	random letter noise	same noise layer as the other screens, read at 2x: the big word (UNLOCKED / DISABLED) covers the 'FK' line starts and the 'KK'; what stays visible are long random strings, no word or code stands alone
+6407	textures/screens/screen_elevator1.jpg	low	random letter noise	same noise layer as the other screens, read at 2x: the big word (UNLOCKED / DISABLED) covers the 'FK' line starts and the 'KK'; what stays visible are long random strings, no word or code stands alone
+6409	textures/screens/screen_toggle0.jpg	low	random letter noise	same noise layer as the other screens, read at 2x: the big word (UNLOCKED / DISABLED) covers the 'FK' line starts and the 'KK'; what stays visible are long random strings, no word or code stands alone
+6417	textures/seraphina.jpg	low	body/face	fictional character's face sheet with shoulder digits '4' and '2': harmless
+6461	textures/sniperrifle.jpg	low	model-code text	fictional model codes 'GE-ZOx IR' / 'GE-HD40': no real brand
+6581	textures/stralenex1/slime_rev-1.jpg	low	readable word (map credit ad sequence)	billboard frames with ordinary words ('presents', 'a', '2.3', 'map', 'even', 'more', 'slime', 'on', 'slimepit', 'revisited', 'by'); the frames with the handle and the other game's name are blanked
+6582	textures/stralenex1/slime_rev-1_glow.jpg	low	readable word (map credit ad sequence)	billboard frames with ordinary words ('presents', 'a', '2.3', 'map', 'even', 'more', 'slime', 'on', 'slimepit', 'revisited', 'by'); the frames with the handle and the other game's name are blanked
+6583	textures/stralenex1/slime_rev-2.jpg	low	readable word (map credit ad sequence)	billboard frames with ordinary words ('presents', 'a', '2.3', 'map', 'even', 'more', 'slime', 'on', 'slimepit', 'revisited', 'by'); the frames with the handle and the other game's name are blanked
+6584	textures/stralenex1/slime_rev-2_glow.jpg	low	readable word (map credit ad sequence)	billboard frames with ordinary words ('presents', 'a', '2.3', 'map', 'even', 'more', 'slime', 'on', 'slimepit', 'revisited', 'by'); the frames with the handle and the other game's name are blanked
+6587	textures/stralenex1/slime_rev.jpg	low	readable word (map credit ad sequence)	billboard frames with ordinary words ('presents', 'a', '2.3', 'map', 'even', 'more', 'slime', 'on', 'slimepit', 'revisited', 'by'); the frames with the handle and the other game's name are blanked
+6588	textures/stralenex1/slime_rev_glow.jpg	low	readable word (map credit ad sequence)	billboard frames with ordinary words ('presents', 'a', '2.3', 'map', 'even', 'more', 'slime', 'on', 'slimepit', 'revisited', 'by'); the frames with the handle and the other game's name are blanked
+6589	textures/stralenex1/slimepit_ad-1.jpg	low	readable word (map credit ad sequence)	billboard frames with ordinary words ('presents', 'a', '2.3', 'map', 'even', 'more', 'slime', 'on', 'slimepit', 'revisited', 'by'); the frames with the handle and the other game's name are blanked
+6590	textures/stralenex1/slimepit_ad-10.jpg	low	readable word (map credit ad sequence)	billboard frames with ordinary words ('presents', 'a', '2.3', 'map', 'even', 'more', 'slime', 'on', 'slimepit', 'revisited', 'by'); the frames with the handle and the other game's name are blanked
+6591	textures/stralenex1/slimepit_ad-11.jpg	low	readable word (map credit ad sequence)	billboard frames with ordinary words ('presents', 'a', '2.3', 'map', 'even', 'more', 'slime', 'on', 'slimepit', 'revisited', 'by'); the frames with the handle and the other game's name are blanked
+6592	textures/stralenex1/slimepit_ad-2.jpg	low	readable word (map credit ad sequence)	billboard frames with ordinary words ('presents', 'a', '2.3', 'map', 'even', 'more', 'slime', 'on', 'slimepit', 'revisited', 'by'); the frames with the handle and the other game's name are blanked
+6594	textures/stralenex1/slimepit_ad-4.jpg	low	readable word (map credit ad sequence)	billboard frames with ordinary words ('presents', 'a', '2.3', 'map', 'even', 'more', 'slime', 'on', 'slimepit', 'revisited', 'by'); the frames with the handle and the other game's name are blanked
+6595	textures/stralenex1/slimepit_ad-5.jpg	low	readable word (map credit ad sequence)	billboard frames with ordinary words ('presents', 'a', '2.3', 'map', 'even', 'more', 'slime', 'on', 'slimepit', 'revisited', 'by'); the frames with the handle and the other game's name are blanked
+6596	textures/stralenex1/slimepit_ad-6.jpg	low	readable word (map credit ad sequence)	billboard frames with ordinary words ('presents', 'a', '2.3', 'map', 'even', 'more', 'slime', 'on', 'slimepit', 'revisited', 'by'); the frames with the handle and the other game's name are blanked
+6597	textures/stralenex1/slimepit_ad-7.jpg	low	readable word (map credit ad sequence)	billboard frames with ordinary words ('presents', 'a', '2.3', 'map', 'even', 'more', 'slime', 'on', 'slimepit', 'revisited', 'by'); the frames with the handle and the other game's name are blanked
+6598	textures/stralenex1/slimepit_ad-8.jpg	low	readable word (map credit ad sequence)	billboard frames with ordinary words ('presents', 'a', '2.3', 'map', 'even', 'more', 'slime', 'on', 'slimepit', 'revisited', 'by'); the frames with the handle and the other game's name are blanked
+6599	textures/stralenex1/slimepit_ad-9.jpg	low	readable word (map credit ad sequence)	billboard frames with ordinary words ('presents', 'a', '2.3', 'map', 'even', 'more', 'slime', 'on', 'slimepit', 'revisited', 'by'); the frames with the handle and the other game's name are blanked
+6711	textures/terrain01x/blends/mars-rock01-ground01.jpg	low	readable label text	editor preview labels ('Mars Rock01 Ground01', 'Horizontal' / 'Vertical'): harmless
+6712	textures/terrain01x/blends/mars-rock01-sand04.jpg	low	readable label text	editor preview labels ('Mars Rock01 Ground01', 'Horizontal' / 'Vertical'): harmless
+6713	textures/terrain01x/blends/mars-rock02-ground01.jpg	low	readable label text	editor preview labels ('Mars Rock01 Ground01', 'Horizontal' / 'Vertical'): harmless
+6882	textures/terrain_dotproduct2/grass01-rock05.jpg	low	readable label text	editor preview labels ('Mars Rock01 Ground01', 'Horizontal' / 'Vertical'): harmless
+6883	textures/terrain_dotproduct2/leafs01-rock02.jpg	low	readable label text	editor preview labels ('Mars Rock01 Ground01', 'Horizontal' / 'Vertical'): harmless
+6884	textures/terrain_dotproduct2/mossrock02-mudground04.jpg	low	readable label text	editor preview labels ('Mars Rock01 Ground01', 'Horizontal' / 'Vertical'): harmless
+6885	textures/terrain_dotproduct2/mudground01_rock01.jpg	low	readable label text	editor preview labels ('Mars Rock01 Ground01', 'Horizontal' / 'Vertical'): harmless
+6886	textures/terrain_dotproduct2/mudground02-rock06.jpg	low	readable label text	editor preview labels ('Mars Rock01 Ground01', 'Horizontal' / 'Vertical'): harmless
+6887	textures/terrain_dotproduct2/sand-rock07.jpg	low	readable label text	editor preview labels ('Mars Rock01 Ground01', 'Horizontal' / 'Vertical'): harmless
+6888	textures/terrain_dotproduct2/snow-rock05.jpg	low	readable label text	editor preview labels ('Mars Rock01 Ground01', 'Horizontal' / 'Vertical'): harmless
+6912	textures/train02.jpg	low	small unreadable text	tiny faint illegible mark on the panel: nothing readable
+6971	textures/trak4x/decal/decal_door.jpg	low	readable sign text	harmless signage (PLEASE KEEP DOOR CLOSED, EXIT, ISOLATION 1-3, NORTH/SOUTH WING, 'ANGER IS NEVER THE ANSWER' cartoon)
+6972	textures/trak4x/decal/decal_exit.jpg	low	readable sign text	harmless signage (PLEASE KEEP DOOR CLOSED, EXIT, ISOLATION 1-3, NORTH/SOUTH WING, 'ANGER IS NEVER THE ANSWER' cartoon)
+6973	textures/trak4x/decal/decal_exit_alpha.jpg	low	readable sign text	harmless signage (PLEASE KEEP DOOR CLOSED, EXIT, ISOLATION 1-3, NORTH/SOUTH WING, 'ANGER IS NEVER THE ANSWER' cartoon)
+6975	textures/trak4x/decal/decal_help_alpha.jpg	medium	distress graffiti, dripping paint	mask already has the long drips trimmed (earlier pass): plain brush lettering 'HELP'; the colour image now matches it
+6976	textures/trak4x/decal/decal_iso1.jpg	low	readable sign text	harmless signage (PLEASE KEEP DOOR CLOSED, EXIT, ISOLATION 1-3, NORTH/SOUTH WING, 'ANGER IS NEVER THE ANSWER' cartoon)
+6977	textures/trak4x/decal/decal_iso1_alpha.jpg	low	readable sign text	harmless signage (PLEASE KEEP DOOR CLOSED, EXIT, ISOLATION 1-3, NORTH/SOUTH WING, 'ANGER IS NEVER THE ANSWER' cartoon)
+6978	textures/trak4x/decal/decal_iso2.jpg	low	readable sign text	harmless signage (PLEASE KEEP DOOR CLOSED, EXIT, ISOLATION 1-3, NORTH/SOUTH WING, 'ANGER IS NEVER THE ANSWER' cartoon)
+6979	textures/trak4x/decal/decal_iso2_alpha.jpg	low	readable sign text	harmless signage (PLEASE KEEP DOOR CLOSED, EXIT, ISOLATION 1-3, NORTH/SOUTH WING, 'ANGER IS NEVER THE ANSWER' cartoon)
+6980	textures/trak4x/decal/decal_iso3.jpg	low	readable sign text	harmless signage (PLEASE KEEP DOOR CLOSED, EXIT, ISOLATION 1-3, NORTH/SOUTH WING, 'ANGER IS NEVER THE ANSWER' cartoon)
+6981	textures/trak4x/decal/decal_iso3_alpha.jpg	low	readable sign text	harmless signage (PLEASE KEEP DOOR CLOSED, EXIT, ISOLATION 1-3, NORTH/SOUTH WING, 'ANGER IS NEVER THE ANSWER' cartoon)
+6982	textures/trak4x/decal/decal_northwing.jpg	low	readable sign text	harmless signage (PLEASE KEEP DOOR CLOSED, EXIT, ISOLATION 1-3, NORTH/SOUTH WING, 'ANGER IS NEVER THE ANSWER' cartoon)
+6983	textures/trak4x/decal/decal_northwing_alpha.jpg	low	readable sign text	harmless signage (PLEASE KEEP DOOR CLOSED, EXIT, ISOLATION 1-3, NORTH/SOUTH WING, 'ANGER IS NEVER THE ANSWER' cartoon)
+6988	textures/trak4x/decal/decal_southwing.jpg	low	readable sign text	harmless signage (PLEASE KEEP DOOR CLOSED, EXIT, ISOLATION 1-3, NORTH/SOUTH WING, 'ANGER IS NEVER THE ANSWER' cartoon)
+6989	textures/trak4x/decal/decal_southwing_alpha.jpg	low	readable sign text	harmless signage (PLEASE KEEP DOOR CLOSED, EXIT, ISOLATION 1-3, NORTH/SOUTH WING, 'ANGER IS NEVER THE ANSWER' cartoon)
+6994	textures/trak4x/decal/decal_wallpainting.jpg	low	readable text + screaming faces	harmless signage (PLEASE KEEP DOOR CLOSED, EXIT, ISOLATION 1-3, NORTH/SOUTH WING, 'ANGER IS NEVER THE ANSWER' cartoon)
+6995	textures/trak4x/decal/decal_wallpainting_alpha.jpg	low	readable text + screaming faces	harmless signage (PLEASE KEEP DOOR CLOSED, EXIT, ISOLATION 1-3, NORTH/SOUTH WING, 'ANGER IS NEVER THE ANSWER' cartoon)
+7208	textures/trak5x/panel/panel_comp1a_glow.jpg	low	small filler text	tiny filler text ('Zone 17 ... Sector B ... This text is just filler'): harmless and barely legible
+7583	textures/tymo3t5/wf1.jpg	low	screenshot with text/HUD	in-game screenshot with the map name and HUD numbers: harmless
+7584	textures/tymo3t5/wf2.jpg	low	screenshot with text/HUD	in-game screenshot with the map name and HUD numbers: harmless
+7600	textures/uzi.jpg	low	trademark in file name	pixels are harmless; only the file name has the word, and uploads use neutral names ('Xonotic texture <sha12>', G-047)
+7601	textures/uzi_gloss.jpg	low	trademark in file name	pixels are harmless; only the file name has the word, and uploads use neutral names ('Xonotic texture <sha12>', G-047)
+7632	textures/wyvern.jpg	low	creature skin, fleshy mouth/slit	monster skin sheet (mouth lining, nostril): creature art, nothing body-like out of context
