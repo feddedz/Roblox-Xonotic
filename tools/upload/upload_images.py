@@ -55,12 +55,13 @@ def main():
     ap.add_argument("--max-batches", type=int, default=1000)
     ap.add_argument("--dry-run", action="store_true", help="list what would be uploaded, upload nothing")
     a = ap.parse_args()
-    done = set()
+    done, probe = set(), ""
     if IDS.exists():
         for l in IDS.read_text().splitlines():
             c = l.split("\t")
             if not l.startswith("#") and len(c) > 4 and c[4] == "ok":
                 done.add(c[0])
+                probe = c[2]
     else:
         IDS.write_text("# sha256\tvpath\tasset_id\toperation\tstatus\tdetail\n")
     # Reviewed set (tools/upload/build_ready.py): key = sha256 of the file actually uploaded, so a fixed
@@ -90,6 +91,11 @@ def main():
         for v, key, p in todo[:20]:
             print(f"  would upload {v} ({p.relative_to(ROOT)})")
         return
+    if probe:  # key check on an asset we own: a missing/blocked key stops here, not after a batch of error rows
+        try:
+            U.request("GET", f"{U.API}/assets/{probe}?readMask=moderationResult")
+        except RuntimeError as e:
+            sys.exit(f"preflight: cannot read asset {probe} - nothing uploaded: {e}")
     lock, n = threading.Lock(), {"ok": 0, "err": 0, "i": 0}
 
     stop = threading.Event()
