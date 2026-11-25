@@ -30,15 +30,17 @@ Every section except §MAP and §DIFFS stays under ~60 lines; detail lives in `d
   it is an upload log that also holds the old, replaced uploads. Sounds: platform/sound/audio_assets.luau.
 - **Sounds:** 804 of 805 Approved; sound/cdtracks/heavymetal.ogg Rejected (Q-013: owner appeals or decides).
 - **Old uploads:** 16 old rejected sound uploads archived by API (assets/manifest/roblox-archived.tsv). Images
-  cannot be archived by Open Cloud (G-052): **owner archives the 68 unused images of assets/manifest/
-  archive-now.tsv in the Creator Dashboard** (old CP set, blood decal, ...; none is used by the game).
+  cannot be archived by Open Cloud (G-052); 68 unused old images stay on the account (assets/manifest/
+  archive-now.tsv: old CP set, blood decal, ...; none is used by the game; owner chose to leave them).
   State of every asset: tools/upload/check_assets.py → assets/manifest/roblox-assets-state.tsv.
 - **M2-RUNNER done** (stormkeep entities load, first StartFrame spawns them; world builtins wait on M3).
   ~170 builtins ported; server state (engine/server.luau), SZ/MSG writes, mathlib bit-exact.
 - **M2-AOT-SHIP (claimed, Claude-Anvil):** lazy chunk loading + background preload; Q-014 (startup 17.7 s).
 - **Tests:** 14 Lune files, all pass; StyLua/Selene clean; check_port_lines 0 wrong.
 - **Stale claims:** M3-BSPLOAD and REF-DP branches have only claim commits from 2026-11-20 — owner to reassign.
-- **Next:** owner: archive the 68 images, heavymetal.ogg appeal; M1-TEX / M5-RENDER use texture_assets.luau;
+- **Branches (2026-11-25):** PRs 1, 2, 3 merged into main: start every new branch from main (D-012). Owner
+  decided NOT to archive the 68 old images (archive-now.tsv is only a list).
+- **Next:** owner: heavymetal.ogg appeal (optional); M1-TEX / M5-RENDER use texture_assets.luau;
   M3-BSPLOAD (if reassigned) → world builtins.
 
 ## §RULES (condensed from the owner's brief; absolute)
