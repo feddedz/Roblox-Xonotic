@@ -1037,10 +1037,10 @@ local function Mod_Q3BSP_LoadLightGrid(l: lump_t)
 		scale[k] = R(1.0 / cellsize[k])
 	end
 	for k = 1, 3 do
-		imins[k] = math.ceil(R(model0.mins[k] * scale[k]))
+		imins[k] = math.ceil(R(model0.mins[k] * scale[k])) + 0 -- (int): + 0 turns a Luau -0 into 0
 	end
 	for k = 1, 3 do
-		imaxs[k] = math.floor(R(model0.maxs[k] * scale[k]))
+		imaxs[k] = math.floor(R(model0.maxs[k] * scale[k])) + 0
 	end
 	for k = 1, 3 do
 		isize[k] = imaxs[k] - imins[k] + 1
