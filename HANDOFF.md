@@ -38,6 +38,12 @@ Every section except §MAP and §DIFFS stays under ~60 lines; detail lives in `d
 - **M2-AOT-SHIP (claimed, Claude-Anvil):** lazy chunk loading + background preload; Q-014 (startup 17.7 s).
 - **Tests:** 14 Lune files, all pass; StyLua/Selene clean; check_port_lines 0 wrong.
 - **Stale claims:** M3-BSPLOAD and REF-DP branches have only claim commits from 2026-11-20 — owner to reassign.
+- **Local + Studio (2026-11-25):** the owner cannot use cloud sessions; work happens on the owner's Windows PC.
+  Toolchain there: `rokit install` (shims in %USERPROFILE%/.rokit/bin; stylua, selene, lune 14/14, rojo pass).
+  Roblox Studio is reachable from the session through the Studio MCP tools (run Luau, playtest, screenshots), so
+  **[needs Studio] tasks can be done now.** Experience **"Xonotic"** on the owner's account: placeId
+  130462204737495, universeId 10779065323 (private; built with `rojo build default.project.json`, Team Create
+  on, AI data sharing off). Never touch the owner's other places (e.g. "walled in").
 - **Branches (2026-11-25):** PRs 1, 2, 3 merged into main: start every new branch from main (D-012). Owner
   decided NOT to archive the 68 old images (archive-now.tsv is only a list).
 - **Next:** owner: heavymetal.ogg appeal (optional); M1-TEX / M5-RENDER use texture_assets.luau;
@@ -116,7 +122,7 @@ Particles: diff sim state vs instrumented DP. Visuals: screenshot process. Data 
 ## §TASKS
 
 Status: `open` · `claimed by <session> <date>` · `done` · `blocked (<why>)`. **[needs Studio]** = can only be
-checked in Roblox Studio (nobody has it now): prefer headless tasks. Claim = edit + commit + push
+checked in Roblox Studio (available on the owner's PC since 2026-11-25, see STATUS). Claim = edit + commit + push
 before working. One claimed task per subsystem at a time. Details per task in the linked subsystem doc.
 
 | ID | Title | Status | Files | Deps |
@@ -514,5 +520,6 @@ One line each; **details and sources: `docs/gotchas.md`** (add to both). Roblox 
 - **G-049** Xonotic spawns map entities lazily: its engine-called SV_OnEntityPreSpawnFunction (qcsrc/lib/_all.inc) sets `__spawnfunc_expecting`, so PRVM_ED_LoadFromFile only queues them; the first StartFrame runs the world constructor (real worldspawn), which spawns the queue. Engine-called functions read `this` from leftover OFS_PARM0 or `self`, so builtins must leave parameter globals exactly as DP does.
 - **G-050** qsort in buf_sort: comparators are inconsistent for NULL/empty strings, so the result depends on the algorithm. Ported as glibc's msort (top-down merge sort, glibc ≤ 2.37 as at the 0.8.6 release); newer glibc may order empty strings differently.
 - **G-051** (2026-11-22) Roblox moderation flagged textures/cp_glow.jpg (big letters "CP" meaning Control Point) as child-safety and moderated the account (appeal granted). Review for *ambiguous* letters/numbers too (CP, SS, 88, 14, 69, 420), symbol look-alikes (map layouts, rotated crosses, sun crosses), real names/handles and other games' names — not only URLs/gore. A batch item stuck in "Reviewing" for hours preceded the ban: treat a long review as a warning.
+- **G-053** (2026-11-25) string.format calls the C runtime: Windows prints "i.nf" for "%#.0e" of infinity, glibc "inf". Roblox servers are Linux, clients mostly Windows, so printf-like code must not hand non-finite numbers to string.format (engine/_port/libc.luau format1 does them itself). Lune on Windows found it; CI (Linux) could not.
 - **G-052** (read 2026-11-25) Open Cloud can archive assets: `POST /assets/v1/assets/{id}:archive` (no body, scope asset:write, beta) → `"state": "Archived"` (gone from the website, not usable in experiences); `...:restore` undoes it. `GET /assets/v1/assets/{id}?readMask=moderationResult,state` shows both states; GETs are rate-limited (429 with x-ratelimit-reset; ~4,100 reads ≈ 20 min). A 1x1 grey JPEG was Rejected while 1x1 colour swatches were Approved: moderation of tiny images is not predictable. **Tried: only Audio can be archived; Image answers 400 "not an archivable asset type" → dashboard only.** tools/upload/check_assets.py, archive_assets.py.
 <!-- /§GOTCHAS -->

@@ -88,3 +88,21 @@ None new (D-025 + the owner's brief of 2026-11-24 applied).
 ## Next step
 Owner: archive the 68 images of assets/manifest/archive-now.tsv in the Creator Dashboard; appeal heavymetal.ogg
 (Q-013). The key stays on the PC until `set_key.ps1 -Remove`. Renderer/texture tasks read texture_assets.luau.
+
+## Local setup on the owner's PC (2026-11-25, owner: "we can't do a cloud environment, we can just use Studio")
+- PRs 1, 2, 3 merged into main (owner: "do whatever you think is best"); GitHub default branch set to main.
+  CI was red on main after PR 2 (rojo build: game/generated/vfs had no .gitkeep); fixed before merging PR 3.
+- `rokit install` (Rokit was already installed): rojo 7.7.1, lune 0.11.1, stylua 2.6.0, selene 0.31.0.
+  stylua/selene clean; Lune: 13/14, tests/unit/libc.test.luau failed on Windows only -> G-053, fixed in
+  libc.format1 (non-finite doubles formatted in Luau); now 14/14. The new texture_assets*.luau pass CI and load
+  in Studio (13,676 entries).
+- `rojo build default.project.json -o work/xonotic.rbxl`, opened in a second Studio window, saved to Roblox as
+  the experience "Xonotic" (placeId 130462204737495, universeId 10779065323) through Studio's Save dialog
+  (computer use, the only step that needed the screen). The session reaches it through the Studio MCP tools.
+- The owner's other Studio window ("walled in") was no longer open afterwards; this session did not close it on
+  purpose (told the owner).
+
+## Next step
+Game work on this PC: branch from main, run `stylua --check`, `selene`, `lune run tests/run.luau` locally, check
+in Studio through the Studio MCP tools. First candidates: M3-BSPLOAD, M1-TEX, M1-MODELS.
+
