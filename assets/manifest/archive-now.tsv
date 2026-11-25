@@ -1,29 +1,69 @@
-# asset_id	vpath	why (live-asset review 2026-11-23, work/review3/findings_*.tsv) — owner archives in Creator Dashboard
-102694919490077	gfx/blood.jpg	blood splatter
-110067246759641	gfx/blood_alpha.jpg	blood splatter mask
-71699447678506	gfx/leave_em_behind_mini.jpg	map layout reads as a swastika
-137572817661785	textures/cp.jpg	"CP" letters
-137959453837292	textures/cp_gloss.jpg	"CP" letters
-112550785271454	textures/cp_norm_alpha.jpg	"CP" letters
-104036066166958	textures/cp_norm.jpg	"CP" letters
-74900875715984	models/desertfactory/textures/documents/note02.jpg	credits naming other software/games
-115904010373924	models/desertfactory/textures/documents/note03.jpg	credits thanking a real username
-97035768395278	models/desertfactory/textures/documents/writing02_alpha.jpg	"Nexuiz Rulez"
-78657944090291	models/desertfactory/textures/shaders/writing02.jpg	"Nexuiz Rulez"
-93960888200802	models/desertfactory/textures/documents/writing05_alpha.jpg	author graffiti tag
-104225085465836	models/desertfactory/textures/documents/writing05.jpg	author graffiti tag
-102724993332129	models/desertfactory/textures/documents/writing01_alpha.jpg	"sev was here"
-119286752435446	models/desertfactory/textures/documents/writing01.jpg	"sev was here"
-79187336107208	models/desertfactory/textures/documents/note01.jpg	sun-cross-like emblem + signature
-110702541225803	textures/race/checkpoint/outerring.jpg	SS-rune-like S + contributor name
-118245371403016	textures/race/checkpoint/outerring_bump.jpg	same, bump map
-138056794401669	models/desertfactory/textures/documents/newspaper01.jpg	"SPECOP ANNOUNCES WAR" + masked soldiers photo
-91425806467333	models/trak/tablet.jpg	"BS" profanity abbreviation
-73377876846964	models/trak/tablet_xon0.jpg	off-platform community text
-138172084660203	models/trak/tablet_xon1.jpg	off-platform community text
-111150131544914	models/trak/tablet_xon2.jpg	off-platform community text
-72623604865243	models/trak/tablet_xon3.jpg	URL (already flagged earlier)
-89294749394228	textures/cockpit.jpg	real photo with photographer credit + real brand
-121804908035435	models/vehicles/rockets.jpg	blood-like red drip + meme/signature
-131537538930533	gfx/menu/wickedx/background_ingame.jpg	tiny URL-like string
-93867009513964	(HEAD icon, earlier list)	flagged earlier
+# asset_id	vpath	why - images the game no longer uses; Open Cloud cannot archive images, the owner archives them in the Creator Dashboard (written by tools/upload/archive_assets.py)
+102694919490077	gfx/blood.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+110067246759641	gfx/blood_alpha.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+84343236277196	gfx/hud/default/notify_death.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+102468579358819	gfx/hud/default/notify_death_alpha.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+103104883591845	gfx/hud/default/notify_fall.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+93867009513964	gfx/hud/default/notify_headshot.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+117938535269542	gfx/hud/default/notify_melee_laser.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+131550397189425	gfx/hud/default/notify_melee_laser_alpha.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+123502057489531	gfx/hud/default/notify_outofammo.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+85776129881684	gfx/hud/default/notify_selfkill.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+133512703796161	gfx/hud/default/notify_teamkill_blue.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+109687611772074	gfx/hud/default/notify_teamkill_blue_alpha.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+74743900050408	gfx/hud/default/notify_teamkill_pink.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+124022485289975	gfx/hud/default/notify_teamkill_red.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+139079722212669	gfx/hud/default/notify_teamkill_yellow.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+108978423525689	gfx/hud/luma/notify_fall.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+73316593834985	gfx/hud/luma/notify_fall_alpha.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+100672633534579	gfx/hud/luminos/dom_icon_yellow-highlighted.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+101840611910938	gfx/hud/luminos/dom_icon_yellow-highlighted_alpha.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+101504762525363	gfx/hud/luminos/dom_icon_yellow.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+84816081599850	gfx/hud/luminos/dom_icon_yellow_alpha.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+135871780293023	gfx/hud/old/armor.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+85575972346055	gfx/hud/old/dom_icon_yellow-highlighted.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+85592337939072	gfx/hud/old/dom_icon_yellow-highlighted_alpha.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+74942145475222	gfx/hud/old/dom_icon_yellow.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+114996070666957	gfx/hud/old/dom_icon_yellow_alpha.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+71699447678506	gfx/leave_em_behind_mini.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+91376254790809	gfx/menu/luminos/background_ingame_alpha.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+79398766576361	gfx/menu/luminos/skinpreview.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+131537538930533	gfx/menu/wickedx/background_ingame.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+96832978043702	maps/darkzone.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+132404055800279	models/casing_bronze.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+126829235812949	models/casing_bronze_gloss.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+114403533532336	models/casing_bronze_norm.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+77413778627203	models/containers/crate01.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+138056794401669	models/desertfactory/textures/documents/newspaper01.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+79187336107208	models/desertfactory/textures/documents/note01.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+74900875715984	models/desertfactory/textures/documents/note02.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+115904010373924	models/desertfactory/textures/documents/note03.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+102724993332129	models/desertfactory/textures/documents/writing01_alpha.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+97035768395278	models/desertfactory/textures/documents/writing02_alpha.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+93960888200802	models/desertfactory/textures/documents/writing05_alpha.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+119286752435446	models/desertfactory/textures/shaders/writing01.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+78657944090291	models/desertfactory/textures/shaders/writing02.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+104225085465836	models/desertfactory/textures/shaders/writing05.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+110702541225803	models/race/checkpoint/outerring.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+118245371403016	models/race/checkpoint/outerring_bump.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+89693165001421	models/race/checkpoint/outerring_gloss.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+101023382192947	models/trak/pbox.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+99311406873339	models/trak/pen.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+91425806467333	models/trak/tablet.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+73377876846964	models/trak/tablet_xon0.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+111150131544914	models/trak/tablet_xon2.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+72623604865243	models/trak/tablet_xon3.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+121804908035435	models/vehicles/rockets.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+121722793310786	textures/alphamod/alpha_014.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+136741641248208	textures/alphamod/alpha_069.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+73495280635873	textures/alphamod/alpha_088.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+78231769480081	textures/bloodyskull.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+128361450716495	textures/cake/pipe1d_msg.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+115512202824690	textures/cmp1-dm8/e8circle_pur.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+89294749394228	textures/cockpit.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+139898858670215	textures/cockpit_glow.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+137572817661785	textures/cp.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+137959453837292	textures/cp_gloss.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+132465057074044	textures/cp_glow.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+104036066166958	textures/cp_norm.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)
+112550785271454	textures/cp_norm_alpha.jpg	old upload, replaced by a fixed version (see texture-assets.tsv)

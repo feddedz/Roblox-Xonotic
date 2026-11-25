@@ -64,5 +64,27 @@ None new (D-025 + the owner's brief of 2026-11-24 applied).
 - archive-now.tsv: 25 of 28 are still needed (upload-ready.tsv has no fixed version for them), incl. all five
   textures/cp*.jpg. 112 of the 119 live findings are in use unfixed → new task UPLOAD-FIX4.
 
+## UPLOAD-FIX4 (2026-11-25, owner: "fix everything")
+- tools/upload/content_fix4.py → work/upload/fixed4/: 43 fixed, 70 kept (content_{fixes,kept}4.tsv), 7 were already
+  replaced by earlier tools. Starts from the live version (fixed3 > fixed > fixed2 > blurred > original). New ops:
+  mirror_glyph (CP sign), hatch_yards (radar), quad_fill, smooth_shape, drop_lines, const_box. Run twice: same
+  sha256. 11 "medium" findings that are only the XONOTIC logo kept on the owner's wordmark rule (told the owner).
+- build_ready.py: fixed4 first. fix3_sheets.py --fix4 → work/review_fix4/f00..f06.jpg, sent; owner approved.
+- Gated upload: 43 ok, batch all Approved.
+- Owner asked "will the game know which asset is the new version, and is anything missing?" → there was no
+  texture lookup at all (only the upload log). tools/upload/asset_index.py --write → assets/manifest/
+  texture-assets.tsv + platform/render/texture_assets.luau (+5 parts, each < 190k chars): all 13,676 texture
+  vpaths → current asset id. tools/upload/test_asset_index.py (4 tests, ok) fails when the table is stale or
+  hands out a superseded upload. Sounds: 851/851 in audio_assets.luau.
+- tools/upload/archive_assets.py --apply (owner approved): 16 old rejected sound uploads Archived. Images:
+  HTTP 400 "not an archivable asset type" (G-052) → 68 unused images written to archive-now.tsv for the owner.
+  Bug found on the way: the tool stopped on an asset id containing "403"; now it tests for "HTTP 403".
+
+## Tests run and results (2026-11-25)
+- `python -m unittest tools/upload/test_asset_index.py`: 4 ok.
+- Lune / StyLua / Selene NOT run on platform/render/texture_assets*.luau (toolchain not on this PC): the next
+  cloud session should run `stylua --check platform` and `selene platform` once.
+
 ## Next step
-UPLOAD-FIX4. Owner: heavymetal.ogg (appeal or change). The key stays on the PC until `set_key.ps1 -Remove`.
+Owner: archive the 68 images of assets/manifest/archive-now.tsv in the Creator Dashboard; appeal heavymetal.ogg
+(Q-013). The key stays on the PC until `set_key.ps1 -Remove`. Renderer/texture tasks read texture_assets.luau.

@@ -2,8 +2,9 @@
 """Archive every asset we uploaded that the game no longer uses (old versions that got a fixed replacement,
 the archive lists, rejected leftovers). Never touches a needed asset.
 
-  python3 tools/upload/archive_assets.py            -> list what would be archived (nothing is changed)
+  python3 tools/upload/archive_assets.py            -> list what would be archived (nothing is changed on Roblox)
   python3 tools/upload/archive_assets.py --apply    -> archive them (owner's OK needed; reversible)
+Only audio can be archived this way; unused images are listed in assets/manifest/archive-now.tsv for the owner.
 
 Open Cloud (G-052, read 2026-11-25): POST /assets/v1/assets/{id}:archive, no body, scope asset:write; the asset
 then has "state": "Archived", disappears from the website and is not usable in experiences; POST ...:restore
@@ -44,6 +45,16 @@ def main() -> None:
     for aid, kind, v, role in todo:
         if not a.apply:
             print(f"  would archive {kind} {aid} {v} ({role})")
+    # Images: Open Cloud answers 400 "not an archivable asset type" (tried 2026-11-25, G-052), so the owner
+    # archives them in the Creator Dashboard. The list is rewritten on every run.
+    manual = [t for t in todo if t[1] == "image"]
+    with open(K.M / "archive-now.tsv", "w", encoding="utf-8", newline="\n") as f:
+        f.write("# asset_id\tvpath\twhy - images the game no longer uses; Open Cloud cannot archive images, the owner "
+                "archives them in the Creator Dashboard (written by tools/upload/archive_assets.py)\n")
+        for aid, kind, v, role in manual:
+            f.write(f"{aid}\t{v}\told upload, replaced by a fixed version (see texture-assets.tsv)\n")
+    todo = [t for t in todo if t[1] != "image"]
+    print(f"{len(manual)} images -> assets/manifest/archive-now.tsv (dashboard only); {len(todo)} archivable by API")
     if not a.apply:
         return
     if not LOG.exists():
@@ -61,7 +72,7 @@ def main() -> None:
         ok += st == "Archived"
         if st != "Archived":
             print("  ", st, kind, aid, v, flush=True)
-            if "403" in st:
+            if "HTTP 403" in st:
                 sys.exit("403 - stopping")
     print(f"archived {ok} of {len(todo)}")
 
