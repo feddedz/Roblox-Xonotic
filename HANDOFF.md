@@ -158,7 +158,7 @@ before working. One claimed task per subsystem at a time. Details per task in th
 | M2-DEBUG | Rebuild progs.dat from qcsrc with the pinned gmqcc; prove byte-identical; emit line-number debug info | open | tools/qcaot/ | M2-PROGS |
 | REF-CVARLIST | From REF-DP's dedicated server after startup: `cvarlist` (name/value/default/flags) and `cmdlist` → tests/reference/cvars/; diff against engine/host.luau's result (validates tools/engine/gen_cvars.py and the config chain) | open | tests/reference/cvars/, tests/integration/ | REF-DP, M2-RUNNER |
 | REF-DP | Instrumented DarkPlaces (from release source) that records traces, server frames, net messages, particles | open | tools/darkplaces-ref/ | M0-PIN |
-| M3-BSPLOAD | Port model_brush.c (Q3 BSP), model_shared.c, bih.c, collision.c; headless reads work/vfs-high (Roblox runtime loading needs M1-RTVFS later) | open | engine/ | M1-VFS |
+| M3-BSPLOAD | Port model_brush.c (Q3 BSP), model_shared.c, bih.c, collision.c; headless reads work/vfs-high (Roblox runtime loading needs M1-RTVFS later) | claimed by Claude-Quartz 2026-11-25 (the 2026-11-20 claim on branch M3-BSPLOAD-collision was stale: owner reassigned) | engine/ | M1-VFS |
 | M3-TRACEREF | Record ≥1000 traceline/tracebox per stock map from REF-DP | open | tests/reference/traces/ | REF-DP |
 | M3-TRACE | Port world.c/sv traces; bit-identical vs M3-TRACEREF on all stock maps | open | engine/ | M3-BSPLOAD, M3-TRACEREF |
 | M4-* | Server: sv_phys/sv_main/sv_user/sv_move, prvm_*, svvm_cmds builtins, host loop; bot match frame-diff | open (split when M3 done) | engine/ | M2-RUNNER, M3-TRACE |
