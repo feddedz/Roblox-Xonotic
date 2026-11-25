@@ -28,15 +28,14 @@ def rows(name):
     return [l.split("\t") for l in (M / name).read_text(encoding="utf-8").splitlines() if l and not l.startswith("#")]
 
 
-def main() -> None:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--skip-last", type=int, default=0, help="do not re-read the last N image uploads (they just "
-                    "passed the upload's own moderation gate); written as 'Approved(gate)'. GETs are rate-limited.")
-    a = ap.parse_args()
-    assets = {}  # asset id -> [kind, vpath, role]
+def classify(skip_last: int = 0, quiet: bool = False):
+    """(assets, gated): assets = {asset id: [kind, vpath, role]} for everything we ever uploaded (also used by
+    archive_assets.py); gated = ids of the last `skip_last` image uploads."""
+    say = (lambda *x: None) if quiet else print
+    assets = {}
     img = {}
     okrows = [c for c in rows("roblox-images.tsv") if len(c) > 4 and c[4] == "ok"]
-    gated = {c[2] for c in okrows[len(okrows) - a.skip_last:]} if a.skip_last else set()
+    gated = {c[2] for c in okrows[len(okrows) - skip_last:]} if skip_last else set()
     for c in okrows:
         img[c[0]] = c[2]
         assets[c[2]] = ["image", c[1], "superseded"]
@@ -45,7 +44,7 @@ def main() -> None:
         if aid:
             assets[aid] = ["image", c[0], "needed"]
         else:
-            print("NO ASSET for", c[0])
+            say("NO ASSET for", c[0])
     for c in rows("roblox-audio.tsv"):
         if len(c) > 4 and c[4] == "ok":
             assets[c[2]] = ["audio", c[1], "superseded"]
@@ -54,15 +53,24 @@ def main() -> None:
         if aid:
             assets.setdefault(aid, ["audio", c[0], "needed"])[2] = "needed"
         else:
-            print("NO ASSET for", c[0])
+            say("NO ASSET for", c[0])
     for name in ("archive-now.tsv", "replace-after-review.tsv"):
         for c in rows(name):
             if c[0] in assets and assets[c[0]][2] != "needed":
                 assets[c[0]][2] = "archive"
             elif c[0] in assets:
-                print("LISTED FOR ARCHIVE BUT NEEDED:", c[0], c[1])
+                say("LISTED FOR ARCHIVE BUT NEEDED:", c[0], c[1])
             else:
                 assets[c[0]] = ["image", c[1], "archive"]
+    return assets, gated
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--skip-last", type=int, default=0, help="do not re-read the last N image uploads (they just "
+                    "passed the upload's own moderation gate); written as 'Approved(gate)'. GETs are rate-limited.")
+    a = ap.parse_args()
+    assets, gated = classify(a.skip_last)
     ids = sorted(assets)
     print(len(ids), "assets,", len(ids) - len(gated & set(ids)), "to read", flush=True)
     n = [0]
