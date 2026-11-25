@@ -1,0 +1,27 @@
+name: Testgen
+# Builds the C reference programs of tools/testgen against the pinned release source and uploads the vector
+# files they write as an artifact (tests-vectors). For machines without a C compiler (the owner's Windows PC):
+# push the generator, download the artifact (gh run download), commit the vectors. Nothing is committed here.
+on:
+  workflow_dispatch:
+  push:
+    branches-ignore: [main]
+    paths: ["tools/testgen/**", ".github/workflows/testgen.yml"]
+jobs:
+  vectors:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Release source
+        run: tools/release/fetch.sh source
+      - name: Generate
+        run: |
+          for s in tools/testgen/*_vectors.sh; do
+            case "$s" in
+              */bih_vectors.sh|*/collision_vectors.sh|*/curves_vectors.sh) bash "$s" ;;  # generators that read work/source; add new ones here
+            esac
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tests-vectors
+          path: tests/vectors/

@@ -1,0 +1,40 @@
+{
+	"name": "XonoticMapView",
+	"tree": {
+		"$className": "DataModel",
+		"Workspace": {
+			"$className": "Workspace"
+		},
+		"ReplicatedStorage": {
+			"Xonotic": {
+				"$className": "Folder",
+				"engine": {
+					"$path": "engine"
+				},
+				"platform": {
+					"$className": "Folder",
+					"render": {
+						"$path": "platform/render"
+					}
+				}
+			},
+			"MapView": {
+				"$path": "tools/studio/mapview"
+			},
+			"MapData": {
+				"$path": "work/studio/mapview/data"
+			}
+		},
+		"ServerScriptService": {
+			"$className": "ServerScriptService"
+		},
+		"StarterPlayer": {
+			"$className": "StarterPlayer"
+		},
+		"Lighting": {
+			"$properties": {
+				"Technology": "Future"
+			}
+		}
+	}
+}
