@@ -8,7 +8,8 @@ param(
     [Parameter(Mandatory = $true)][string]$UserId,
     [int]$Jobs = 6,
     [int]$Batch = 100,
-    [string]$Session = "Claude-Quartz"
+    [string]$Session = "Claude-Quartz",
+    [string]$Task = "UPLOAD-FIX4"
 )
 Set-Location (Join-Path $PSScriptRoot "..\..")
 if (-not $env:ROBLOX_API_KEY) {
@@ -29,7 +30,7 @@ function Save-Progress {
     git add $ids
     git diff --cached --quiet
     if ($LASTEXITCODE -ne 0) {
-        git commit -q -m "UPLOAD-FIX3 [$Session] texture upload progress ($ok ok)" -m "Co-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>"
+        git commit -q -m "$Task [$Session] texture upload progress ($ok ok)" -m "Co-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>"
         git push -q
     }
 }
