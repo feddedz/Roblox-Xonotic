@@ -98,7 +98,7 @@
 100657704541384	image	textures/phillipk2x/decals/pk02_dec_num05_alpha.jpg	needed	Approved(gate)	?
 100665665593941	image	models/sprites/wpn-campingrifle_frame0_alpha.jpg	needed	Approved	Active
 100669064195887	image	textures/morphed/gelslime_glow.jpg	needed	Approved(gate)	?
-100672633534579	image	gfx/hud/luminos/dom_icon_yellow-highlighted.jpg	needed	Approved	Active
+100672633534579	image	gfx/hud/luminos/dom_icon_yellow-highlighted.jpg	archive	Approved	Active
 100684222500993	image	textures/trak5x/light/light_light3a_norm_alpha.jpg	needed	Approved(gate)	?
 100690695192614	image	models/sprites/item-invis_frame1.jpg	needed	Approved	Active
 100693469914876	image	textures/common/clip.jpg	needed	Approved	Active
@@ -204,7 +204,7 @@
 101343947833640	image	gfx/menu/luma/icon_aeslevel1.jpg	needed	Approved	Active
 101351614658999	image	textures/evil8_floor/e8spacecrete_norm.jpg	needed	Approved(gate)	?
 101354905166758	audio	sound/weapons/rocket_fire.ogg	needed	Approved	Active
-101357161139804	audio	sound/player/specop/coms/taunt1.ogg	superseded	Rejected	Active
+101357161139804	audio	sound/player/specop/coms/taunt1.ogg	superseded	Rejected	Archived
 101357870270824	image	textures/evil8_trim/e8trim2_blue_norm_alpha.jpg	needed	Approved(gate)	?
 101380037201368	image	models/sprites/danger_frame0.jpg	needed	Approved	Active
 101393490901241	image	textures/egyptsoc_trim/v064-03a.jpg	needed	Approved(gate)	?
@@ -230,7 +230,7 @@
 101472841658061	image	textures/trak7x/base/base_pipe1.jpg	needed	Approved(gate)	?
 101477483691127	image	textures/evil4_techtrims/dwtrim_fade2_norm_alpha.jpg	needed	Approved(gate)	?
 101478636283471	image	gfx/menu/wickedx/skinpreview.jpg	needed	Approved	Active
-101504762525363	image	gfx/hud/luminos/dom_icon_yellow.jpg	needed	Approved	Active
+101504762525363	image	gfx/hud/luminos/dom_icon_yellow.jpg	archive	Approved	Active
 101512409532918	image	textures/evil6_floors/e6grtflr2bl.jpg	needed	Approved(gate)	?
 101546882936726	audio	sound/player/reptilian/player/pain75.ogg	needed	Approved	Active
 101553057350777	image	textures/evil8_trim/e8beam02.jpg	needed	Approved(gate)	?
@@ -239,6 +239,7 @@
 101557239768843	image	gfx/hud/old/border_radar.jpg	needed	Approved	Active
 101559754463703	image	textures/evil8_trim/e8_btrim02_gloss.jpg	needed	Approved(gate)	?
 101565062165358	audio	sound/player/soldier/coms/taunt1.ogg	needed	Approved	Active
+101575073844775	image	models/desertfactory/textures/documents/writing01_alpha.jpg	needed	Approved(gate)	?
 101577078949238	image	gfx/finalrage_mini.jpg	needed	Approved	Active
 101587730383737	image	textures/evil3_metals/mtl_pipeswll_drk.jpg	needed	Approved(gate)	?
 101602313505289	image	textures/evil1_metals/rmetal1.jpg	needed	Approved(gate)	?
@@ -272,7 +273,7 @@
 101819078977705	audio	sound/weapons/crylink_fire2.ogg	needed	Approved	Active
 101821567258136	image	textures/trak4x/base/base_concrete1a.jpg	needed	Approved(gate)	?
 101832653282254	image	textures/evil8_wall/e8_mtlwall4_norm.jpg	needed	Approved(gate)	?
-101840611910938	image	gfx/hud/luminos/dom_icon_yellow-highlighted_alpha.jpg	needed	Approved	Active
+101840611910938	image	gfx/hud/luminos/dom_icon_yellow-highlighted_alpha.jpg	archive	Approved	Active
 101862111141004	image	gfx/menu/wickedx/checkbox_d0_alpha.jpg	needed	Approved	Active
 101863370032006	image	textures/facility114x/misc/lift02r.jpg	needed	Approved(gate)	?
 101863439516833	image	gfx/menu/xaw/colorbutton_f_alpha.jpg	needed	Approved	Active
@@ -421,14 +422,14 @@
 102683276612014	image	gfx/menu/luminos/icon_mod_instagib.jpg	needed	Approved	Active
 102687746773266	image	textures/spider_reflect.jpg	needed	Approved(gate)	?
 102693735499919	image	textures/Reaptxt/lud_Corona.jpg	needed	Approved	Active
-102694919490077	image	gfx/blood.jpg	needed	Approved	Active
+102694919490077	image	gfx/blood.jpg	archive	Approved	Active
 102698493454918	image	textures/map_erbium/moss_norm_alpha.jpg	needed	Approved(gate)	?
 102700628783716	image	textures/egyptsoc_trim/s128-02d_norm_alpha.jpg	needed	Approved(gate)	?
 102705757570238	audio	sound/cdtracks/x-force.ogg	needed	Approved	Active
 102708574971162	image	textures/evil8_fx/e8jumpspawn02grey_glow.jpg	needed	Approved(gate)	?
 102709885786779	image	textures/evil4_lights/l_light_b_glow.jpg	needed	Approved(gate)	?
 102723865648326	image	textures/evil1_walls/cementwall_btm2_bump.jpg	needed	Approved(gate)	?
-102724993332129	image	models/desertfactory/textures/documents/writing01_alpha.jpg	needed	Approved	Active
+102724993332129	image	models/desertfactory/textures/documents/writing01_alpha.jpg	archive	Approved	Active
 102726192278589	image	models/desertfactory/textures/metal/metal04.jpg	needed	Approved	Active
 102731643061678	image	env/med-troubadour-gray/med-troubadour-gray_dn.jpg	needed	Approved	Active
 102733348935735	image	textures/map_catharsis/catharsis_decal.jpg	needed	Approved(gate)	?
@@ -636,7 +637,7 @@
 104023852540299	image	gfx/menu/luminos/buttongray_c.jpg	needed	Approved	Active
 104031840492042	image	gfx/hud/default/flag_yellow_carrying.jpg	needed	Approved	Active
 104036019152442	image	gfx/hud/luma/flag_pink_taken.jpg	needed	Approved	Active
-104036066166958	image	textures/cp_norm.jpg	needed	Approved	Active
+104036066166958	image	textures/cp_norm.jpg	archive	Approved	Active
 104039439102243	image	maps/dance.jpg	needed	Approved	Active
 104039767760076	image	gfx/hud/default/minigames/pong/icon.jpg	needed	Approved	Active
 104040100808727	image	textures/egyptsoc_trim/064-08e.jpg	needed	Approved(gate)	?
@@ -665,7 +666,7 @@
 104210244189324	image	textures/facility114invx/trim/trim00inv.jpg	needed	Approved(gate)	?
 104214355005352	image	textures/portals/portals_red_norm_alpha.jpg	needed	Approved(gate)	?
 104220689654496	image	models/items/g_h25_luma.jpg	needed	Approved	Active
-104225085465836	image	models/desertfactory/textures/shaders/writing05.jpg	needed	Approved	Active
+104225085465836	image	models/desertfactory/textures/shaders/writing05.jpg	archive	Approved	Active
 104238174942624	image	maps/dance/lm_0013.jpg	needed	Approved	Active
 104241650707387	image	textures/egyptsoc_wall/relief04c_norm.jpg	needed	Approved(gate)	?
 104249275234623	image	textures/egyptsoc_wall/relief03d_norm_alpha.jpg	needed	Approved(gate)	?
@@ -744,6 +745,7 @@
 104620809581854	image	textures/egyptsoc_floor/jumppad1ab_norm_alpha.jpg	needed	Approved(gate)	?
 104621218643895	image	textures/evil8_floor/e8clangwarnmix_c_norm_alpha.jpg	needed	Approved(gate)	?
 104627634550314	image	textures/stralenex1/newstrip_grey.jpg	needed	Approved(gate)	?
+104628467365328	image	models/trak/tablet_xon2.jpg	needed	Approved(gate)	?
 104637943044694	image	textures/evil4_techwalls/drkmtl_dpanel.jpg	needed	Approved(gate)	?
 104639233851862	image	models/pillars/mpillar_shirt.jpg	needed	Approved	Active
 104639931091173	audio	sound/player/insurrectionist/coms/freelance1.ogg	needed	Approved	Active
@@ -780,6 +782,7 @@
 104805866457316	image	gfx/menu/xaw/slider_c_alpha.jpg	needed	Approved	Active
 104806895424697	image	textures/terrain01x/ground/sand03_alpha.jpg	needed	Approved(gate)	?
 104809231079520	image	textures/evil8_lights/e8tmtllight2_norm.jpg	needed	Approved(gate)	?
+104818230373208	image	textures/cockpit.jpg	needed	Approved(gate)	?
 104827302220350	image	gfx/crosshair59.jpg	needed	Approved	Active
 104842866952229	image	textures/trak6x/floor/floor_tile3.jpg	needed	Approved(gate)	?
 104847040660748	image	textures/exomorphx/wall/metal_wall01_reflect.jpg	needed	Approved(gate)	?
@@ -882,7 +885,7 @@
 105369217277424	image	textures/egyptsoc_sfx/lig_b064-02b_norm_alpha.jpg	needed	Approved(gate)	?
 105383352819294	image	textures/effects_beam/beam-purple.jpg	needed	Approved(gate)	?
 105386493427803	image	textures/evil8_floor/e8clangfloor03.jpg	needed	Approved(gate)	?
-105407581577747	audio	sound/player/carni-lycan/coms/teamshoot3.ogg	superseded	Rejected	Active
+105407581577747	audio	sound/player/carni-lycan/coms/teamshoot3.ogg	superseded	Rejected	Archived
 105411298785082	audio	sound/weapons/mine_stick.ogg	needed	Approved	Active
 105413995631742	image	gfx/menu/luminos/slider_f.jpg	needed	Approved	Active
 105423147280903	image	textures/evil8_trim/e8_btrim01_bump.jpg	needed	Approved(gate)	?
@@ -1197,6 +1200,7 @@
 107146645970506	image	gfx/hud/luma/tka_taken_red.jpg	needed	Approved	Active
 107160198896643	image	gfx/menu/luma/icon_ipv6_alpha.jpg	needed	Approved	Active
 107170830780308	image	textures/exomorphx/light/metal_light05_norm_alpha.jpg	needed	Approved(gate)	?
+107180465368063	image	models/desertfactory/textures/documents/note03.jpg	needed	Approved(gate)	?
 107185097688075	image	textures/evil3_support/mtlsupgrt2_light_blend.jpg	needed	Approved(gate)	?
 107185218415319	image	textures/evil4_d_techwalls/d_lighttechdoor_norm_alpha.jpg	needed	Approved(gate)	?
 107193607227444	image	models/map_xoylent/pathway.jpg	needed	Approved	Active
@@ -1215,6 +1219,7 @@
 107299921429763	image	gfx/hud/default/minigames/ps/icon.jpg	needed	Approved	Active
 107316806751019	image	textures/narmorx/base/concrete04_norm_alpha.jpg	needed	Approved(gate)	?
 107318220934339	image	textures/evil8_trim/e8_btrim02_norm.jpg	needed	Approved(gate)	?
+107322845251803	image	gfx/blood.jpg	needed	Approved(gate)	?
 107336267091550	image	textures/evil8_trim/e8_btrim04b_norm_alpha.jpg	needed	Approved(gate)	?
 107344656125460	image	textures/exomorphx/trim/trim_metal05_reflect.jpg	needed	Approved(gate)	?
 107347124873666	audio	sound/cdtracks/also-t.ogg	needed	Approved	Active
@@ -1329,6 +1334,7 @@
 108070224418337	image	textures/weapons/ok_railgun.jpg	needed	Approved(gate)	?
 108071153170680	image	textures/exx/light/light_panel01_gloss.jpg	needed	Approved(gate)	?
 108074227713605	image	textures/stralenex1/e7beam02_blue_glow.jpg	needed	Approved(gate)	?
+108075519791479	image	models/desertfactory/textures/documents/writing02_alpha.jpg	needed	Approved(gate)	?
 108087701546421	image	textures/tutorial/8.jpg	needed	Approved(gate)	?
 108093183823059	image	textures/evil1_woods/wood_pnl_drty_bump.jpg	needed	Approved(gate)	?
 108111262187892	image	textures/phillipk2x/floor/pk02_floor_cyl02_gloss.jpg	needed	Approved(gate)	?
@@ -1485,7 +1491,7 @@
 108973399326358	image	textures/trak5x/floor/floor_tile2b_gloss.jpg	needed	Approved(gate)	?
 108975923381814	image	models/turrets/walker_base.jpg	needed	Approved	Active
 108978423525689	image	gfx/hud/luma/notify_fall.jpg	archive	Approved	Active
-108978849197638	audio	sound/player/pyria-skadi/coms/taunt1.ogg	superseded	Rejected	Active
+108978849197638	audio	sound/player/pyria-skadi/coms/taunt1.ogg	superseded	Rejected	Archived
 108981915709364	image	models/weapons/g_electro_luma.jpg	needed	Approved	Active
 108981975381394	image	textures/trak5x/panel/panel_vertpanel1a_norm_alpha.jpg	needed	Approved(gate)	?
 108993401969012	image	gfx/menu/luma/scrollbar_n_alpha.jpg	needed	Approved	Active
@@ -1647,7 +1653,7 @@
 110047155928144	image	models/items/h50_reflect.jpg	needed	Approved	Active
 110049353341369	image	textures/evil8_fx/e8jumpspawn02grey-1_glow.jpg	needed	Approved(gate)	?
 110065925958300	image	textures/evil6_floors/e6c_floor_bump.jpg	needed	Approved(gate)	?
-110067246759641	image	gfx/blood_alpha.jpg	needed	Approved	Active
+110067246759641	image	gfx/blood_alpha.jpg	archive	Approved	Active
 110067838180682	image	textures/egyptsoc_trim/s064-03b_norm_alpha.jpg	needed	Approved(gate)	?
 110071569425634	image	textures/evil4_techwalls/drkmtl_dpanelwrnb_norm_alpha.jpg	needed	Approved(gate)	?
 110072073813927	image	textures/logos/logo01/logo01_purpleg_glow.jpg	needed	Approved(gate)	?
@@ -1716,6 +1722,7 @@
 110465338754027	image	textures/egyptsoc_trim/128-comb1_norm.jpg	needed	Approved(gate)	?
 110479978311304	image	textures/trak5x/trim/trim_trim6e.jpg	needed	Approved(gate)	?
 110481158086913	image	textures/egyptsoc_trim/128-02a_norm.jpg	needed	Approved(gate)	?
+110487028103509	image	gfx/leave_em_behind_mini.jpg	needed	Approved(gate)	?
 110488654252255	image	textures/wakazachi_pants.jpg	needed	Approved(gate)	?
 110489630331400	image	textures/egyptsoc_trim/s128-02c_norm.jpg	needed	Approved(gate)	?
 110493542615486	image	textures/egyptsoc_trim/v128-03c_norm.jpg	needed	Approved(gate)	?
@@ -1726,6 +1733,7 @@
 110535261479990	image	textures/terrain_data/mudground03.jpg	needed	Approved(gate)	?
 110539945980473	image	gfx/menu/wickedx/cursor_alpha.jpg	needed	Approved	Active
 110547755471178	image	textures/evil8_trim/e8support05_gloss.jpg	needed	Approved(gate)	?
+110548916471855	image	gfx/hud/old/dom_icon_yellow_alpha.jpg	needed	Approved(gate)	?
 110559535726635	image	textures/shellsammo_norm.jpg	needed	Approved(gate)	?
 110559701204347	image	textures/egyptsoc_trim/256-04d_norm_alpha.jpg	needed	Approved(gate)	?
 110565830441804	image	textures/stralenex1/stralenex_roundlight_glow.jpg	needed	Approved(gate)	?
@@ -1741,11 +1749,12 @@
 110641868341470	audio	sound/player/insurrectionist/coms/teamshoot3.ogg	needed	Approved	Active
 110647560510486	image	gfx/hud/default/minigames/pp/board.jpg	needed	Approved	Active
 110652647454644	image	textures/egyptsoc_sfx/lig_128-05y1.jpg	needed	Approved(gate)	?
+110672591444879	image	textures/cp_norm_alpha.jpg	needed	Approved(gate)	?
 110679264478670	image	cubemaps/default/skyny.jpg	needed	Approved	Active
 110687742730818	image	textures/dsi/tlight.blend.jpg	needed	Approved(gate)	?
 110696797442094	image	textures/trak5x/wall/wall_wall3b_gloss.jpg	needed	Approved(gate)	?
 110697897239321	image	textures/exx/panel/panel_rs01_norm_alpha.jpg	needed	Approved(gate)	?
-110702541225803	image	models/race/checkpoint/outerring.jpg	needed	Approved	Active
+110702541225803	image	models/race/checkpoint/outerring.jpg	archive	Approved	Active
 110710878698016	image	gfx/menu/wickedx/checkmark.jpg	needed	Approved	Active
 110713111168076	image	gfx/menu/luma/nopreview_menuskin.jpg	needed	Approved	Active
 110713306897503	audio	sound/vehicles/raptor_fly.ogg	needed	Approved	Active
@@ -1818,7 +1827,7 @@
 111146296109541	image	gfx/hud/luma/health_medium_alpha.jpg	needed	Approved	Active
 111147650338847	image	textures/map_boil/credit_alpha.jpg	needed	Approved(gate)	?
 111149350339938	image	models/weapons/g_uzi_simple.jpg	needed	Approved	Active
-111150131544914	image	models/trak/tablet_xon2.jpg	needed	Approved	Active
+111150131544914	image	models/trak/tablet_xon2.jpg	archive	Approved	Active
 111158672846702	image	gfx/hud/luma/notify_ballpickedup_alpha.jpg	needed	Approved	Active
 111160408505544	image	textures/portals/portals_blue.jpg	needed	Approved(gate)	?
 111167622339338	audio	sound/player/pyria-skadi/coms/meet.ogg	needed	Approved	Active
@@ -1915,6 +1924,7 @@
 111649943280911	image	models/xonotic_jumppad01/launchpad2lod_orange_alpha.jpg	needed	Approved	Active
 111655514362997	image	textures/exomorphx/floor/metal_floor04a.jpg	needed	Approved(gate)	?
 111672338243981	image	textures/evil8_trim/e8wrntrim_norm.jpg	needed	Approved(gate)	?
+111678474142111	image	models/trak/tablet_xon0.jpg	needed	Approved(gate)	?
 111679409667427	image	models/desertfactory/textures/misc/white01.jpg	needed	Approved	Active
 111679729323752	image	textures/evil6_lights/e6horzovallight_glow.jpg	needed	Approved(gate)	?
 111685715129408	image	textures/egyptsoc_trim/064-06d_norm_alpha.jpg	needed	Approved(gate)	?
@@ -2067,7 +2077,7 @@
 112517044467785	image	textures/evil4_metals/mtldoor_norm_alpha.jpg	needed	Approved(gate)	?
 112531494696323	image	textures/evil8_floor/e8clangfloor01_norm.jpg	needed	Approved(gate)	?
 112539588886551	image	textures/e7/e7panelwood.jpg	needed	Approved(gate)	?
-112550785271454	image	textures/cp_norm_alpha.jpg	needed	Approved	Active
+112550785271454	image	textures/cp_norm_alpha.jpg	archive	Approved	Active
 112576121624624	image	textures/exomorphx/wall/metal_panel05_blue_norm.jpg	needed	Approved(gate)	?
 112583560504342	image	textures/effects_item/respawnring-black-highres_alpha.jpg	needed	Approved(gate)	?
 112586994401732	image	textures/evil8_lights/e8tmtllight2_glow.jpg	needed	Approved(gate)	?
@@ -2422,6 +2432,7 @@
 114550573669827	image	env/extragalactic/asteroids_dn.jpg	needed	Approved	Active
 114557736770207	image	textures/egyptsoc_floor/grate2a_norm.jpg	needed	Approved(gate)	?
 114569354018593	image	textures/e8/e8trimlight2_glow.jpg	needed	Approved(gate)	?
+114576540450765	image	models/desertfactory/textures/documents/writing05_alpha.jpg	needed	Approved(gate)	?
 114592242885123	image	models/desertfactory/textures/wood/filling01.jpg	needed	Approved	Active
 114594787957495	image	textures/egyptsoc_trim/s064-04a_norm_alpha.jpg	needed	Approved(gate)	?
 114596763474021	image	textures/evil1_floors/br_tiles_broke_bump.jpg	needed	Approved(gate)	?
@@ -2435,6 +2446,7 @@
 114636428117864	image	gfx/crosshair35_alpha.jpg	needed	Approved	Active
 114638045918945	image	textures/egyptsoc_sfx/lig_064-01y2_norm_alpha.jpg	needed	Approved(gate)	?
 114641542348453	image	textures/evil6_floors/e6l_floor.jpg	needed	Approved(gate)	?
+114643700368183	image	models/race/checkpoint/outerring_bump.jpg	needed	Approved(gate)	?
 114657650132253	image	textures/exx/floor/floor_grate02_norm_alpha.jpg	needed	Approved(gate)	?
 114660314092048	image	gfx/hud/luma/weapon_ammo_alpha.jpg	needed	Approved	Active
 114666372066099	image	gfx/hud/luma/border_fading_east_alpha.jpg	needed	Approved	Active
@@ -2494,7 +2506,7 @@
 114983043431388	image	textures/skies/polluted_earth.jpg	needed	Approved(gate)	?
 114985427465787	image	textures/facility114invx/misc/lift01inv_gloss.jpg	needed	Approved(gate)	?
 114993294859474	image	textures/alphamod/alpha_087.jpg	needed	Approved	Active
-114996070666957	image	gfx/hud/old/dom_icon_yellow_alpha.jpg	needed	Approved	Active
+114996070666957	image	gfx/hud/old/dom_icon_yellow_alpha.jpg	archive	Approved	Active
 115010336930300	image	env/exomorph/exomorphnz.jpg	needed	Approved	Active
 115010393621057	image	models/weapons/g_porto_luma_alpha.jpg	needed	Approved	Active
 115013253433863	image	textures/terrain_data/mudground02_alpha.jpg	needed	Approved(gate)	?
@@ -2581,7 +2593,7 @@
 115499969809001	image	models/items/g_jetpack_luma.jpg	needed	Approved	Active
 115500467118376	image	models/turrets/r_fx1_1.jpg	needed	Approved	Active
 115510775739870	image	textures/phillipk2x/pipes/pk02_pipes01_norm.jpg	needed	Approved(gate)	?
-115512202824690	image	textures/cmp1-dm8/e8circle_pur.jpg	needed	Approved	Active
+115512202824690	image	textures/cmp1-dm8/e8circle_pur.jpg	archive	Approved	Active
 115515743658825	image	models/it/lcd_norm_alpha.jpg	needed	Approved	Active
 115525223244862	image	textures/evil2_basewall/mtl_gray.jpg	needed	Approved(gate)	?
 115530775163353	image	textures/egyptsoc_sfx/lig_128-05r2.jpg	needed	Approved(gate)	?
@@ -2651,7 +2663,7 @@
 115892917084462	image	textures/evil1_trims/trim_wallpaper.jpg	needed	Approved(gate)	?
 115897220049030	image	textures/trak5x/trim/trim_vert1.jpg	needed	Approved(gate)	?
 115902389539606	image	textures/evil6_trims/e6basegrt_smll_bump.jpg	needed	Approved(gate)	?
-115904010373924	image	models/desertfactory/textures/documents/note03.jpg	needed	Approved	Active
+115904010373924	image	models/desertfactory/textures/documents/note03.jpg	archive	Approved	Active
 115905575069223	image	textures/egyptsoc_floor/solidgrate2a_norm_alpha.jpg	needed	Approved(gate)	?
 115907534040896	image	textures/exx/panel/panel_metal04.jpg	needed	Approved(gate)	?
 115908254225662	image	textures/trak4x/decal/decal_paperdecal_alpha.jpg	needed	Approved(gate)	?
@@ -2778,6 +2790,7 @@
 116653955722920	image	textures/generator_destroyed.jpg	needed	Approved(gate)	?
 116655529571477	image	textures/evil4_techwalls/tech_drkwall_cutr_norm_alpha.jpg	needed	Approved(gate)	?
 116658005223151	image	textures/logos/logo03/logo03_greeng.jpg	needed	Approved(gate)	?
+116658280428268	image	models/desertfactory/textures/shaders/writing01.jpg	needed	Approved(gate)	?
 116658483268452	image	env/stralenex5/stralenex5_dn.jpg	needed	Approved	Active
 116668246697521	image	models/turrets/mlrs_norm.jpg	needed	Approved	Active
 116685368917332	image	gfx/crosshair57.jpg	needed	Approved	Active
@@ -2938,6 +2951,7 @@
 117580392568530	image	textures/trak7x/floor/floor_tile1_norm.jpg	needed	Approved(gate)	?
 117581290684663	image	textures/trak5x/floor/floor_tile2a.jpg	needed	Approved(gate)	?
 117582402330788	image	textures/evil2_basewall/t_wll_fnctrm.jpg	needed	Approved(gate)	?
+117591910204618	image	textures/cake/pipe1d_msg.jpg	needed	Approved(gate)	?
 117593196156639	image	textures/evil3_metals/mtl_pipeswll_drk_bump.jpg	needed	Approved(gate)	?
 117599056121680	image	textures/trak4x/wall/wall_plaster3b-2.jpg	needed	Approved(gate)	?
 117608245982029	image	gfx/menu/luma/scrollbar_c.jpg	needed	Approved	Active
@@ -3052,7 +3066,7 @@
 118235194476981	image	textures/evil1_walls/ancient3.jpg	needed	Approved(gate)	?
 118243272709346	image	textures/morphed/flagred.jpg	needed	Approved(gate)	?
 118244493129525	image	textures/egyptsoc_wall/stone10a_norm.jpg	needed	Approved(gate)	?
-118245371403016	image	models/race/checkpoint/outerring_bump.jpg	needed	Approved	Active
+118245371403016	image	models/race/checkpoint/outerring_bump.jpg	archive	Approved	Active
 118247550966847	image	textures/cmp1-dm8/e8support06c.jpg	needed	Approved	Active
 118253820021782	image	textures/exx/floor/floor_wrn01-blue_norm.jpg	needed	Approved(gate)	?
 118254168988788	image	textures/narmorx/base/concrete02_norm_alpha.jpg	needed	Approved(gate)	?
@@ -3234,7 +3248,7 @@
 119276934543643	image	textures/kaznexctf2/large_red_glow.jpg	needed	Approved(gate)	?
 119280808232066	image	textures/egyptsoc_wall/stone03b.jpg	needed	Approved(gate)	?
 119286450468371	image	textures/egyptsoc_trimd/128-04cr.jpg	needed	Approved(gate)	?
-119286752435446	image	models/desertfactory/textures/shaders/writing01.jpg	needed	Approved	Active
+119286752435446	image	models/desertfactory/textures/shaders/writing01.jpg	archive	Approved	Active
 119290596305528	audio	sound/player/pyria-skadi/coms/defend.ogg	needed	Approved	Active
 119297459200361	image	textures/exx/panel/panel_metalbig04b_norm_alpha.jpg	needed	Approved(gate)	?
 119299320103186	image	gfx/menu/luma/checkbox_c1.jpg	needed	Approved	Active
@@ -3280,7 +3294,7 @@
 119538648988114	image	textures/evil4_techwalls/drkmtlsupport_alpha_norm_alpha.jpg	needed	Approved(gate)	?
 119543754086153	image	darkplaces-icon4.jpg	needed	Approved	Active
 119545349509270	image	textures/phillipk2x/walls/pk02_wall_big02a.jpg	needed	Approved(gate)	?
-119550120789860	audio	sound/player/soldier/coms/meet.ogg	superseded	Rejected	Active
+119550120789860	audio	sound/player/soldier/coms/meet.ogg	superseded	Rejected	Archived
 119565406773309	image	textures/ac.jpg	needed	Approved	Active
 119570026082646	audio	sound/machines/Machine-Vat-Mix.ogg	needed	Approved	Active
 119575884219133	image	textures/evil4_d_techwalls/d_tech_wall_dlight.jpg	needed	Approved(gate)	?
@@ -3649,12 +3663,12 @@
 121650875034914	image	textures/map_techassault/crate24_gloss.jpg	needed	Approved(gate)	?
 121655160010880	image	textures/trak5x/light/light_light1c_glow.jpg	needed	Approved(gate)	?
 121670013066970	audio	sound/thunder/Thunder-Reverse-Loop.ogg	needed	Approved	Active
-121676805627720	audio	sound/player/carni-lycan/coms/needhelp2.ogg	superseded	Rejected	Active
+121676805627720	audio	sound/player/carni-lycan/coms/needhelp2.ogg	superseded	Rejected	Archived
 121691845553308	image	textures/egyptsoc_trim/128-05h_norm_alpha.jpg	needed	Approved(gate)	?
 121706198157005	image	gfx/hud/luma/weaponlaser_alpha.jpg	needed	Approved	Active
 121721811538650	image	textures/trak5x/panel/panel_crate1e.jpg	needed	Approved(gate)	?
 121722310476843	image	textures/stein1x/wall/wall_cement03_norm_alpha.jpg	needed	Approved(gate)	?
-121722793310786	image	textures/alphamod/alpha_014.jpg	needed	Approved	Active
+121722793310786	image	textures/alphamod/alpha_014.jpg	archive	Approved	Active
 121724200772942	image	textures/evil4_metals/mtlpanel_wrnstripe.jpg	needed	Approved(gate)	?
 121727126253629	image	textures/techpanelx/panel/panel_tech3.jpg	needed	Approved(gate)	?
 121733115015287	image	textures/evil8_floor/e8clangwarnmix_b.jpg	needed	Approved(gate)	?
@@ -3670,7 +3684,7 @@
 121791481233283	image	textures/ex2x/floor/floor_h3.jpg	needed	Approved(gate)	?
 121793078279210	image	textures/evil2_basewall/mtl_fnce2.jpg	needed	Approved(gate)	?
 121795817863305	image	textures/exomorphx/floor/metal_panel_floor02_norm_alpha.jpg	needed	Approved(gate)	?
-121804908035435	image	models/vehicles/rockets.jpg	needed	Approved	Active
+121804908035435	image	models/vehicles/rockets.jpg	archive	Approved	Active
 121825993608901	image	env/green_dark/green_dark_dn.jpg	needed	Approved	Active
 121828772366283	image	textures/trak4x/wall/wall_brick2_norm_alpha.jpg	needed	Approved(gate)	?
 121830875863614	image	gfx/menu/xaw/scrollbar_c_alpha.jpg	needed	Approved	Active
@@ -3833,14 +3847,14 @@
 122804178337802	audio	sound/misc/armor1.ogg	needed	Approved	Active
 122808390102545	image	textures/raptor_gloss.jpg	needed	Approved(gate)	?
 122809803328387	image	textures/narmorx/base/concrete07_blue_norm_alpha.jpg	needed	Approved(gate)	?
-122818506705835	audio	sound/player/marine/coms/teamshoot3.ogg	superseded	Rejected	Active
+122818506705835	audio	sound/player/marine/coms/teamshoot3.ogg	superseded	Rejected	Archived
 122819191447377	image	textures/exomorphx/panel/metal_panel05_blue_reflect.jpg	needed	Approved(gate)	?
 122828212137264	image	models/items/g_strength_simple_alpha.jpg	needed	Approved	Active
 122828533690059	image	maps/runningmanctf/lm_0005.jpg	needed	Approved	Active
 122828726218783	image	textures/e7/e7dimfloor_ow_alpha.jpg	needed	Approved(gate)	?
 122830390307865	image	gfx/crosshair64_alpha.jpg	needed	Approved	Active
 122838791852602	image	textures/exomorphx/base/metal01_blue.jpg	needed	Approved(gate)	?
-122843929476543	audio	sound/player/soldier/coms/meet.ogg	superseded	Rejected	Active
+122843929476543	audio	sound/player/soldier/coms/meet.ogg	superseded	Rejected	Archived
 122846300427372	image	textures/egyptsoc_sfx/lig_064-06w1_norm.jpg	needed	Approved(gate)	?
 122846622487875	image	textures/phillipk2x/walls/pk02_wall_big02b_gloss.jpg	needed	Approved(gate)	?
 122853058808839	image	textures/evil8_wall/e8_mtlwall3b.jpg	needed	Approved(gate)	?
@@ -4050,7 +4064,7 @@
 124073072222939	image	maps/dance/lm_0000.jpg	needed	Approved	Active
 124074055216009	image	textures/evil6_lights/e6platelight.jpg	needed	Approved(gate)	?
 124079661179785	image	textures/evil4_metals/stepgrl.jpg	needed	Approved(gate)	?
-124083994490808	audio	sound/player/soldier/coms/taunt2.ogg	superseded	Rejected	Active
+124083994490808	audio	sound/player/soldier/coms/taunt2.ogg	superseded	Rejected	Archived
 124091139557592	image	textures/egyptsoc_trimd/v128-02cr_norm.jpg	needed	Approved(gate)	?
 124096716827855	image	textures/egyptsoc_trimd/s064-02cd.jpg	needed	Approved(gate)	?
 124101931483879	image	textures/evil8_floor/e8warning2step.jpg	needed	Approved(gate)	?
@@ -4256,6 +4270,7 @@
 125229399696854	image	textures/egyptsoc_trim/256-04a_norm_alpha.jpg	needed	Approved(gate)	?
 125236447433946	image	textures/cmp1-dm8/e8tinylightpur.jpg	needed	Approved	Active
 125248968135049	image	textures/trak4x/floor/floor_tile2a_norm.jpg	needed	Approved(gate)	?
+125277690023475	image	textures/cp_norm.jpg	needed	Approved(gate)	?
 125278046552218	image	gfx/crosshairrocketlauncher.jpg	needed	Approved	Active
 125283232243182	image	textures/evil3_floors/cemdrk_oddtile_bldb_gloss.jpg	needed	Approved(gate)	?
 125292887213696	image	models/vehicles/rockets_glow.jpg	needed	Approved	Active
@@ -4447,7 +4462,7 @@
 126327076499919	image	textures/egyptsoc_trim/128-05e.jpg	needed	Approved(gate)	?
 126327181747327	image	textures/egyptsoc_sfx/lig_b064-03d_norm.jpg	needed	Approved(gate)	?
 126342502477114	image	textures/trak5x/trim/trim_trim3a_norm.jpg	needed	Approved(gate)	?
-126343043765537	audio	sound/player/soldier/coms/meet.ogg	superseded	Rejected	Active
+126343043765537	audio	sound/player/soldier/coms/meet.ogg	superseded	Rejected	Archived
 126365884811662	image	textures/common/donotenter.jpg	needed	Approved	Active
 126367357662821	image	textures/exomorphx/trim/trim_metal07a_norm.jpg	needed	Approved(gate)	?
 126368436254110	image	textures/evil8_wall/e8_mtlwall3b_norm.jpg	needed	Approved(gate)	?
@@ -4756,6 +4771,7 @@
 128302039021061	image	env/desert/desert_up.jpg	needed	Approved	Active
 128309264566512	image	textures/exomorphx/light/metal_light03_norm_alpha.jpg	needed	Approved(gate)	?
 128309478347931	image	textures/narmorx/base/concrete05_blue_gloss.jpg	needed	Approved(gate)	?
+128313032120139	image	textures/alphamod/alpha_088.jpg	needed	Approved(gate)	?
 128314473179925	image	textures/metaltechx/wall/aluyellow_gloss.jpg	needed	Approved(gate)	?
 128335372166631	image	textures/egyptsoc_floor/marker1bg_norm_alpha.jpg	needed	Approved(gate)	?
 128335419865406	image	textures/egyptsoc_sfx/lig_032-03w2_norm_alpha.jpg	needed	Approved(gate)	?
@@ -4764,7 +4780,7 @@
 128352842400449	image	textures/evil6_floors/e6c_floor_b_bump.jpg	needed	Approved(gate)	?
 128356539536887	image	textures/trak5x/panel/panel_grate2a_norm_alpha.jpg	needed	Approved(gate)	?
 128359551756223	image	textures/egyptsoc_sfx/lig_064-01w2_norm_alpha.jpg	needed	Approved(gate)	?
-128361450716495	image	textures/cake/pipe1d_msg.jpg	needed	Approved	Active
+128361450716495	image	textures/cake/pipe1d_msg.jpg	archive	Approved	Active
 128369980343592	image	textures/exx/trim/trim_horz01_gloss.jpg	needed	Approved(gate)	?
 128372068172621	image	textures/effects_lightning/lightning1/3.jpg	needed	Approved(gate)	?
 128376900166956	image	gfx/menu/luma/icon_pure1.jpg	needed	Approved	Active
@@ -5215,12 +5231,14 @@
 131046222043542	image	textures/exomorphx/floor/metal_floor04a_norm_alpha.jpg	needed	Approved(gate)	?
 131064511696550	image	textures/evil6_trims/e6symbol_b.jpg	needed	Approved(gate)	?
 131084464241816	image	textures/trak4x/wall/wall_plaster3c-2.jpg	needed	Approved(gate)	?
+131084948692303	image	textures/cp_glow.jpg	needed	Approved(gate)	?
 131086822900755	image	models/sprites/wpn-rl_frame0.jpg	needed	Approved	Active
 131089459709752	audio	sound/player/espeak/coms/freelance.ogg	needed	Approved	Active
 131090661630445	audio	sound/weapons/grenade_bounce3.ogg	needed	Approved	Active
 131095523698823	image	textures/evil2_basemetal/p_mtl_brn_gloss.jpg	needed	Approved(gate)	?
 131100778984837	image	textures/evil6_floors/e6bsegrtflr128.jpg	needed	Approved(gate)	?
 131108582236949	image	textures/egyptsoc_sfx/lig_064-05y1.jpg	needed	Approved(gate)	?
+131135773208925	image	models/vehicles/rockets.jpg	needed	Approved(gate)	?
 131139511647683	image	models/it/chair_norm.jpg	needed	Approved	Active
 131143973565892	image	textures/terrain01x/ground/barren02_alpha.jpg	needed	Approved(gate)	?
 131153506165149	audio	sound/object/impact_wood_1.ogg	needed	Approved	Active
@@ -5360,6 +5378,7 @@
 131832931045773	image	textures/facility114invx/trim/trim01inv_gloss.jpg	needed	Approved(gate)	?
 131841413082664	image	textures/map_geoplanetary/wiz1_4_gloss.jpg	needed	Approved(gate)	?
 131845800332966	image	textures/egyptsoc_floor/block04a_norm_alpha.jpg	needed	Approved(gate)	?
+131845903221367	image	textures/cockpit_glow.jpg	needed	Approved(gate)	?
 131854712739807	image	textures/techpanelx/panel/panel_tech1b_norm_alpha.jpg	needed	Approved(gate)	?
 131865981667105	image	textures/egyptsoc_trim/048-02c_norm_alpha.jpg	needed	Approved(gate)	?
 131870661409231	image	gfx/hud/luma/race_newfail.jpg	needed	Approved	Active
@@ -5413,6 +5432,7 @@
 132238042897423	image	models/map/forklift_gloss.jpg	needed	Approved	Active
 132245958653815	image	models/turrets/mlrs_glow.jpg	needed	Approved	Active
 132246540238207	image	gfx/menu/luminos/checkbox_d0.jpg	needed	Approved	Active
+132260470712903	image	gfx/hud/old/dom_icon_yellow.jpg	needed	Approved(gate)	?
 132270991429720	image	textures/ons_icon.jpg	needed	Approved(gate)	?
 132279631063755	image	gfx/hud/default/notify_slime.jpg	needed	Approved	Active
 132281195641232	image	textures/evil8_trim/e8support04b_red.jpg	needed	Approved(gate)	?
@@ -5446,7 +5466,7 @@
 132461345747834	image	textures/ex2x/base/base_chainlink_gloss.jpg	needed	Approved(gate)	?
 132462020848907	image	textures/phillipk2x/pipes/pk02_pipes01.jpg	needed	Approved(gate)	?
 132465044223131	image	textures/ons_pad_pants.jpg	needed	Approved(gate)	?
-132465057074044	image	textures/cp_glow.jpg	needed	Approved	Active
+132465057074044	image	textures/cp_glow.jpg	archive	Approved	Active
 132466299167152	image	textures/trak5x/floor/floor_floor1a.jpg	needed	Approved(gate)	?
 132470685770648	image	textures/evil8_wall/e8_mtlwall1b.jpg	needed	Approved(gate)	?
 132478318548202	image	textures/proceduralx/wall/fruitconcrete_blue_norm_alpha.jpg	needed	Approved(gate)	?
@@ -5757,6 +5777,7 @@
 134475452535053	image	gfx/menu/luma/icon_stats1.jpg	needed	Approved	Active
 134476893707696	image	textures/phillipk2x/walls/pk02_wall02a_gloss.jpg	needed	Approved(gate)	?
 134478987332383	image	gfx/menu/luma/gametype_ca.jpg	needed	Approved	Active
+134479969955531	image	textures/alphamod/alpha_014.jpg	needed	Approved(gate)	?
 134485704030602	audio	sound/player/reptilian/coms/taunt1.ogg	needed	Approved	Active
 134485911797524	image	gfx/menu/xaw/clearbutton_n.jpg	needed	Approved	Active
 134486642731215	image	textures/egyptsoc_sfx/lig_032-01r1_norm_alpha.jpg	needed	Approved(gate)	?
@@ -5998,7 +6019,7 @@
 135842658667074	image	textures/egyptsoc_trim/128-03a_norm_alpha.jpg	needed	Approved(gate)	?
 135851114192277	image	textures/exx/base/base_metal01.jpg	needed	Approved(gate)	?
 135860593554386	image	gfx/crosshair45_alpha.jpg	needed	Approved	Active
-135871780293023	image	gfx/hud/old/armor.jpg	needed	Approved	Active
+135871780293023	image	gfx/hud/old/armor.jpg	archive	Approved	Active
 135873485257070	image	gfx/hud/luma/notify_selfkill.jpg	needed	Approved	Active
 135876788747188	image	textures/evil4_lights/l_light_g_norm.jpg	needed	Approved(gate)	?
 135876852406305	audio	sound/weapons/rocket_fly.ogg	needed	Approved	Active
@@ -6042,6 +6063,7 @@
 136126565163282	image	textures/egyptsoc_sfx/lig_b064-01c_norm_alpha.jpg	needed	Approved(gate)	?
 136135133401294	image	textures/portals/portals_red_vortex.jpg	needed	Approved(gate)	?
 136141567282225	image	textures/map_erbium/large-turbine.jpg	needed	Approved(gate)	?
+136142333854455	image	models/desertfactory/textures/shaders/writing05.jpg	needed	Approved(gate)	?
 136151707661396	audio	sound/weapons/fireball_fire.ogg	needed	Approved	Active
 136159314712910	image	textures/evil4_lights/mtl_l1_norm_alpha.jpg	needed	Approved(gate)	?
 136162777883251	image	textures/egyptsoc_sfx/lig_064-04y2_norm.jpg	needed	Approved(gate)	?
@@ -6150,7 +6172,7 @@
 136727999421597	image	textures/evil8_trim/e8supporttrim01.jpg	needed	Approved(gate)	?
 136728483693374	image	textures/map_erbium/fern_gloss.jpg	needed	Approved(gate)	?
 136733188924780	image	textures/trak5x/wall/wall_wall1a_norm.jpg	needed	Approved(gate)	?
-136741641248208	image	textures/alphamod/alpha_069.jpg	needed	Approved	Active
+136741641248208	image	textures/alphamod/alpha_069.jpg	archive	Approved	Active
 136753269365328	image	textures/evil4_d_techwalls/d_tech_dwteky_norm_alpha.jpg	needed	Approved(gate)	?
 136762647205334	image	textures/hook_gloss.jpg	needed	Approved(gate)	?
 136770639726831	image	textures/evil4_techwalls/drkmtl_dpanelwrnb2_norm_alpha.jpg	needed	Approved(gate)	?
@@ -6196,6 +6218,7 @@
 136981524547432	image	textures/evil3_roofs/ceil-crkd_big.jpg	needed	Approved(gate)	?
 136986838268875	image	textures/stein1x/wall/wall_cement02_gloss.jpg	needed	Approved(gate)	?
 136990930213200	image	models/items/a_rockets_luma.jpg	needed	Approved	Active
+136998157399887	image	gfx/hud/old/dom_icon_yellow-highlighted.jpg	needed	Approved(gate)	?
 137001652171850	image	textures/proceduralx/pattern/tiles05_norm.jpg	needed	Approved(gate)	?
 137021569078081	image	textures/egyptsoc_sfx/lig_064-02y1_glow.jpg	needed	Approved(gate)	?
 137029051484946	image	textures/evil1_trims/trim_mtlb.jpg	needed	Approved(gate)	?
@@ -6291,7 +6314,7 @@
 137566636629377	image	models/weapons/g_crylink_luma.jpg	needed	Approved	Active
 137570945091340	image	textures/alphamod/alpha_038.jpg	needed	Approved	Active
 137572118407644	image	textures/egyptsoc_sfx/lig_b064-01c_glow.jpg	needed	Approved(gate)	?
-137572817661785	image	textures/cp.jpg	needed	Approved	Active
+137572817661785	image	textures/cp.jpg	archive	Approved	Active
 137590753372309	image	textures/phillipk2x/pipes/pk02_pipes01_glow.jpg	needed	Approved(gate)	?
 137601593121371	image	textures/exomorphx/trim/trim_metal04_dark_norm_alpha.jpg	needed	Approved(gate)	?
 137603758950901	image	models/xonotic_jumppad01/jumpglow_p.jpg	needed	Approved	Active
@@ -6341,7 +6364,7 @@
 137930385470630	image	textures/evil4_metals/drkmtl_default.jpg	needed	Approved(gate)	?
 137938111932618	image	textures/stein1x/trim/trim_peeling01_gloss.jpg	needed	Approved(gate)	?
 137944299622557	image	textures/map_implosion/code.jpg	needed	Approved(gate)	?
-137959453837292	image	textures/cp_gloss.jpg	needed	Approved	Active
+137959453837292	image	textures/cp_gloss.jpg	archive	Approved	Active
 137969875119185	image	textures/trak6x/wall/wall_wall6_norm_alpha.jpg	needed	Approved(gate)	?
 137970321697628	image	gfx/hud/luma/nexball_carrying_alpha.jpg	needed	Approved	Active
 137982651505319	image	textures/e7/e7beam02_bump.jpg	needed	Approved(gate)	?
@@ -6361,7 +6384,7 @@
 138047314776243	image	models/containers/barrel01.jpg	needed	Approved	Active
 138050701779488	image	textures/egyptsoc_floor/grate2b_norm_alpha.jpg	needed	Approved(gate)	?
 138051356725485	image	textures/egyptsoc_floor/solidgrate3b_norm.jpg	needed	Approved(gate)	?
-138056794401669	image	models/desertfactory/textures/documents/newspaper01.jpg	needed	Approved	Active
+138056794401669	image	models/desertfactory/textures/documents/newspaper01.jpg	archive	Approved	Active
 138067952360418	image	textures/evil8_trim/e8trimlight2_red_norm_alpha.jpg	needed	Approved(gate)	?
 138072179995463	image	textures/portals/portals_blue_glow.jpg	needed	Approved(gate)	?
 138074060543372	image	gfx/hud/luma/ammo_bullets.jpg	needed	Approved	Active
@@ -6395,6 +6418,7 @@
 138294168929149	audio	sound/water/Pipe_Water.ogg	needed	Approved	Active
 138296919873859	image	textures/exx/trim/trim_steptop01_norm.jpg	needed	Approved(gate)	?
 138308888905198	image	env/distant_sunset/distant_sunset_lf.jpg	needed	Approved	Active
+138320664723634	image	gfx/hud/old/dom_icon_yellow-highlighted_alpha.jpg	needed	Approved(gate)	?
 138325668673948	image	gfx/hud/luma/strength.jpg	needed	Approved	Active
 138327021541082	image	textures/trak5x/floor/floor_tile1d.jpg	needed	Approved(gate)	?
 138335305072844	image	textures/evil9/9screen01.jpg	needed	Approved(gate)	?
@@ -6642,7 +6666,7 @@
 139889072478200	image	models/weapons/g_porto_simple_alpha.jpg	needed	Approved	Active
 139890080832224	image	gfx/hud/luma/armor_mega_alpha.jpg	needed	Approved	Active
 139893511446666	image	textures/egyptsoc_wall/stone11d_norm.jpg	needed	Approved(gate)	?
-139898858670215	image	textures/cockpit_glow.jpg	needed	Approved	Active
+139898858670215	image	textures/cockpit_glow.jpg	archive	Approved	Active
 139899522342584	image	maps/xoylent.jpg	needed	Approved	Active
 139904504319304	image	textures/alphamod/alpha_049.jpg	needed	Approved	Active
 139905813421756	audio	sound/player/espeak/player/death.ogg	needed	Approved	Active
@@ -7006,7 +7030,7 @@
 71679262027444	image	gfx/hud/default/weaponcrylink.jpg	needed	Approved	Active
 71682299403773	image	gfx/menu/xaw/checkbox_c1.jpg	needed	Approved	Active
 71683549917304	image	textures/evil4_techfloors/tfloor4_norm_alpha.jpg	needed	Approved(gate)	?
-71699447678506	image	gfx/leave_em_behind_mini.jpg	needed	Approved	Active
+71699447678506	image	gfx/leave_em_behind_mini.jpg	archive	Approved	Active
 71717379619207	image	textures/egyptsoc_mat/wood18.jpg	needed	Approved(gate)	?
 71720626930859	audio	sound/player/insurrectionist/coms/freelance2.ogg	needed	Approved	Active
 71722283098243	image	textures/facility114invx/wall/corridor01invr.jpg	needed	Approved(gate)	?
@@ -7174,7 +7198,7 @@
 72754636557079	image	textures/wyvern.jpg	needed	Approved(gate)	?
 72755927823997	image	textures/evil4_metals/defaultmetal.jpg	needed	Approved(gate)	?
 72758605407771	image	textures/map_erbium/leaves.jpg	needed	Approved(gate)	?
-72772579262142	audio	sound/player/pyria-skadi/coms/taunt5.ogg	superseded	Rejected	Active
+72772579262142	audio	sound/player/pyria-skadi/coms/taunt5.ogg	superseded	Rejected	Archived
 72782180398928	image	textures/map_solarium/water4/water4.jpg	needed	Approved(gate)	?
 72788933258805	audio	sound/player/reptilian/coms/defend.ogg	needed	Approved	Active
 72794223415782	image	textures/evil2_basewall/t_wll_fnctrm_sign_bump.jpg	needed	Approved(gate)	?
@@ -7233,7 +7257,9 @@
 73118465872700	image	textures/evil8_trim/e8_btrim01b_gloss.jpg	needed	Approved(gate)	?
 73126090992402	image	models/weapons/akordeon.jpg	needed	Approved	Active
 73130509626046	image	models/items/item_armor_large_simple.jpg	needed	Approved	Active
+73131119701276	image	gfx/hud/luminos/dom_icon_yellow-highlighted_alpha.jpg	needed	Approved(gate)	?
 73136070001958	image	gfx/menu/wickedx/bigbutton_c.jpg	needed	Approved	Active
+73137878724293	image	textures/cp.jpg	needed	Approved(gate)	?
 73142818060059	image	textures/nexgun_gloss.jpg	needed	Approved(gate)	?
 73148539709813	image	textures/egyptsoc_trimd/v128-01dr_norm_alpha.jpg	needed	Approved(gate)	?
 73161526091541	image	textures/exx/wall/wall_u207_norm_alpha.jpg	needed	Approved(gate)	?
@@ -7273,7 +7299,7 @@
 73343349765859	image	textures/evil8_wall/e8crete_pillarb_norm.jpg	needed	Approved(gate)	?
 73352100643938	audio	sound/weapons/dryfire.ogg	needed	Approved	Active
 73364242690387	image	env/polluted_earth/polluted_earth_up.jpg	needed	Approved	Active
-73377876846964	image	models/trak/tablet_xon0.jpg	needed	Approved	Active
+73377876846964	image	models/trak/tablet_xon0.jpg	archive	Approved	Active
 73379192267709	image	textures/trak4x/wall/wall_brick2.jpg	needed	Approved(gate)	?
 73383827730118	image	textures/dsi_textures/dablue_0000.jpg	needed	Approved(gate)	?
 73395534776445	image	textures/egyptsoc_trimd/s064-02dr_norm.jpg	needed	Approved(gate)	?
@@ -7291,7 +7317,7 @@
 73489738380404	image	textures/trak6x/misc/misc_greeble_norm_alpha.jpg	needed	Approved(gate)	?
 73492238786066	image	gfx/hud/old/race_newrankgreen.jpg	needed	Approved	Active
 73494213564108	image	textures/evil4_walls/d_stonewll_drk_gloss.jpg	needed	Approved(gate)	?
-73495280635873	image	textures/alphamod/alpha_088.jpg	needed	Approved	Active
+73495280635873	image	textures/alphamod/alpha_088.jpg	archive	Approved	Active
 73496547878455	image	textures/egyptsoc_trimd/v064-01dr_norm.jpg	needed	Approved(gate)	?
 73505740818841	image	models/weapons/g_campingrifle_luma.jpg	needed	Approved	Active
 73506111433362	image	textures/trak5x/floor/floor_tile4e.jpg	needed	Approved(gate)	?
@@ -7301,7 +7327,7 @@
 73549565098875	image	textures/egyptsoc_floor/block08b_norm.jpg	needed	Approved(gate)	?
 73560141448828	image	textures/trak4x/base/base_rust2_gloss.jpg	needed	Approved(gate)	?
 73566028904181	image	textures/evil4_metals/tekwallmulti2_norm.jpg	needed	Approved(gate)	?
-73578554792253	audio	sound/player/robot/coms/needhelp2.ogg	superseded	Rejected	Active
+73578554792253	audio	sound/player/robot/coms/needhelp2.ogg	superseded	Rejected	Archived
 73585360134838	image	textures/terrain_data/frozenground_bump.jpg	needed	Approved(gate)	?
 73590782642897	audio	sound/machines/Flash_Light(dry).ogg	needed	Approved	Active
 73598247989348	image	textures/evil1_floors/mtl_flooring_bump.jpg	needed	Approved(gate)	?
@@ -7506,11 +7532,11 @@
 74878927302670	image	textures/facility114invx/misc/door01inv_gloss.jpg	needed	Approved(gate)	?
 74892240809580	image	models/desertfactory/textures/misc/radio01.jpg	needed	Approved	Active
 74892702859174	image	textures/exomorphx/light/metal_light02_gloss.jpg	needed	Approved(gate)	?
-74900875715984	image	models/desertfactory/textures/documents/note02.jpg	needed	Approved	Active
+74900875715984	image	models/desertfactory/textures/documents/note02.jpg	archive	Approved	Active
 74928920867479	image	textures/phillipk1x/trim/pk01_door01b.jpg	needed	Approved(gate)	?
 74929683302061	image	textures/evil8_trim/e8smlltrim1b_bump.jpg	needed	Approved(gate)	?
 74930605631200	image	gfx/menu/luma/gametype_lms.jpg	needed	Approved	Active
-74942145475222	image	gfx/hud/old/dom_icon_yellow.jpg	needed	Approved	Active
+74942145475222	image	gfx/hud/old/dom_icon_yellow.jpg	archive	Approved	Active
 74943148464092	image	maps/bromine/lm_0002.jpg	needed	Approved	Active
 74950210877953	audio	sound/nexball/drop.ogg	needed	Approved	Active
 74962008615450	image	textures/logos/logo01/logo01_greeng_glow.jpg	needed	Approved(gate)	?
@@ -7720,6 +7746,7 @@
 76138139266923	image	gfx/hud/default/key_left_inv.jpg	needed	Approved	Active
 76141926422368	image	textures/evil1_woods/wood_rot.jpg	needed	Approved(gate)	?
 76143406469556	image	textures/exomorphx/trim/trim_concrete01_norm.jpg	needed	Approved(gate)	?
+76154321317320	image	models/race/checkpoint/outerring.jpg	needed	Approved(gate)	?
 76154630326587	image	textures/egyptsoc_sfx/lig_032-01b1.jpg	needed	Approved(gate)	?
 76159783921051	image	textures/trak5x/panel/panel_graypanel3_gloss.jpg	needed	Approved(gate)	?
 76183926132489	image	gfx/hud/old/flag_neutral_carrying_alpha.jpg	needed	Approved	Active
@@ -7742,6 +7769,7 @@
 76248349561925	image	textures/evil3_metals/mtl_rivplt2-yellow.jpg	needed	Approved(gate)	?
 76249646931118	image	textures/exomorphx/trim/trim_metal07a.jpg	needed	Approved(gate)	?
 76257536932058	image	textures/exx/floor/floor_simple05.jpg	needed	Approved(gate)	?
+76266089616243	image	models/desertfactory/textures/shaders/writing02.jpg	needed	Approved(gate)	?
 76276873746897	image	models/containers/barrel01_norm.jpg	needed	Approved	Active
 76278671474463	image	textures/stein1x/base/base_cracks_norm.jpg	needed	Approved(gate)	?
 76278715141286	image	textures/phillipk2x/trims/pk02_trim_set02a_norm_alpha.jpg	needed	Approved(gate)	?
@@ -7940,7 +7968,7 @@
 77487388223396	image	textures/egyptsoc_sfx/lig_b064-02d.jpg	needed	Approved(gate)	?
 77491016856550	image	env/strale_grey/ygrey_bk.jpg	needed	Approved	Active
 77492963644948	image	gfx/menu/luminos/gametype_as.jpg	needed	Approved	Active
-77495152750184	audio	sound/player/specop/coms/teamshoot2.ogg	superseded	Rejected	Active
+77495152750184	audio	sound/player/specop/coms/teamshoot2.ogg	superseded	Rejected	Archived
 77498573125500	image	textures/evil1_floors/carpet_drty_blood2_bump.jpg	needed	Approved(gate)	?
 77501361331577	image	gfx/hud/luma/border_tab_south_alpha.jpg	needed	Approved	Active
 77501981449462	image	textures/evil4_techwalls/drkmtl_dpanel_ow.jpg	needed	Approved(gate)	?
@@ -8071,7 +8099,7 @@
 78220177928331	image	textures/evil1_walls/cementwall_btmwrn.jpg	needed	Approved(gate)	?
 78221038533606	image	particles/hook_white.jpg	needed	Approved	Active
 78227054862442	image	textures/trak5x/base/base_holes1a_norm_alpha.jpg	needed	Approved(gate)	?
-78231769480081	image	textures/bloodyskull.jpg	needed	Approved	Active
+78231769480081	image	textures/bloodyskull.jpg	archive	Approved	Active
 78247207600470	image	textures/evil4_metals/mtlwrndoor.jpg	needed	Approved(gate)	?
 78254663511839	image	textures/evil4_walls/hsptl_wallpainted_gray.jpg	needed	Approved(gate)	?
 78256617484118	image	textures/phillipk2x/base/pk02_generic01a_norm.jpg	needed	Approved(gate)	?
@@ -8116,6 +8144,7 @@
 78450539380116	image	textures/evil2_misc/light_x_trm.jpg	needed	Approved(gate)	?
 78468586184267	image	textures/evil4_lights/l_light_w.jpg	needed	Approved(gate)	?
 78492454891475	image	textures/egyptsoc_floor/block08b_norm_alpha.jpg	needed	Approved(gate)	?
+78497811861329	image	models/desertfactory/textures/documents/note02.jpg	needed	Approved(gate)	?
 78511770098659	image	maps/runningmanctf/lm_0003.jpg	needed	Approved	Active
 78517901071723	image	textures/hlac_metal_glow.jpg	needed	Approved(gate)	?
 78525113944950	image	models/relics/sign_luck.jpg	needed	Approved	Active
@@ -8139,13 +8168,14 @@
 78588432947693	image	textures/egyptsoc_wall/stone01b.jpg	needed	Approved(gate)	?
 78589297534867	image	textures/evil8_base/e8metal03c_norm.jpg	needed	Approved(gate)	?
 78589389900557	image	textures/evil4_d_techwalls/d_drkmtl_dpanelwrnb2_norm.jpg	needed	Approved(gate)	?
+78604333956246	image	gfx/hud/luminos/dom_icon_yellow-highlighted.jpg	needed	Approved(gate)	?
 78606596154437	image	textures/evil1_walls/drtwll3.jpg	needed	Approved(gate)	?
 78611261182663	image	textures/trak5x/panel/panel_panel1_norm.jpg	needed	Approved(gate)	?
 78624350057789	image	models/ltrail.jpg	needed	Approved	Active
 78632588052696	image	textures/egyptsoc_trim/stepangle01d_norm.jpg	needed	Approved(gate)	?
 78649956361490	image	textures/evil3_walls/mtlwll_twrn2drtyhfx.jpg	needed	Approved(gate)	?
 78655393660179	image	textures/evil1_trims/crude_warn.jpg	needed	Approved(gate)	?
-78657944090291	image	models/desertfactory/textures/shaders/writing02.jpg	needed	Approved	Active
+78657944090291	image	models/desertfactory/textures/shaders/writing02.jpg	archive	Approved	Active
 78662305207469	image	env/med-troubadour-gray/med-troubadour-gray_lf.jpg	needed	Approved	Active
 78663774022833	image	textures/egyptsoc_wall/stone04b_norm.jpg	needed	Approved(gate)	?
 78670812604392	image	textures/e7/e7sfx_lava.jpg	needed	Approved(gate)	?
@@ -8229,7 +8259,8 @@
 79170909552318	image	textures/ex2x/floor/floor_plate1_norm.jpg	needed	Approved(gate)	?
 79178849466925	image	textures/exomorphx/wall/concrete_wall_slab02_gloss.jpg	needed	Approved(gate)	?
 79183833072061	image	textures/egyptsoc_floor/jumppad1bg.jpg	needed	Approved(gate)	?
-79187336107208	image	models/desertfactory/textures/documents/note01.jpg	needed	Approved	Active
+79187336107208	image	models/desertfactory/textures/documents/note01.jpg	archive	Approved	Active
+79188233120587	image	gfx/blood_alpha.jpg	needed	Approved(gate)	?
 79201744351257	image	textures/trak7x/wall/wall_wallplain1_norm.jpg	needed	Approved(gate)	?
 79203195627630	audio	sound/player/reptilian/coms/meet.ogg	needed	Approved	Active
 79206439697702	image	textures/trak5x/wall/wall_wall1a_gloss.jpg	needed	Approved(gate)	?
@@ -8581,6 +8612,7 @@
 81118061840187	audio	sound/player/espeak/player/jump.ogg	needed	Approved	Active
 81132588930671	image	textures/egyptsoc_mat/block02b_norm.jpg	needed	Approved(gate)	?
 81134271193569	image	textures/phillipk2x/decals/pk02_dec_num02.jpg	needed	Approved(gate)	?
+81136588844113	image	textures/alphamod/alpha_069.jpg	needed	Approved(gate)	?
 81139994884888	image	textures/evil3_walls/mtlwll_twrn2drty_gloss.jpg	needed	Approved(gate)	?
 81146437824948	image	textures/evil4_walls/d_stnwll_mossbtm.jpg	needed	Approved(gate)	?
 81147573122937	image	textures/egyptsoc_sfx/lig_064-05w2.jpg	needed	Approved(gate)	?
@@ -8756,6 +8788,7 @@
 82152084984593	image	textures/map_atelier/9techwall06.jpg	needed	Approved(gate)	?
 82152601853403	image	models/turrets/walker_base_norm.jpg	needed	Approved	Active
 82154877836026	image	gfx/crosshair63_alpha.jpg	needed	Approved	Active
+82155064608258	image	gfx/menu/luminos/background_ingame_alpha.jpg	needed	Approved(gate)	?
 82156585551866	image	textures/evil1_woods/wood_pnl.jpg	needed	Approved(gate)	?
 82168618509345	image	textures/phillipk2x/floor/pk02_floor06a_norm.jpg	needed	Approved(gate)	?
 82168864363065	image	textures/dsi_textures/cretetrimlight2.jpg	needed	Approved(gate)	?
@@ -8917,6 +8950,7 @@
 83141120722530	image	textures/exx/panel/panel_grate01_gloss.jpg	needed	Approved(gate)	?
 83150599434294	image	textures/kaznexctf2/large_red.jpg	needed	Approved(gate)	?
 83160862186667	image	textures/egyptsoc_trim/032-03c_norm.jpg	needed	Approved(gate)	?
+83167338121381	image	models/race/checkpoint/outerring_gloss.jpg	needed	Approved(gate)	?
 83182128004308	image	gfx/hud/default/notify_balldropped_alpha.jpg	needed	Approved	Active
 83191670349542	image	textures/savdm6ish/wall5_4.jpg	needed	Approved(gate)	?
 83203446001505	image	gfx/hud/luma/weaponhook.jpg	needed	Approved	Active
@@ -9203,7 +9237,7 @@
 84809637728996	image	textures/evil2_basefloor/flr_tmtl_drk_bld.jpg	needed	Approved(gate)	?
 84811682170736	image	textures/arc_gloss.jpg	needed	Approved	Active
 84813132767059	image	textures/egyptsoc_floor/block01a.jpg	needed	Approved(gate)	?
-84816081599850	image	gfx/hud/luminos/dom_icon_yellow_alpha.jpg	needed	Approved	Active
+84816081599850	image	gfx/hud/luminos/dom_icon_yellow_alpha.jpg	archive	Approved	Active
 84819796479146	image	textures/evil4_metals/mtlwrndoor2_norm.jpg	needed	Approved(gate)	?
 84825900530105	image	textures/phillipk1x/panel/pk01_panel01b_glow.jpg	needed	Approved(gate)	?
 84835252093811	image	textures/proceduralx/wall/fruitconcrete_red.jpg	needed	Approved(gate)	?
@@ -9235,6 +9269,7 @@
 85011159243800	image	textures/cmp1-dm8/e8mtltrim.jpg	needed	Approved	Active
 85015237007157	image	gfx/hud/old/voteprogress_prog_alpha.jpg	needed	Approved	Active
 85025611126277	image	textures/egyptsoc_trim/t064-02d_r.jpg	needed	Approved(gate)	?
+85031718267711	image	models/desertfactory/textures/documents/newspaper01.jpg	needed	Approved(gate)	?
 85041404769852	image	textures/stralenex1/mtl_l1_glow.jpg	needed	Approved(gate)	?
 85057761298719	image	textures/trak7x/floor/floor_tile1_norm_alpha.jpg	needed	Approved(gate)	?
 85062434912647	image	textures/strength/light-liney-3_glow.jpg	needed	Approved(gate)	?
@@ -9327,10 +9362,10 @@
 85549854859792	image	textures/dsi_textures/dsiglass.jpg	needed	Approved(gate)	?
 85562974240346	image	textures/exx/base/base_metal04_gloss.jpg	needed	Approved(gate)	?
 85569604113497	image	textures/map_go/pipe1_red.jpg	needed	Approved(gate)	?
-85575972346055	image	gfx/hud/old/dom_icon_yellow-highlighted.jpg	needed	Approved	Active
+85575972346055	image	gfx/hud/old/dom_icon_yellow-highlighted.jpg	archive	Approved	Active
 85579638016848	image	gfx/hud/luma/vehicle_icon_ammo2_alpha.jpg	needed	Approved	Active
 85584567402452	audio	sound/machines/Jacobs_Ladder.ogg	needed	Approved	Active
-85592337939072	image	gfx/hud/old/dom_icon_yellow-highlighted_alpha.jpg	needed	Approved	Active
+85592337939072	image	gfx/hud/old/dom_icon_yellow-highlighted_alpha.jpg	archive	Approved	Active
 85597382877036	image	gfx/menu/luma/colorbutton_c.jpg	needed	Approved	Active
 85598869820406	image	textures/egyptsoc_trimd/v128-02cr.jpg	needed	Approved(gate)	?
 85604655465746	image	textures/phillipk1x/floors/pk01_pan_floor01a_norm_alpha.jpg	needed	Approved(gate)	?
@@ -9441,6 +9476,7 @@
 86195673575289	image	textures/phillipk1x/walls/pk01_wall04b_norm_alpha.jpg	needed	Approved(gate)	?
 86198966752449	image	textures/egyptsoc_trim/s064-05l.jpg	needed	Approved(gate)	?
 86212229385009	image	textures/evil8_base/e8metal_blue_norm_alpha.jpg	needed	Approved(gate)	?
+86212434586737	image	textures/bloodyskull.jpg	needed	Approved(gate)	?
 86214872933048	image	textures/egyptsoc_floor/block09a_norm.jpg	needed	Approved(gate)	?
 86220881591491	image	textures/evil8_floor/e8clangfloor01_gloss.jpg	needed	Approved(gate)	?
 86223619433402	image	textures/evil4_metals/whitemtl_default.jpg	needed	Approved(gate)	?
@@ -9509,6 +9545,7 @@
 86655598155259	image	textures/exomorphx/base/metal01_gloss.jpg	needed	Approved(gate)	?
 86667196971252	image	textures/stein1x/floor/floor_tile01_gloss.jpg	needed	Approved(gate)	?
 86681663683670	image	gfx/hud/luma/item_large_armor.jpg	needed	Approved	Active
+86682881458498	image	models/desertfactory/textures/documents/note01.jpg	needed	Approved(gate)	?
 86686057705060	image	models/turrets/basedestroyed_glow.jpg	needed	Approved	Active
 86700169638485	image	gfx/hud/default/buff_vengeance.jpg	needed	Approved	Active
 86702135644919	image	textures/evil1_floors/metalflr1b.jpg	needed	Approved(gate)	?
@@ -9904,6 +9941,7 @@
 89101567537998	audio	sound/onslaught/controlpoint_built.ogg	needed	Approved	Active
 89111324995910	image	textures/evil2_misc/ceil_blank.jpg	needed	Approved(gate)	?
 89128414478970	image	gfx/hud/luma/flag_blue_lost_alpha.jpg	needed	Approved	Active
+89146260309562	image	gfx/hud/luminos/dom_icon_yellow.jpg	needed	Approved(gate)	?
 89153049242747	image	textures/phillipk2x/decals/pk02_dec_numc_alpha.jpg	needed	Approved(gate)	?
 89153824078920	audio	sound/player/torus/player/death.ogg	needed	Approved	Active
 89156700147018	image	textures/phillipk2x/panels/pk02_door01.jpg	needed	Approved(gate)	?
@@ -9934,7 +9972,7 @@
 89284146169615	image	textures/terrain_data/rockyground01_bump.jpg	needed	Approved(gate)	?
 89284174532302	image	maps/geoplanetary/lm_0004.jpg	needed	Approved	Active
 89292464352642	image	textures/egyptsoc_sfx/lig_b064-01e_norm.jpg	needed	Approved(gate)	?
-89294749394228	image	textures/cockpit.jpg	needed	Approved	Active
+89294749394228	image	textures/cockpit.jpg	archive	Approved	Active
 89301801085523	image	textures/exomorphx/wall/concrete_metal_wallplate01_norm_alpha.jpg	needed	Approved(gate)	?
 89305228764160	image	textures/trak5x/trim/trim_trim2a.jpg	needed	Approved(gate)	?
 89311961300894	image	textures/evil8_trim/e8support04_red_norm_alpha.jpg	needed	Approved(gate)	?
@@ -10000,8 +10038,9 @@
 89679086566200	image	textures/egyptsoc_trimd/s128-04dd_norm_alpha.jpg	needed	Approved(gate)	?
 89683811848106	image	textures/ex2x/floor/floor_plate2.jpg	needed	Approved(gate)	?
 89691409140557	audio	sound/player/specop/coms/needhelp.ogg	needed	Approved	Active
-89693165001421	image	models/race/checkpoint/outerring_gloss.jpg	needed	Approved	Active
+89693165001421	image	models/race/checkpoint/outerring_gloss.jpg	archive	Approved	Active
 89694470689613	image	textures/egyptsoc_trim/s064-05f_norm_alpha.jpg	needed	Approved(gate)	?
+89697108404002	image	textures/cp_gloss.jpg	needed	Approved(gate)	?
 89712160523446	image	textures/egyptsoc_trimd/s064-03dd_norm.jpg	needed	Approved(gate)	?
 89712461878821	image	textures/terrain01x/ground/mud01_norm.jpg	needed	Approved(gate)	?
 89713022498062	image	textures/evil4_techtrims/drttrimmulti.jpg	needed	Approved(gate)	?
@@ -10283,13 +10322,13 @@
 91353904660401	image	models/weapons/g_arc_simple_alpha.jpg	needed	Approved	Active
 91357536517826	image	textures/facility114invx/floor/floor02inv_norm.jpg	needed	Approved(gate)	?
 91365338324731	image	textures/e7/e7brickfloor01jump-7_glow.jpg	needed	Approved(gate)	?
-91376254790809	image	gfx/menu/luminos/background_ingame_alpha.jpg	needed	Rejected	Active
+91376254790809	image	gfx/menu/luminos/background_ingame_alpha.jpg	archive	Rejected	Active
 91380083230414	image	textures/exomorphx/floor/metal_floor03b.jpg	needed	Approved(gate)	?
 91380279236881	audio	sound/wind/Evening-Wind(MONO-8bit.22050).ogg	needed	Approved	Active
 91392879041588	image	textures/cyberparcour01_textures/brown_stripes.jpg	needed	Approved(gate)	?
 91412342859043	image	textures/egyptsoc_trimd/v128-02dr.jpg	needed	Approved(gate)	?
 91414291117812	image	models/trak/tablet_xon3.jpg	needed	Approved	Active
-91425806467333	image	models/trak/tablet.jpg	needed	Approved	Active
+91425806467333	image	models/trak/tablet.jpg	archive	Approved	Active
 91426148250847	image	textures/evil4_techtrims/dwtrim_panel_norm_alpha.jpg	needed	Approved(gate)	?
 91427427167320	image	models/player/ignismasked.iqm_0_alpha.jpg	needed	Approved	Active
 91437586789464	image	gfx/menu/wickedx/slider_s.jpg	needed	Approved	Active
@@ -10315,7 +10354,7 @@
 91548221727493	image	textures/trak5x/trim/trim_trim6a_norm.jpg	needed	Approved(gate)	?
 91553979523601	image	textures/evil2_misc/support_grate3_alpha.jpg	needed	Approved(gate)	?
 91554383949171	image	textures/trak4x/decal/decal_iso1_alpha.jpg	needed	Approved(gate)	?
-91556415662672	audio	sound/player/specop/coms/taunt4.ogg	superseded	Rejected	Active
+91556415662672	audio	sound/player/specop/coms/taunt4.ogg	superseded	Rejected	Archived
 91557697942639	audio	sound/player/robot/player/death2.ogg	needed	Approved	Active
 91560474299065	image	textures/evil4_techfloors/tfloor2b_norm.jpg	needed	Approved(gate)	?
 91562758393446	image	textures/trak5x/trim/trim_trim9c.jpg	needed	Approved(gate)	?
@@ -10462,6 +10501,7 @@
 92490359718691	image	models/weapons/g_shockwave_luma_alpha.jpg	needed	Approved	Active
 92491553151514	image	gfx/menu/xaw/button_n.jpg	needed	Approved	Active
 92494303804975	image	models/sprites/keycarrier-pink_frame0.jpg	needed	Approved	Active
+92500176129471	image	models/trak/tablet.jpg	needed	Approved(gate)	?
 92502824097514	image	gfx/hud/old/health_small.jpg	needed	Approved	Active
 92510971149967	image	textures/alphamod/alpha_061.jpg	needed	Approved	Active
 92529685140826	image	models/items/g_fuelregen_luma_alpha.jpg	needed	Approved	Active
@@ -10485,7 +10525,7 @@
 92637434093670	audio	sound/rain/Light_Rain-Wind-Thunder.ogg	needed	Approved	Active
 92648782846519	image	textures/map_leave_em_behind/biolumi2_yellow.jpg	needed	Approved(gate)	?
 92668360297567	image	textures/trak5x/floor/floor_tile2a_norm_alpha.jpg	needed	Approved(gate)	?
-92670988540573	audio	sound/cdtracks/heavymetal.ogg	superseded	Rejected	Active
+92670988540573	audio	sound/cdtracks/heavymetal.ogg	superseded	Rejected	Archived
 92684743174011	image	textures/evil4_d_techwalls/d_tech_dw2_glow.jpg	needed	Approved(gate)	?
 92685125225310	audio	sound/weapons/hagar_fire.ogg	needed	Approved	Active
 92691787547179	image	gfx/hud/luma/vehicle_bar_southwest.jpg	needed	Approved	Active
@@ -10684,7 +10724,7 @@
 93936714654476	image	textures/egyptsoc_trim/s064-05a.jpg	needed	Approved(gate)	?
 93939908822834	image	textures/phillipk1x/walls/pk01_wall04a_norm_alpha.jpg	needed	Approved(gate)	?
 93945914181464	image	gfx/hud/default/minigames/pp/piece1.jpg	needed	Approved	Active
-93960888200802	image	models/desertfactory/textures/documents/writing05_alpha.jpg	needed	Approved	Active
+93960888200802	image	models/desertfactory/textures/documents/writing05_alpha.jpg	archive	Approved	Active
 93963892192720	image	gfx/hud/default/buff_magnet.jpg	needed	Approved	Active
 93984773811355	audio	sound/weapons/weapon_switch.ogg	needed	Approved	Active
 93991109851731	image	env/exomorph/exomorphnx.jpg	needed	Approved	Active
@@ -10978,7 +11018,7 @@
 95591357284113	image	gfx/hud/luma/nade_heal.jpg	needed	Approved	Active
 95592130416454	image	textures/phillipk2x/walls/pk02_wall03a_norm.jpg	needed	Approved(gate)	?
 95595326592006	image	models/relics/relic_gloss.jpg	needed	Approved	Active
-95605778713065	audio	sound/player/carni-lycan/coms/taunt1.ogg	superseded	Rejected	Active
+95605778713065	audio	sound/player/carni-lycan/coms/taunt1.ogg	superseded	Rejected	Archived
 95606764722476	image	textures/evil8_floor/e8clangfloor05b_norm_alpha.jpg	needed	Approved(gate)	?
 95608777986110	image	textures/dsi/stepside0.jpg	needed	Approved(gate)	?
 95609229694741	image	textures/egyptsoc_trim/v128-04b.jpg	needed	Approved(gate)	?
@@ -11217,6 +11257,7 @@
 96969941407752	image	env/stralenex8/darkblue_dn.jpg	needed	Approved	Active
 96970969660832	image	textures/exomorphx/trim/trim_metal_panel03_reflect.jpg	needed	Approved(gate)	?
 96977660845747	image	textures/trak5x/floor/floor_floor2c.jpg	needed	Approved(gate)	?
+96991822637000	image	gfx/hud/old/armor.jpg	needed	Approved(gate)	?
 96994773607652	image	gfx/hud/luminos/notify_red_carrying.jpg	needed	Approved	Active
 96997507314679	image	textures/ons_pad_glow.jpg	needed	Approved(gate)	?
 97010071368256	audio	sound/ambient/water.ogg	needed	Approved	Active
@@ -11224,7 +11265,7 @@
 97022165788739	image	textures/ex2x/trim/trim_green2_glow.jpg	needed	Approved(gate)	?
 97028872439269	image	textures/egyptsoc_trim/032-05d_r.jpg	needed	Approved(gate)	?
 97031893445673	image	textures/egyptsoc_trimd/s064-01ed.jpg	needed	Approved(gate)	?
-97035768395278	image	models/desertfactory/textures/documents/writing02_alpha.jpg	needed	Approved	Active
+97035768395278	image	models/desertfactory/textures/documents/writing02_alpha.jpg	archive	Approved	Active
 97042322273145	image	models/player/ignis.iqm_0.jpg	needed	Approved	Active
 97043289709910	image	gfx/hud/old/flag_blue_shielded_alpha.jpg	needed	Approved	Active
 97047591331942	audio	sound/desertfactory/windhowling_loop.ogg	needed	Approved	Active
@@ -11318,7 +11359,7 @@
 97492552791705	image	textures/evil8_floor/e8clangwarnmix_b_gloss.jpg	needed	Approved(gate)	?
 97495540930742	image	textures/egyptsoc_trim/s128-01c_norm_alpha.jpg	needed	Approved(gate)	?
 97500461250640	image	env/hip_inter/interstellar_bk.jpg	needed	Approved	Active
-97505231954373	audio	sound/player/pyria-skadi/coms/teamshoot2.ogg	superseded	Rejected	Active
+97505231954373	audio	sound/player/pyria-skadi/coms/teamshoot2.ogg	superseded	Rejected	Archived
 97514256256176	image	textures/exomorphx/floor/metal_floor04_gloss_alpha.jpg	needed	Approved(gate)	?
 97519846926940	image	textures/evil6_floors/e6xgratebasic.jpg	needed	Approved(gate)	?
 97524429695883	image	textures/glow_reflect_alpha.jpg	needed	Approved(gate)	?
@@ -11442,6 +11483,7 @@
 98154084241961	image	textures/map_erbium/fightingzone.jpg	needed	Approved(gate)	?
 98154372311701	image	textures/egyptsoc_trim/s128-04b_norm.jpg	needed	Approved(gate)	?
 98166373119189	image	textures/trak5x/light/light_light3a.jpg	needed	Approved(gate)	?
+98171391702710	image	gfx/hud/luminos/dom_icon_yellow_alpha.jpg	needed	Approved(gate)	?
 98178499251631	image	textures/phillipk2x/lights/pk02_light03_norm.jpg	needed	Approved(gate)	?
 98187197967161	image	env/polluted_earth/polluted_earth_bk.jpg	needed	Approved	Active
 98188117702202	image	textures/evil8_trim/e8bolttrim_bump.jpg	needed	Approved(gate)	?
@@ -11621,6 +11663,7 @@
 99235595608404	image	textures/evil6_walls/e6simpwallsupp_rst.jpg	needed	Approved(gate)	?
 99238286689244	image	textures/egyptsoc_trim/256-04d.jpg	needed	Approved(gate)	?
 99244654614447	image	gfx/hud/default/minigames/pong/paddle-glow_alpha.jpg	needed	Approved	Active
+99247300473735	image	textures/cmp1-dm8/e8circle_pur.jpg	needed	Approved(gate)	?
 99249928313284	audio	sound/misc/armorimpact.ogg	needed	Approved	Active
 99250051910218	image	textures/map_courtfun/screen_backdrop.jpg	needed	Approved(gate)	?
 99256651365552	image	textures/phillipk2x/floor/pk02_floor07_norm.jpg	needed	Approved(gate)	?
