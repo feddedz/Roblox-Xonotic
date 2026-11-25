@@ -7,7 +7,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 dp=work/source/Xonotic/source/darkplaces
 out=$(mktemp -d)
-gcc -O0 -ffp-contract=off -ffunction-sections -fdata-sections -w -I "$dp" \
+gcc -std=gnu11 -O0 -ffp-contract=off -ffunction-sections -fdata-sections -w -I "$dp" \
 	-o "$out/collision_vectors" tools/testgen/collision_vectors.c "$dp/collision.c" "$dp/polygon.c" \
 	-Wl,--gc-sections -Wl,--unresolved-symbols=ignore-all -lm
 "$out/collision_vectors" > tests/vectors/collision.tsv
