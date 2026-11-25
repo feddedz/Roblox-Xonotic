@@ -77,7 +77,7 @@ static void makepatch(int w, int h, int mode)
 
 static void tess(int w, int h, int tw, int th, int firstvertex, int areaweighting)
 {
-	int fw = Q3PatchDimForTess(w, tw), fh = Q3PatchDimForTess(h, th), nv = fw * fh, nt = (fw - 1) * (fh - 1) * 2, n, i;
+	int fw = Q3PatchDimForTess(w, tw), fh = Q3PatchDimForTess(h, th), nv = fw * fh, nt = (fw - 1) * (fh - 1) * 2, n;
 	if (firstvertex + nv > MAXV)
 		return;
 	printf("TESS\t%d\t%d\t%d\t%d\t%d\t%d\n", tw, th, fw, fh, firstvertex, areaweighting);
@@ -94,7 +94,7 @@ static void tess(int w, int h, int tw, int th, int firstvertex, int areaweightin
 	n = Mod_RemoveDegenerateTriangles(nt, elem, elem2, opos);
 	ints("DEGEN", elem2, n * 3);
 	memcpy(snapped, opos + firstvertex * 3, nv * sizeof(float[3]));
-	Mod_SnapVertices(3, nv, snapped, i = (tw & 1) ? 1.0f : 0.25f);
+	Mod_SnapVertices(3, nv, snapped, (tw & 1) ? 1.0f : 0.25f);
 	floats("SNAP", snapped, nv * 3);
 	Mod_BuildTextureVectorsFromNormals(firstvertex, nv, n, opos, otc, onrm, elem2, svec, tvec, areaweighting);
 	floats("SVEC", svec + firstvertex * 3, nv * 3);
