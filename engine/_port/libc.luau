@@ -569,6 +569,33 @@ function libc.format1(flags: string, width: number, prec: number, conv: string, 
 		prec = 99
 		bigp = false
 	end
+	if
+		(conv == "e" or conv == "E" or conv == "f" or conv == "F" or conv == "g" or conv == "G")
+		and (value ~= value or value == math.huge or value == -math.huge)
+	then
+		-- Non-finite double, done here and not by snprintf: C runtimes differ (Windows' prints "i.nf" for
+		-- "%#.0e" of infinity), and the server (Linux) and clients must print the same. glibc: "inf" / "nan",
+		-- upper case for E F G, sign from the sign bit or the + / space flag, padded with spaces only;
+		-- '#', '0' and the precision have no effect.
+		local word = if value ~= value then "nan" else "inf"
+		if conv == "E" or conv == "F" or conv == "G" then
+			word = string.upper(word)
+		end
+		local bits = buffer.create(8)
+		buffer.writef64(bits, 0, value)
+		local sign = if buffer.readu8(bits, 7) >= 128
+			then "-"
+			elseif string.find(flags, "+", 1, true) then "+"
+			elseif string.find(flags, " ", 1, true) then " "
+			else ""
+		local text = sign .. word
+		if #text < width then
+			text = if string.find(flags, "-", 1, true)
+				then text .. string.rep(" ", width - #text)
+				else string.rep(" ", width - #text) .. text
+		end
+		return text
+	end
 	local spec = "%" .. flags
 	if not bigw and width > 0 then
 		spec ..= tostring(width)
