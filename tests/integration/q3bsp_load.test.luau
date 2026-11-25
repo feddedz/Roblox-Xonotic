@@ -46,6 +46,7 @@ return function(ctx: t.Ctx)
 	end
 	local brushes, nilbrushes, points = 0, 0, 0
 	local surfaces, patches, meshverts = 0, 0, 0
+	local bihleafs = 0
 	for line in string.gmatch(t.read("tests/vectors/q3bsp.tsv"), "[^\r\n]+") do
 		if string.sub(line, 1, 1) == "#" then
 			continue
@@ -291,9 +292,85 @@ return function(ctx: t.Ctx)
 		surfaces += #mod.data_surfaces
 		patches += patch
 		meshverts += sm.num_vertices
+
+		-- submodels and their collision / render BIH (BIH_Build itself is checked against C in bih.test)
+		t.eq(ctx, #brush.submodels, q3.num_models, name .. ": one model per q3 model")
+		for mi, sub in brush.submodels do
+			local dm = q3.data_models[mi]
+			local what = `{name} *{mi - 1}`
+			t.eq(
+				ctx,
+				sub.firstmodelsurface .. ":" .. sub.nummodelsurfaces,
+				dm.firstface .. ":" .. dm.numfaces,
+				what .. ": surfaces"
+			)
+			t.eq(
+				ctx,
+				sub.firstmodelbrush .. ":" .. sub.nummodelbrushes,
+				dm.firstbrush .. ":" .. dm.numbrushes,
+				what .. ": brushes"
+			)
+			-- sortedmodelsurfaces: a permutation of the model's surfaces, grouped by texture in texture order
+			local seen, lasttex, sortedok = {}, -1, #sub.sortedmodelsurfaces == sub.nummodelsurfaces
+			for _, si in sub.sortedmodelsurfaces do
+				local ti = mod.data_surfaces[si + 1].texture.index
+				if
+					seen[si]
+					or si < sub.firstmodelsurface
+					or si >= sub.firstmodelsurface + sub.nummodelsurfaces
+					or ti < lasttex
+				then
+					sortedok = false
+				end
+				seen[si], lasttex = true, ti
+			end
+			t.ok(ctx, sortedok, what .. ": sortedmodelsurfaces")
+			-- expected leaf counts
+			local wantcol, wantren = 0, 0
+			for bi = sub.firstmodelbrush + 1, sub.firstmodelbrush + sub.nummodelbrushes do
+				if brush.data_brushes[bi].colbrushf then
+					wantcol += 1
+				end
+			end
+			for si = sub.firstmodelsurface + 1, sub.firstmodelsurface + sub.nummodelsurfaces do
+				wantcol += mod.data_surfaces[si].num_collisiontriangles
+				wantren += mod.data_surfaces[si].num_triangles
+			end
+			for which, b in { collision = sub.collision_bih, render = sub.render_bih } do
+				local want = if which == "collision" then wantcol else wantren
+				if want == 0 then
+					continue -- C leaves the bih_t as it was (a copy of the world's for a submodel)
+				end
+				local okbih = b.numleafs == want and b.error == 0 and b.rootnode == 0 and #b.nodes == b.numnodes
+				-- every leaf is referenced exactly once and lies inside the node that lists it
+				local refs = 0
+				for _, n in b.nodes do
+					if n.type == 3 then
+						for _, li in n.children do
+							if li >= 0 then
+								refs += 1
+								local leaf = b.leafs[li + 1]
+								for k = 1, 3 do
+									if leaf.mins[k] < n.mins[k] or leaf.maxs[k] > n.maxs[k] then
+										okbih = false
+									end
+								end
+							end
+						end
+					end
+				end
+				t.ok(
+					ctx,
+					okbih and refs == want,
+					`{what}: {which} BIH ({b.numleafs} leafs, want {want}; {refs} referenced)`
+				)
+				bihleafs += b.numleafs
+			end
+			t.ok(ctx, sub.radius >= 0 and sub.radius2 == f32.round(sub.radius * sub.radius), what .. ": radius")
+		end
 	end
 	console.sink = oldsink
 	print(
-		`    q3bsp: {brushes} brushes built ({nilbrushes} rejected like in C), {points} corner points, {warnings} console lines`
+		`    q3bsp: {brushes} brushes built ({nilbrushes} rejected like in C), {points} corner points; {surfaces} surfaces ({patches} patches), {meshverts} mesh vertices, {bihleafs} BIH leafs; {warnings} console lines`
 	)
 end

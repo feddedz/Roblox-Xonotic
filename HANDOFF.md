@@ -48,8 +48,10 @@ Every section except §MAP and §DIFFS stays under ~60 lines; detail lives in `d
   code compiled unchanged: bih.c (complete), curves.c (complete), polygon.c (PolygonD_*), collision.c
   Collision_NewBrushFromPlanes, model_shared.c mesh helpers, matrixlib.c (4 functions). model_brush.c: the Q3
   BSP loader up to the submodel loop (all lumps except lightmaps) loads all 30 stock maps and matches an
-  independent decoder (tests/integration/q3bsp_load.test.luau, 81,874 checks). **Next in this task:**
-  Mod_MakeCollisionBIH + the submodel loop, then the traces (Mod_CollisionBIH_Trace*, Collision_Trace*), then
+  independent decoder (tests/integration/q3bsp_load.test.luau, 84,795 checks), incl. Mod_MakeCollisionBIH and
+  the submodel loop (collision + render BIH per submodel; submodels only in brush.submodels, no model registry
+  yet). Debug pictures of the loaded surfaces: tools/studio/render_map.py. **Next in this task:**
+  the traces (Mod_CollisionBIH_Trace*, Collision_Trace*), then
   Mod_LoadTextureFromQ3Shader and lightmaps. C reference vectors: push tools/testgen/*_vectors.{c,sh} -> the
   Testgen workflow builds them on GitHub (no C compiler on the owner's PC, G-054) -> `gh run download`.
 - **Branches (2026-11-25):** PRs 1, 2, 3 merged into main: start every new branch from main (D-012). Owner
@@ -166,7 +168,7 @@ before working. One claimed task per subsystem at a time. Details per task in th
 | M2-DEBUG | Rebuild progs.dat from qcsrc with the pinned gmqcc; prove byte-identical; emit line-number debug info | open | tools/qcaot/ | M2-PROGS |
 | REF-CVARLIST | From REF-DP's dedicated server after startup: `cvarlist` (name/value/default/flags) and `cmdlist` → tests/reference/cvars/; diff against engine/host.luau's result (validates tools/engine/gen_cvars.py and the config chain) | open | tests/reference/cvars/, tests/integration/ | REF-DP, M2-RUNNER |
 | REF-DP | Instrumented DarkPlaces (from release source) that records traces, server frames, net messages, particles | open | tools/darkplaces-ref/ | M0-PIN |
-| M3-BSPLOAD | Port model_brush.c (Q3 BSP), model_shared.c, bih.c, collision.c; headless reads work/vfs-high (Roblox runtime loading needs M1-RTVFS later) | claimed by Claude-Quartz 2026-11-25 (partial: bih, curves, polygon, brush builder, Q3 lump + face loaders done and verified; BIH build, submodels, traces, shaders, lightmaps open; the 2026-11-20 claim on branch M3-BSPLOAD-collision was stale) | engine/ | M1-VFS |
+| M3-BSPLOAD | Port model_brush.c (Q3 BSP), model_shared.c, bih.c, collision.c; headless reads work/vfs-high (Roblox runtime loading needs M1-RTVFS later) | claimed by Claude-Quartz 2026-11-25 (partial: bih, curves, polygon, brush builder, Q3 lump + face loaders done and verified; BIH build + submodels done; traces, shaders, lightmaps open; the 2026-11-20 claim on branch M3-BSPLOAD-collision was stale) | engine/ | M1-VFS |
 | M3-TRACEREF | Record ≥1000 traceline/tracebox per stock map from REF-DP | open | tests/reference/traces/ | REF-DP |
 | M3-TRACE | Port world.c/sv traces; bit-identical vs M3-TRACEREF on all stock maps | open | engine/ | M3-BSPLOAD, M3-TRACEREF |
 | M4-* | Server: sv_phys/sv_main/sv_user/sv_move, prvm_*, svvm_cmds builtins, host loop; bot match frame-diff | open (split when M3 done) | engine/ | M2-RUNNER, M3-TRACE |
