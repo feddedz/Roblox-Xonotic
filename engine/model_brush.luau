@@ -22,8 +22,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 --[[
 	Port of model_brush.c @xonotic-v0.8.6. PARTIAL (task M3-BSPLOAD, part 1): the Quake 3 BSP loader
 	Mod_IBSP_Load / Mod_Q3BSP_Load with the lump loaders for entities, textures (lump fields only), planes,
-	brush sides, brushes, effects, vertices, triangles, models, leaf brushes, leaf faces, leafs, nodes, light
-	grid and PVS, plus the contents-flag mapping.
+	brush sides, brushes, effects, vertices, triangles, faces (flat, mesh and patch surfaces with their
+	collision geometry), models, leaf brushes, leaf faces, leafs, nodes, light grid and PVS, plus the
+	contents-flag mapping.
 
 	How the C data is held:
 	  * The file (mod_base) is a `buffer`; LittleLong / LittleFloat are buffer.readi32 / readf32.
@@ -39,12 +40,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 	    data_leafbrushes and data_leafsurfaces are i32 buffers, data_pvsclusters and data_lightgrid are byte
 	    buffers. Element k of a float array is buffer.readf32(b, 4 * k).
 	NOT YET PORTED (each logs once when reached): Mod_LoadTextureFromQ3Shader (model_shared.c; texture_t has
-	only name / surfaceflags / supercontents), Mod_Q3BSP_LoadLightmaps, Mod_Q3BSP_LoadFaces beyond counting the
-	surfaces, Mod_Q1BSP_MakePortals, Mod_Q1BSP_CreateShadowMesh, the submodel loop of Mod_Q3BSP_Load
+	only name / surfaceflags / supercontents), Mod_Q3BSP_LoadLightmaps and the lightmap parts of
+	Mod_Q3BSP_LoadFaces (surfaces load as on a dedicated server), Mod_Q1BSP_MakePortals, Mod_Q1BSP_CreateShadowMesh, the submodel loop of Mod_Q3BSP_Load
 	(bounds, sorted surfaces, Mod_MakeCollisionBIH), all tracing / PVS / light-point functions, the Q1 / Q2 /
 	HL BSP and OBJ loaders, Mod_BrushInit (cvar registration: the cvars are read with their defaults).
 ]]
 local collision = require("./collision")
+local curves = require("./curves")
 local common = require("./common")
 local console = require("./console")
 local cvar = require("./cvar")
@@ -52,11 +54,12 @@ local f32 = require("./_port/f32")
 local libc = require("./_port/libc")
 local matrixlib = require("./matrixlib")
 local mdfour = require("./mdfour")
+local model_shared = require("./model_shared")
 
 local model_brush = {}
 
 local R = f32.round
-local Con_Printf, Con_DPrintf = console.Con_Printf, console.Con_DPrintf
+local Con_Print, Con_Printf, Con_DPrintf = console.Con_Print, console.Con_Printf, console.Con_DPrintf
 local readi32, readf32, readu8 = buffer.readi32, buffer.readf32, buffer.readu8
 local writei32, writef32 = buffer.writei32, buffer.writef32
 
@@ -98,6 +101,23 @@ local Q3LUMP_PVS = 16 -- potentially visible set; bit[clusters][clusters] (used 
 local Q3HEADER_LUMPS = 17
 local Q3HEADER_LUMPS_LIVE = 18
 local Q3PATHLENGTH = 64 -- bspfile.h
+
+-- model_brush.h L724-727
+local Q3FACETYPE_FLAT = 1 -- common
+local Q3FACETYPE_PATCH = 2 -- common
+local Q3FACETYPE_MESH = 3 -- common
+local Q3FACETYPE_FLARE = 4 -- rare (is this ever used?)
+
+-- curves.h
+local PATCH_LOD_COLLISION = curves.PATCH_LOD_COLLISION
+local PATCH_LOD_VISUAL = curves.PATCH_LOD_VISUAL
+
+-- cls.state == ca_dedicated. Only the dedicated path of the loader is ported so far (no lightmap textures).
+model_brush.dedicated = true
+
+-- Test hook (port support, no C counterpart): called with the model after Mod_Q3BSP_LoadTriangles, while the
+-- brushq3 vertex and triangle arrays still exist (Mod_Q3BSP_LoadFaces frees them).
+model_brush.debug_after_triangles = nil :: ((mod: any) -> ())?
 
 -- sizeof() of the on-disk structs (model_brush.h L643-812)
 local SIZEOF_q3dheader_t = 8 + 8 * 18
@@ -326,19 +346,13 @@ local function Mod_Q1BSP_LoadNodes_RecursiveSetParent(node: mnode_t, parent: mno
 		end
 		-- check if this leaf contains any collision surfaces (q3 patches)
 		local surfaces = loadmodel.data_surfaces
-		if surfaces then
-			local leafsurfaces: buffer = loadmodel.brush.data_leafsurfaces
-			for j = 0, leaf.numleafsurfaces - 1 do
-				local surface = surfaces[readi32(leafsurfaces, 4 * (leaf.firstleafsurface + j)) + 1]
-				if surface.num_collisiontriangles ~= 0 then
-					leaf.containscollisionsurfaces = true
-					leaf.combinedsupercontents = bit32.bor(leaf.combinedsupercontents, surface.texture.supercontents)
-				end
+		local leafsurfaces: buffer = loadmodel.brush.data_leafsurfaces
+		for j = 0, leaf.numleafsurfaces - 1 do
+			local surface = surfaces[readi32(leafsurfaces, 4 * (leaf.firstleafsurface + j)) + 1]
+			if surface.num_collisiontriangles ~= 0 then
+				leaf.containscollisionsurfaces = true
+				leaf.combinedsupercontents = bit32.bor(leaf.combinedsupercontents, surface.texture.supercontents)
 			end
-		else
-			NOT_YET_PORTED(
-				"Mod_Q1BSP_LoadNodes_RecursiveSetParent: collision surfaces of a leaf (needs Mod_Q3BSP_LoadFaces)"
-			)
 		end
 	end
 end
@@ -789,15 +803,781 @@ local function Mod_Q3BSP_LoadLightmaps(_l: lump_t, _faceslump: lump_t)
 	NOT_YET_PORTED("Mod_Q3BSP_LoadLightmaps (model_brush.c L5590-5865)")
 end
 
--- model_brush.c Mod_Q3BSP_LoadFaces L5934-6416: only the lump check and the surface count (L5952-5962) so
--- far; the surfaces themselves (meshes, patches, collision triangles) are NOT YET PORTED.
+-- port: model_brush.c Mod_Q3BSP_BuildBBoxes L5867-5912 @xonotic-v0.8.6
+-- (element3i: i32 buffer + byte offset; returns *collisionbbox6f (nil = NULL) and *collisionstride)
+local function Mod_Q3BSP_BuildBBoxes(
+	element3i: buffer,
+	eofs: number,
+	num_triangles: number,
+	vertex3f: buffer,
+	stride: number
+): (buffer?, number)
+	if stride > 0 then
+		local cnt = (num_triangles + stride - 1) // stride
+		local bbox6f = buffer.create(24 * cnt)
+		for j = 0, cnt - 1 do
+			local mins = 24 * j
+			local maxs = 24 * j + 12
+			for k = 0, stride - 1 do
+				local tri = j * stride + k
+				if tri >= num_triangles then
+					break
+				end
+				for corner = 0, 2 do
+					local vert = readi32(element3i, eofs + (3 * tri + corner) * 4) * 12
+					for c = 0, 2 do
+						local x = readf32(vertex3f, vert + c * 4)
+						if (corner == 0 and k == 0) or x < readf32(bbox6f, mins + c * 4) then
+							writef32(bbox6f, mins + c * 4, x)
+						end
+						if (corner == 0 and k == 0) or x > readf32(bbox6f, maxs + c * 4) then
+							writef32(bbox6f, maxs + c * 4, x)
+						end
+					end
+				end
+			end
+		end
+		return bbox6f, stride
+	else
+		return nil, stride
+	end
+end
+
+-- model_brush.c patchtess_t L5913-5921
+type patchtess_t = {
+	info: curves.patchinfo_t,
+	-- Auxiliary data used only by patch loading code in Mod_Q3BSP_LoadFaces
+	surface_id: number,
+	lodgroup: { number },
+	originalvertex3f: number, -- byte offset into brushq3.data_vertex3f
+}
+
+-- model_brush.c PATCHTESS_SAME_LODGROUP L5923-5931
+local function PATCHTESS_SAME_LODGROUP(a: patchtess_t, b: patchtess_t): boolean
+	return a.lodgroup[1] == b.lodgroup[1]
+		and a.lodgroup[2] == b.lodgroup[2]
+		and a.lodgroup[3] == b.lodgroup[3]
+		and a.lodgroup[4] == b.lodgroup[4]
+		and a.lodgroup[5] == b.lodgroup[5]
+		and a.lodgroup[6] == b.lodgroup[6]
+end
+
+-- quakedef.h bound()
+local function bound(min: number, num: number, max: number): number
+	return if num >= min then (if num < max then num else max) else min
+end
+
+-- cvar_t.integer / cvar_t.value with the engine default when the cvar is not registered (Mod_BrushInit and
+-- the renderer's cvar registration are not ported yet)
+local function cvi(name: string, def: number): number
+	return libc.toint(cvar.Cvar_VariableValueOr(name, def))
+end
+local function cvf(name: string, def: number): number
+	return R(cvar.Cvar_VariableValueOr(name, def))
+end
+
+-- A zeroed msurface_t (model_shared.h; C: Mem_Alloc). Fields are added as their users are ported.
+local function newsurface(index: number): any
+	return {
+		index = index, -- 0-based position in data_surfaces (port support)
+		texture = nil,
+		effect = nil,
+		lightmaptexture = nil,
+		deluxemaptexture = nil,
+		mins = { 0, 0, 0 },
+		maxs = { 0, 0, 0 },
+		num_vertices = 0,
+		num_triangles = 0,
+		num_firstvertex = 0,
+		num_firsttriangle = 0,
+		num_collisionvertices = 0,
+		num_collisiontriangles = 0,
+		num_firstcollisiontriangle = 0,
+		deprecatedq3data_collisionvertex3f = nil,
+		deprecatedq3data_collisionelement3i = nil,
+		deprecatedq3data_collisionbbox6f = nil,
+		deprecatedq3num_collisionbboxstride = 0,
+		deprecatedq3data_bbox6f = nil,
+		deprecatedq3num_bboxstride = 0,
+	}
+end
+
+-- port: model_brush.c Mod_Q3BSP_LoadFaces L5934-6416 @xonotic-v0.8.6
+-- The lightmap parts (cls.state != ca_dedicated: lightmaptexture / deluxemaptexture and the lightmap texcoord
+-- remapping into merged lightmaps) need Mod_Q3BSP_LoadLightmaps and are NOT YET PORTED: surfaces are loaded as
+-- a dedicated server loads them (model_brush.dedicated).
 local function Mod_Q3BSP_LoadFaces(l: lump_t)
+	local inofs = l.fileofs
+	local patchsize = { 0, 0 }
+	local patchtess: { patchtess_t } = {}
+	local patchtesscount = 0
+	local again: boolean
+	local q3 = loadmodel.brushq3
+	local developer_extra = cvi("developer_extra", 0) ~= 0
+
 	if l.filelen % SIZEOF_q3dface_t ~= 0 then
 		Host_Error("Mod_Q3BSP_LoadFaces: funny lump size in %s", loadmodel.name)
 	end
 	local count = l.filelen // SIZEOF_q3dface_t
+	local out: { any } = table.create(count)
+	for i = 0, count - 1 do
+		out[i + 1] = newsurface(i)
+	end
+
+	loadmodel.data_surfaces = out
 	loadmodel.num_surfaces = count
-	NOT_YET_PORTED("Mod_Q3BSP_LoadFaces (model_brush.c L5934-6416) beyond counting the surfaces")
+
+	local meshvertices = 0
+	local meshtriangles = 0
+	for i = 0, count - 1 do
+		local p = inofs + i * SIZEOF_q3dface_t
+		local surface = out[i + 1]
+		-- check face type first
+		local type = readi32(mod_base, p + 8)
+		if
+			type ~= Q3FACETYPE_FLAT
+			and type ~= Q3FACETYPE_PATCH
+			and type ~= Q3FACETYPE_MESH
+			and type ~= Q3FACETYPE_FLARE
+		then
+			Con_DPrintf("Mod_Q3BSP_LoadFaces: face #%i: unknown face type %i\n", i, type)
+			continue
+		end
+
+		local n = readi32(mod_base, p)
+		if n < 0 or n >= loadmodel.num_textures then
+			Con_DPrintf(
+				"Mod_Q3BSP_LoadFaces: face #%i: invalid textureindex %i (%i textures)\n",
+				i,
+				n,
+				loadmodel.num_textures
+			)
+			continue
+		end
+		surface.texture = loadmodel.data_textures[n + 1]
+		n = readi32(mod_base, p + 4)
+		if n < -1 or n >= q3.num_effects then
+			if developer_extra then
+				Con_DPrintf(
+					'Mod_Q3BSP_LoadFaces: face #%i (texture "%s"): invalid effectindex %i (%i effects)\n',
+					i,
+					surface.texture.name,
+					n,
+					q3.num_effects
+				)
+			end
+			n = -1
+		end
+		if n == -1 then
+			surface.effect = nil
+		else
+			surface.effect = q3.data_effects[n + 1]
+		end
+
+		if not model_brush.dedicated then
+			NOT_YET_PORTED(
+				"Mod_Q3BSP_LoadFaces: lightmap / deluxemap textures of a surface (client, needs Mod_Q3BSP_LoadLightmaps)"
+			)
+		end
+
+		local firstvertex = readi32(mod_base, p + 12)
+		local numvertices = readi32(mod_base, p + 16)
+		local firstelement = readi32(mod_base, p + 20)
+		local numelements = readi32(mod_base, p + 24)
+		local numtriangles = libc.toint(numelements / 3)
+		if numtriangles * 3 ~= numelements then
+			Con_Printf(
+				'Mod_Q3BSP_LoadFaces: face #%i (texture "%s"): numelements %i is not a multiple of 3\n',
+				i,
+				surface.texture.name,
+				numelements
+			)
+			continue
+		end
+		if firstvertex < 0 or firstvertex + numvertices > q3.num_vertices then
+			Con_Printf(
+				'Mod_Q3BSP_LoadFaces: face #%i (texture "%s"): invalid vertex range %i : %i (%i vertices)\n',
+				i,
+				surface.texture.name,
+				firstvertex,
+				firstvertex + numvertices,
+				q3.num_vertices
+			)
+			continue
+		end
+		if firstelement < 0 or firstelement + numtriangles * 3 > q3.num_triangles * 3 then
+			Con_Printf(
+				'Mod_Q3BSP_LoadFaces: face #%i (texture "%s"): invalid element range %i : %i (%i elements)\n',
+				i,
+				surface.texture.name,
+				firstelement,
+				firstelement + numtriangles * 3,
+				q3.num_triangles * 3
+			)
+			continue
+		end
+		if type == Q3FACETYPE_PATCH then
+			patchsize[1] = readi32(mod_base, p + 96) -- specific.patch.patchsize[0]
+			patchsize[2] = readi32(mod_base, p + 100)
+			if
+				numvertices ~= (patchsize[1] * patchsize[2])
+				or patchsize[1] < 3
+				or patchsize[2] < 3
+				or bit32.band(patchsize[1], 1) == 0
+				or bit32.band(patchsize[2], 1) == 0
+				or patchsize[1] * patchsize[2]
+					>= math.min(
+						cvi("r_subdivisions_maxvertices", 65536),
+						cvi("r_subdivisions_collision_maxvertices", 4225)
+					)
+			then
+				Con_Printf(
+					'Mod_Q3BSP_LoadFaces: face #%i (texture "%s"): invalid patchsize %ix%i\n',
+					i,
+					surface.texture.name,
+					patchsize[1],
+					patchsize[2]
+				)
+				continue
+			end
+			local originalvertex3f = firstvertex * 12
+			local vertex3f: buffer = q3.data_vertex3f
+
+			-- convert patch to Q3FACETYPE_MESH
+			local xtess = curves.Q3PatchTesselationOnX(
+				patchsize[1],
+				patchsize[2],
+				3,
+				vertex3f,
+				originalvertex3f,
+				cvf("r_subdivisions_tolerance", 4)
+			)
+			local ytess = curves.Q3PatchTesselationOnY(
+				patchsize[1],
+				patchsize[2],
+				3,
+				vertex3f,
+				originalvertex3f,
+				cvf("r_subdivisions_tolerance", 4)
+			)
+			-- bound to user settings
+			xtess = bound(cvi("r_subdivisions_mintess", 0), xtess, cvi("r_subdivisions_maxtess", 1024))
+			ytess = bound(cvi("r_subdivisions_mintess", 0), ytess, cvi("r_subdivisions_maxtess", 1024))
+			-- bound to sanity settings
+			xtess = bound(0, xtess, 1024)
+			ytess = bound(0, ytess, 1024)
+
+			-- lower quality collision patches! Same procedure as before, but different cvars
+			-- convert patch to Q3FACETYPE_MESH
+			local cxtess = curves.Q3PatchTesselationOnX(
+				patchsize[1],
+				patchsize[2],
+				3,
+				vertex3f,
+				originalvertex3f,
+				cvf("r_subdivisions_collision_tolerance", 15)
+			)
+			local cytess = curves.Q3PatchTesselationOnY(
+				patchsize[1],
+				patchsize[2],
+				3,
+				vertex3f,
+				originalvertex3f,
+				cvf("r_subdivisions_collision_tolerance", 15)
+			)
+			-- bound to user settings
+			cxtess =
+				bound(cvi("r_subdivisions_collision_mintess", 0), cxtess, cvi("r_subdivisions_collision_maxtess", 1024))
+			cytess =
+				bound(cvi("r_subdivisions_collision_mintess", 0), cytess, cvi("r_subdivisions_collision_maxtess", 1024))
+			-- bound to sanity settings
+			cxtess = bound(0, cxtess, 1024)
+			cytess = bound(0, cytess, 1024)
+
+			-- store it for the LOD grouping step
+			patchtesscount += 1
+			patchtess[patchtesscount] = {
+				info = {
+					xsize = patchsize[1],
+					ysize = patchsize[2],
+					-- lods[PATCH_LOD_COLLISION + 1], lods[PATCH_LOD_VISUAL + 1]
+					lods = { { xtess = cxtess, ytess = cytess }, { xtess = xtess, ytess = ytess } },
+				},
+				surface_id = i,
+				lodgroup = {
+					readf32(mod_base, p + 60), -- specific.patch.mins
+					readf32(mod_base, p + 64),
+					readf32(mod_base, p + 68),
+					readf32(mod_base, p + 72), -- specific.patch.maxs
+					readf32(mod_base, p + 76),
+					readf32(mod_base, p + 80),
+				},
+				originalvertex3f = originalvertex3f,
+			}
+		elseif type == Q3FACETYPE_FLARE then
+			if developer_extra then
+				Con_DPrintf(
+					'Mod_Q3BSP_LoadFaces: face #%i (texture "%s"): Q3FACETYPE_FLARE not supported (yet)\n',
+					i,
+					surface.texture.name
+				)
+			end
+			-- don't render it
+			continue
+		end
+		-- (Q3FACETYPE_FLAT, Q3FACETYPE_MESH: no processing necessary)
+		surface.num_vertices = numvertices
+		surface.num_triangles = numtriangles
+		meshvertices += surface.num_vertices
+		meshtriangles += surface.num_triangles
+	end
+
+	-- Fix patches tesselations so that they make no seams
+	repeat
+		again = false
+		for i = 1, patchtesscount do
+			for j = i + 1, patchtesscount do
+				if not PATCHTESS_SAME_LODGROUP(patchtess[i], patchtess[j]) then
+					continue
+				end
+
+				if
+					curves.Q3PatchAdjustTesselation(
+						3,
+						patchtess[i].info,
+						q3.data_vertex3f,
+						patchtess[i].originalvertex3f,
+						patchtess[j].info,
+						q3.data_vertex3f,
+						patchtess[j].originalvertex3f
+					)
+				then
+					again = true
+				end
+			end
+		end
+	until not again
+
+	-- Calculate resulting number of triangles
+	local collisionvertices = 0
+	local collisiontriangles = 0
+	for i = 1, patchtesscount do
+		local pt = patchtess[i]
+		local surface = out[pt.surface_id + 1]
+		local finalwidth = curves.Q3PatchDimForTess(pt.info.xsize, pt.info.lods[PATCH_LOD_VISUAL + 1].xtess)
+		local finalheight = curves.Q3PatchDimForTess(pt.info.ysize, pt.info.lods[PATCH_LOD_VISUAL + 1].ytess)
+		local numvertices = finalwidth * finalheight
+		local numtriangles = (finalwidth - 1) * (finalheight - 1) * 2
+
+		surface.num_vertices = numvertices
+		surface.num_triangles = numtriangles
+		meshvertices += surface.num_vertices
+		meshtriangles += surface.num_triangles
+
+		finalwidth = curves.Q3PatchDimForTess(pt.info.xsize, pt.info.lods[PATCH_LOD_COLLISION + 1].xtess)
+		finalheight = curves.Q3PatchDimForTess(pt.info.ysize, pt.info.lods[PATCH_LOD_COLLISION + 1].ytess)
+		numvertices = finalwidth * finalheight
+		numtriangles = (finalwidth - 1) * (finalheight - 1) * 2
+
+		surface.num_collisionvertices = numvertices
+		surface.num_collisiontriangles = numtriangles
+		collisionvertices += surface.num_collisionvertices
+		collisiontriangles += surface.num_collisiontriangles
+	end
+
+	model_shared.loadmodel = loadmodel
+	model_shared.Mod_AllocSurfMesh(meshvertices, meshtriangles, false, true, false)
+	local surfmesh = loadmodel.surfmesh
+	if collisiontriangles ~= 0 then
+		loadmodel.brush.data_collisionvertex3f = buffer.create(collisionvertices * 12)
+		loadmodel.brush.data_collisionelement3i = buffer.create(collisiontriangles * 12)
+	end
+	meshvertices = 0
+	meshtriangles = 0
+	collisionvertices = 0
+	collisiontriangles = 0
+	local i = 0
+	while i < count and meshvertices + out[i + 1].num_vertices <= surfmesh.num_vertices do
+		local p = inofs + i * SIZEOF_q3dface_t
+		local surface = out[i + 1]
+		i += 1
+		local fi = i - 1 -- the C loop variable i for this surface
+		if surface.num_vertices < 3 or surface.num_triangles < 1 then
+			continue
+		end
+
+		local type = readi32(mod_base, p + 8)
+		local firstvertex = readi32(mod_base, p + 12)
+		local firstelement = readi32(mod_base, p + 20)
+		surface.num_firstvertex = meshvertices
+		surface.num_firsttriangle = meshtriangles
+		surface.num_firstcollisiontriangle = collisiontriangles
+		local fv = surface.num_firstvertex
+		local element3i: buffer = surfmesh.data_element3i
+		local eo = 12 * surface.num_firsttriangle -- byte offset of (data_element3i + 3 * num_firsttriangle)
+		if type == Q3FACETYPE_FLAT or type == Q3FACETYPE_MESH then
+			-- no processing necessary, except for lightmap merging
+			local nv = surface.num_vertices
+			buffer.copy(surfmesh.data_vertex3f, 12 * fv, q3.data_vertex3f, firstvertex * 12, nv * 12)
+			buffer.copy(surfmesh.data_normal3f, 12 * fv, q3.data_normal3f, firstvertex * 12, nv * 12)
+			buffer.copy(surfmesh.data_texcoordtexture2f, 8 * fv, q3.data_texcoordtexture2f, firstvertex * 8, nv * 8)
+			buffer.copy(surfmesh.data_texcoordlightmap2f, 8 * fv, q3.data_texcoordlightmap2f, firstvertex * 8, nv * 8)
+			buffer.copy(surfmesh.data_lightmapcolor4f, 16 * fv, q3.data_color4f, firstvertex * 16, nv * 16)
+			local src: buffer = q3.data_element3i
+			for j = 0, surface.num_triangles * 3 - 1 do
+				writei32(element3i, eo + j * 4, readi32(src, (firstelement + j) * 4) + fv)
+			end
+		elseif type == Q3FACETYPE_PATCH then
+			patchsize[1] = readi32(mod_base, p + 96)
+			patchsize[2] = readi32(mod_base, p + 100)
+			local originalvertex3f = firstvertex * 12
+			local originalnormal3f = firstvertex * 12
+			local originaltexcoordtexture2f = firstvertex * 8
+			local originaltexcoordlightmap2f = firstvertex * 8
+			local originalcolor4f = firstvertex * 16
+
+			local xtess, ytess, cxtess, cytess = -1, -1, -1, -1
+			for j = 1, patchtesscount do
+				if patchtess[j].surface_id == fi then
+					xtess = patchtess[j].info.lods[PATCH_LOD_VISUAL + 1].xtess
+					ytess = patchtess[j].info.lods[PATCH_LOD_VISUAL + 1].ytess
+					cxtess = patchtess[j].info.lods[PATCH_LOD_COLLISION + 1].xtess
+					cytess = patchtess[j].info.lods[PATCH_LOD_COLLISION + 1].ytess
+					break
+				end
+			end
+			if xtess == -1 then
+				Con_Printf("ERROR: patch %d isn't preprocessed?!?\n", fi)
+				xtess, ytess, cxtess, cytess = 0, 0, 0, 0
+			end
+
+			local finalwidth = curves.Q3PatchDimForTess(patchsize[1], xtess) --((patchsize[0] - 1) * xtess) + 1;
+			local finalheight = curves.Q3PatchDimForTess(patchsize[2], ytess) --((patchsize[1] - 1) * ytess) + 1;
+			local finalvertices = finalwidth * finalheight
+			local finaltriangles = (finalwidth - 1) * (finalheight - 1) * 2
+			local oldnumtriangles = finaltriangles
+			type = Q3FACETYPE_MESH
+			-- generate geometry
+			-- (note: normals are skipped because they get recalculated)
+			curves.Q3PatchTesselateFloat(
+				3,
+				12,
+				surfmesh.data_vertex3f,
+				12 * fv,
+				patchsize[1],
+				patchsize[2],
+				12,
+				q3.data_vertex3f,
+				originalvertex3f,
+				xtess,
+				ytess
+			)
+			curves.Q3PatchTesselateFloat(
+				3,
+				12,
+				surfmesh.data_normal3f,
+				12 * fv,
+				patchsize[1],
+				patchsize[2],
+				12,
+				q3.data_normal3f,
+				originalnormal3f,
+				xtess,
+				ytess
+			)
+			curves.Q3PatchTesselateFloat(
+				2,
+				8,
+				surfmesh.data_texcoordtexture2f,
+				8 * fv,
+				patchsize[1],
+				patchsize[2],
+				8,
+				q3.data_texcoordtexture2f,
+				originaltexcoordtexture2f,
+				xtess,
+				ytess
+			)
+			curves.Q3PatchTesselateFloat(
+				2,
+				8,
+				surfmesh.data_texcoordlightmap2f,
+				8 * fv,
+				patchsize[1],
+				patchsize[2],
+				8,
+				q3.data_texcoordlightmap2f,
+				originaltexcoordlightmap2f,
+				xtess,
+				ytess
+			)
+			curves.Q3PatchTesselateFloat(
+				4,
+				16,
+				surfmesh.data_lightmapcolor4f,
+				16 * fv,
+				patchsize[1],
+				patchsize[2],
+				16,
+				q3.data_color4f,
+				originalcolor4f,
+				xtess,
+				ytess
+			)
+			curves.Q3PatchTriangleElements(element3i, eo, finalwidth, finalheight, fv)
+
+			surface.num_triangles = model_shared.Mod_RemoveDegenerateTriangles(
+				surface.num_triangles,
+				element3i,
+				eo,
+				element3i,
+				eo,
+				surfmesh.data_vertex3f
+			)
+
+			if developer_extra then
+				if surface.num_triangles < finaltriangles then
+					Con_DPrintf(
+						"Mod_Q3BSP_LoadFaces: %ix%i curve subdivided to %i vertices / %i triangles, %i degenerate triangles removed (leaving %i)\n",
+						patchsize[1],
+						patchsize[2],
+						surface.num_vertices,
+						finaltriangles,
+						finaltriangles - surface.num_triangles,
+						surface.num_triangles
+					)
+				else
+					Con_DPrintf(
+						"Mod_Q3BSP_LoadFaces: %ix%i curve subdivided to %i vertices / %i triangles\n",
+						patchsize[1],
+						patchsize[2],
+						surface.num_vertices,
+						surface.num_triangles
+					)
+				end
+			end
+			-- q3map does not put in collision brushes for curves... ugh
+			-- build the lower quality collision geometry
+			finalwidth = curves.Q3PatchDimForTess(patchsize[1], cxtess) --((patchsize[0] - 1) * cxtess) + 1;
+			finalheight = curves.Q3PatchDimForTess(patchsize[2], cytess) --((patchsize[1] - 1) * cytess) + 1;
+			finalvertices = finalwidth * finalheight
+			finaltriangles = (finalwidth - 1) * (finalheight - 1) * 2
+			local oldnumtriangles2 = finaltriangles
+
+			-- legacy collision geometry implementation
+			local cv = buffer.create(12 * finalvertices)
+			local ce = buffer.create(12 * finaltriangles)
+			surface.deprecatedq3data_collisionvertex3f = cv
+			surface.deprecatedq3data_collisionelement3i = ce
+			surface.num_collisionvertices = finalvertices
+			surface.num_collisiontriangles = finaltriangles
+			curves.Q3PatchTesselateFloat(
+				3,
+				12,
+				cv,
+				0,
+				patchsize[1],
+				patchsize[2],
+				12,
+				q3.data_vertex3f,
+				originalvertex3f,
+				cxtess,
+				cytess
+			)
+			curves.Q3PatchTriangleElements(ce, 0, finalwidth, finalheight, 0)
+
+			--Mod_SnapVertices(3, out->num_vertices, (loadmodel->surfmesh.data_vertex3f + 3 * out->num_firstvertex), 0.25);
+			model_shared.Mod_SnapVertices(3, finalvertices, cv, 0, 1)
+
+			surface.num_collisiontriangles =
+				model_shared.Mod_RemoveDegenerateTriangles(finaltriangles, ce, 0, ce, 0, cv)
+
+			-- now optimize the collision mesh by finding triangle bboxes...
+			surface.deprecatedq3data_collisionbbox6f, surface.deprecatedq3num_collisionbboxstride =
+				Mod_Q3BSP_BuildBBoxes(
+					ce,
+					0,
+					surface.num_collisiontriangles,
+					cv,
+					cvi("mod_q3bsp_curves_collisions_stride", 16)
+				)
+			surface.deprecatedq3data_bbox6f, surface.deprecatedq3num_bboxstride = Mod_Q3BSP_BuildBBoxes(
+				element3i,
+				eo,
+				surface.num_triangles,
+				surfmesh.data_vertex3f,
+				cvi("mod_q3bsp_curves_stride", 16)
+			)
+
+			-- store collision geometry for BIH collision tree
+			local scv: buffer = loadmodel.brush.data_collisionvertex3f
+			local sce: buffer = loadmodel.brush.data_collisionelement3i
+			local scvo = collisionvertices * 12
+			local sceo = collisiontriangles * 12
+			curves.Q3PatchTesselateFloat(
+				3,
+				12,
+				scv,
+				scvo,
+				patchsize[1],
+				patchsize[2],
+				12,
+				q3.data_vertex3f,
+				originalvertex3f,
+				cxtess,
+				cytess
+			)
+			curves.Q3PatchTriangleElements(sce, sceo, finalwidth, finalheight, collisionvertices)
+			model_shared.Mod_SnapVertices(3, finalvertices, scv, scvo, 1)
+			-- remove this once the legacy code is removed
+			local nc = surface.num_collisiontriangles
+			surface.num_collisiontriangles =
+				model_shared.Mod_RemoveDegenerateTriangles(finaltriangles, sce, sceo, sce, sceo, scv)
+			if nc ~= surface.num_collisiontriangles then
+				Con_Printf("number of collision triangles differs between BIH and BSP. FAIL.\n")
+			end
+
+			if developer_extra then
+				Con_DPrintf(
+					"Mod_Q3BSP_LoadFaces: %ix%i curve became %i:%i vertices / %i:%i triangles (%i:%i degenerate)\n",
+					patchsize[1],
+					patchsize[2],
+					surface.num_vertices,
+					surface.num_collisionvertices,
+					oldnumtriangles,
+					oldnumtriangles2,
+					oldnumtriangles - surface.num_triangles,
+					oldnumtriangles2 - surface.num_collisiontriangles
+				)
+			end
+
+			collisionvertices += finalvertices
+			collisiontriangles += surface.num_collisiontriangles
+		end
+		meshvertices += surface.num_vertices
+		meshtriangles += surface.num_triangles
+		local invalidelements = 0
+		for j = 0, surface.num_triangles * 3 - 1 do
+			local e = readi32(element3i, eo + j * 4)
+			if e < fv or e >= fv + surface.num_vertices then
+				invalidelements += 1
+			end
+		end
+		if invalidelements ~= 0 then
+			Con_Printf(
+				'Mod_Q3BSP_LoadFaces: Warning: face #%i has %i invalid elements, type = %i, texture->name = "%s", texture->surfaceflags = %i, firstvertex = %i, numvertices = %i, firstelement = %i, numelements = %i, elements list:\n',
+				fi,
+				invalidelements,
+				type,
+				surface.texture.name,
+				surface.texture.surfaceflags,
+				firstvertex,
+				surface.num_vertices,
+				firstelement,
+				surface.num_triangles * 3
+			)
+			for j = 0, surface.num_triangles * 3 - 1 do
+				local e = readi32(element3i, eo + j * 4)
+				Con_Printf(" %i", e - fv)
+				if e < fv or e >= fv + surface.num_vertices then
+					writei32(element3i, eo + j * 4, fv)
+				end
+			end
+			Con_Print("\n")
+		end
+		-- calculate a bounding box
+		local mins, maxs = surface.mins, surface.maxs
+		mins[1], mins[2], mins[3] = 0, 0, 0
+		maxs[1], maxs[2], maxs[3] = 0, 0, 0
+		if surface.num_vertices ~= 0 then
+			-- (cls.state != ca_dedicated && out->lightmaptexture: lightmap texcoords are remapped into the merged
+			-- lightmap; NOT YET PORTED, see the note above the function)
+			local vertex3f: buffer = surfmesh.data_vertex3f
+			for c = 1, 3 do
+				mins[c] = readf32(vertex3f, 12 * fv + (c - 1) * 4)
+				maxs[c] = mins[c]
+			end
+			for j = 1, surface.num_vertices - 1 do
+				local v = 12 * (fv + j)
+				for c = 1, 3 do
+					local x = readf32(vertex3f, v + (c - 1) * 4)
+					mins[c] = math.min(mins[c], x)
+					maxs[c] = math.max(maxs[c], x)
+				end
+			end
+			for c = 1, 3 do
+				mins[c] = R(mins[c] - 1.0)
+				maxs[c] = R(maxs[c] + 1.0)
+			end
+		end
+		-- set lightmap styles for consistency with q1bsp
+		--out->lightmapinfo->styles[0] = 0;
+		--out->lightmapinfo->styles[1] = 255;
+		--out->lightmapinfo->styles[2] = 255;
+		--out->lightmapinfo->styles[3] = 255;
+	end
+
+	for si = 0, count - 1 do
+		local surface = out[si + 1]
+		if surface.num_vertices ~= 0 and surface.num_triangles ~= 0 then
+			continue
+		end
+		local texname = if surface.texture then surface.texture.name else "(none)"
+		if surface.num_vertices == 0 then
+			Con_Printf("Mod_Q3BSP_LoadFaces: surface %d (texture %s) has no vertices, ignoring\n", si, texname)
+			if surface.num_triangles == 0 then
+				Con_Printf("Mod_Q3BSP_LoadFaces: surface %d (texture %s) has no triangles, ignoring\n", si, texname)
+			end
+		elseif surface.num_triangles == 0 then
+			local vertex3f: buffer = surfmesh.data_vertex3f
+			local fv = surface.num_firstvertex
+			Con_Printf(
+				"Mod_Q3BSP_LoadFaces: surface %d (texture %s, near %f %f %f) has no triangles, ignoring\n",
+				si,
+				texname,
+				readf32(vertex3f, 12 * fv + 0 * 12),
+				readf32(vertex3f, 12 * fv + 1 * 12),
+				readf32(vertex3f, 12 * fv + 2 * 12)
+			)
+		end
+	end
+
+	-- for per pixel lighting
+	if surfmesh.num_vertices ~= 0 and surfmesh.num_triangles ~= 0 then
+		model_shared.Mod_BuildTextureVectorsFromNormals(
+			0,
+			surfmesh.num_vertices,
+			surfmesh.num_triangles,
+			surfmesh.data_vertex3f,
+			surfmesh.data_texcoordtexture2f,
+			surfmesh.data_normal3f,
+			surfmesh.data_element3i,
+			0,
+			surfmesh.data_svector3f,
+			surfmesh.data_tvector3f,
+			cvi("r_smoothnormals_areaweighting", 1) ~= 0
+		)
+	end
+
+	-- generate ushort elements array if possible
+	if surfmesh.data_element3s then
+		local e3s: buffer = surfmesh.data_element3s
+		local e3i: buffer = surfmesh.data_element3i
+		for j = 0, surfmesh.num_triangles * 3 - 1 do
+			buffer.writeu16(e3s, j * 2, bit32.band(readi32(e3i, j * 4), 0xFFFF))
+		end
+	end
+
+	-- free the no longer needed vertex data
+	q3.num_vertices = 0
+	q3.data_vertex3f = nil
+	q3.data_normal3f = nil
+	q3.data_texcoordtexture2f = nil
+	q3.data_texcoordlightmap2f = nil
+	q3.data_color4f = nil
+	-- free the no longer needed triangle data
+	q3.num_triangles = 0
+	q3.data_element3i = nil
 end
 
 -- port: model_brush.c Mod_Q3BSP_LoadModels L6418-6453 @xonotic-v0.8.6
@@ -1243,6 +2023,9 @@ local function Mod_Q3BSP_Load(mod: dp_model_t, data: string)
 	Mod_Q3BSP_LoadEffects(hl[Q3LUMP_EFFECTS + 1])
 	Mod_Q3BSP_LoadVertices(hl[Q3LUMP_VERTICES + 1])
 	Mod_Q3BSP_LoadTriangles(hl[Q3LUMP_TRIANGLES + 1])
+	if model_brush.debug_after_triangles then
+		model_brush.debug_after_triangles(loadmodel)
+	end
 	Mod_Q3BSP_LoadLightmaps(hl[Q3LUMP_LIGHTMAPS + 1], hl[Q3LUMP_FACES + 1])
 	Mod_Q3BSP_LoadFaces(hl[Q3LUMP_FACES + 1])
 	Mod_Q3BSP_LoadModels(hl[Q3LUMP_MODELS + 1])

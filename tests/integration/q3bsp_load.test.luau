@@ -45,6 +45,7 @@ return function(ctx: t.Ctx)
 		warnings += 1
 	end
 	local brushes, nilbrushes, points = 0, 0, 0
+	local surfaces, patches, meshverts = 0, 0, 0
 	for line in string.gmatch(t.read("tests/vectors/q3bsp.tsv"), "[^\r\n]+") do
 		if string.sub(line, 1, 1) == "#" then
 			continue
@@ -52,7 +53,23 @@ return function(ctx: t.Ctx)
 		local c = string.split(line, "\t")
 		local name = c[1]
 		local mod = model_brush.newmodel("maps/" .. name .. ".bsp")
-		model_brush.Mod_IBSP_Load(mod, lfs.readFile(`{dir}/{name}.bsp`))
+		-- the brushq3 vertex / triangle arrays are freed by Mod_Q3BSP_LoadFaces: checksum them before
+		local pre: { [string]: any } = {}
+		model_brush.debug_after_triangles = function(m: any)
+			local mq = m.brushq3
+			pre.num_vertices = mq.num_vertices
+			pre.vertex3f = fnv(mq.data_vertex3f)
+			pre.normal3f = fnv(mq.data_normal3f)
+			pre.texcoordtexture2f = fnv(mq.data_texcoordtexture2f)
+			pre.texcoordlightmap2f = fnv(mq.data_texcoordlightmap2f)
+			pre.color4f = fnv(mq.data_color4f)
+			pre.lit = m.lit
+			pre.num_triangles = mq.num_triangles
+			pre.element3i = fnv(mq.data_element3i or buffer.create(0))
+		end
+		local filedata = lfs.readFile(`{dir}/{name}.bsp`)
+		model_brush.Mod_IBSP_Load(mod, filedata)
+		model_brush.debug_after_triangles = nil
 		local brush, q3 = mod.brush, mod.brushq3
 		local col = 1
 		local function want(got: any, what: string)
@@ -111,15 +128,15 @@ return function(ctx: t.Ctx)
 		want(fnv(bb), "brushes")
 		want(q3.num_effects, "num_effects")
 
-		want(q3.num_vertices, "num_vertices")
-		want(fnv(q3.data_vertex3f), "data_vertex3f")
-		want(fnv(q3.data_normal3f), "data_normal3f")
-		want(fnv(q3.data_texcoordtexture2f), "data_texcoordtexture2f")
-		want(fnv(q3.data_texcoordlightmap2f), "data_texcoordlightmap2f")
-		want(fnv(q3.data_color4f), "data_color4f")
-		want(if mod.lit then 1 else 0, "lit")
-		want(q3.num_triangles, "num_triangles")
-		want(fnv(q3.data_element3i or buffer.create(0)), "data_element3i")
+		want(pre.num_vertices, "num_vertices")
+		want(pre.vertex3f, "data_vertex3f")
+		want(pre.normal3f, "data_normal3f")
+		want(pre.texcoordtexture2f, "data_texcoordtexture2f")
+		want(pre.texcoordlightmap2f, "data_texcoordlightmap2f")
+		want(pre.color4f, "data_color4f")
+		want(if pre.lit then 1 else 0, "lit (vertex colours)")
+		want(pre.num_triangles, "num_triangles")
+		want(pre.element3i, "data_element3i")
 		want(mod.num_surfaces, "num_surfaces")
 
 		local mb = buffer.create(q3.num_models * 40)
@@ -199,6 +216,81 @@ return function(ctx: t.Ctx)
 			end
 		end
 		want(fnv(xb), "num_lightgrid_indexfromworld")
+		-- surfaces against the raw face lump: flat and mesh faces are copies of the lump's vertices and
+		-- elements; a patch has the vertex count of its tesselation and only valid elements
+		local fb = buffer.fromstring(filedata)
+		local vofs, fofs, eofs =
+			buffer.readi32(fb, 8 + 10 * 8), buffer.readi32(fb, 8 + 13 * 8), buffer.readi32(fb, 8 + 11 * 8)
+		local sm = mod.surfmesh
+		local flat, patch, bad = 0, 0, 0
+		local sumv, sumt = 0, 0
+		local controlverts = 0
+		for si, s in mod.data_surfaces do
+			local fp = fofs + (si - 1) * 104
+			local ftype = buffer.readi32(fb, fp + 8)
+			local fv = s.num_firstvertex
+			sumv += s.num_vertices
+			sumt += s.num_triangles
+			if s.num_vertices == 0 then
+				continue
+			end
+			for j = 0, s.num_triangles * 3 - 1 do
+				local e = buffer.readi32(sm.data_element3i, (s.num_firsttriangle * 3 + j) * 4)
+				if e < fv or e >= fv + s.num_vertices then
+					bad += 1
+				end
+			end
+			if ftype == 1 or ftype == 3 then
+				flat += 1
+				local first, n = buffer.readi32(fb, fp + 12), buffer.readi32(fb, fp + 16)
+				local same = n == s.num_vertices
+				for j = 0, n - 1 do
+					local src = vofs + (first + j) * 44
+					for k = 0, 8, 4 do
+						if buffer.readu32(sm.data_vertex3f, (fv + j) * 12 + k) ~= buffer.readu32(fb, src + k) then
+							same = false
+						end
+						if buffer.readu32(sm.data_normal3f, (fv + j) * 12 + k) ~= buffer.readu32(fb, src + 28 + k) then
+							same = false
+						end
+					end
+					if buffer.readu32(sm.data_texcoordtexture2f, (fv + j) * 8) ~= buffer.readu32(fb, src + 12) then
+						same = false
+					end
+				end
+				local fe = buffer.readi32(fb, fp + 20)
+				for j = 0, s.num_triangles * 3 - 1 do
+					local e = buffer.readi32(sm.data_element3i, (s.num_firsttriangle * 3 + j) * 4)
+					if e - fv ~= buffer.readi32(fb, eofs + (fe + j) * 4) then
+						same = false
+					end
+				end
+				if not same then
+					t.ok(ctx, false, `{name}: surface {si - 1} is not a copy of its face's vertices / elements`)
+				end
+			elseif ftype == 2 then
+				patch += 1
+				controlverts += buffer.readi32(fb, fp + 16)
+				t.ok(
+					ctx,
+					s.num_collisiontriangles <= s.num_collisionvertices * 2,
+					`{name}: patch {si - 1} collision counts`
+				)
+			end
+		end
+		t.eq(ctx, bad, 0, name .. ": elements outside their surface")
+		-- the engine also counts every patch's control points when it sizes the mesh (model_brush.c L6111-6114
+		-- add them once, L6140-6143 add the tesselated count again), so that many vertices stay unused
+		t.eq(
+			ctx,
+			sumv + controlverts,
+			sm.num_vertices,
+			name .. ": surface vertices + patch control points = mesh vertices"
+		)
+		t.ok(ctx, sumt <= sm.num_triangles, name .. ": triangle count")
+		surfaces += #mod.data_surfaces
+		patches += patch
+		meshverts += sm.num_vertices
 	end
 	console.sink = oldsink
 	print(

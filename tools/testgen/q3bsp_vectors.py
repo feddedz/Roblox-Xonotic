@@ -93,6 +93,8 @@ def one(path: Path) -> list[str]:
     # leafs / nodes
     leafs = [struct.unpack_from("<12i", lump(4), i) for i in range(0, L[4][1], 48)]
     leafbrushes = [x for (x,) in struct.iter_unpack("<i", lump(6))]
+    leafsurfaces = [x for (x,) in struct.iter_unpack("<i", lump(5))]
+    faces = lump(13)
     nodes = [struct.unpack_from("<9i", lump(3), i) for i in range(0, L[3][1], 36)]
     # the tree below node 0: combinedsupercontents is only set on nodes and leafs the engine reaches from the
     # root (Mod_Q1BSP_LoadNodes_RecursiveSetParent); leafs outside it (submodel leafs) stay 0
@@ -116,6 +118,12 @@ def one(path: Path) -> list[str]:
         if li in reached:
             for j in range(nb):
                 comb |= texsuper[brushes[leafbrushes[fb + j]][2]]
+            # collision surfaces = patches (a valid patch always tesselates to collision triangles)
+            for j in range(ns):
+                tx, _, typ, _, nverts, _, _ = struct.unpack_from("<7i", faces, leafsurfaces[fs + j] * 104)
+                pw, ph = struct.unpack_from("<2i", faces, leafsurfaces[fs + j] * 104 + 96)
+                if typ == 2 and nverts == pw * ph and pw >= 3 and ph >= 3 and pw & 1 and ph & 1 and pw * ph < 4225:
+                    comb |= texsuper[tx]
         leafcomb.append(comb)
         hl += struct.pack("<ii6fiiiiI", cl, ar, a - 1, b - 1, c - 1, e1 + 1, f + 1, g + 1, fs, ns, fb, nb, comb)
     nodecomb = [0] * len(nodes)
