@@ -49,6 +49,14 @@ None new (D-025 + the owner's brief of 2026-11-24 applied).
   work/upload/run.log, commits roblox-images.tsv every 10 min); upload_images.py reads one owned asset before
   uploading, so a missing or blocked key stops before any upload. Not run end to end (no key).
 
+## Upload (2026-11-24, owner's PC)
+- Owner entered the key in a masked pop-up (tools/upload/set_key.ps1 → Windows user variable; never in chat/repo).
+- `run_unattended.ps1 -UserId 876999276 -Jobs 6 -Batch 100`: 77 batches, 7,634 ok, 0 not ok; every batch
+  "all approved"; no Rejected, no 403, no 45-min timeout. About 2.5 h.
+- Check: all 10,910 rows of upload-ready.tsv (incl. the 122 fixed3 rows) have an asset id in roblox-images.tsv.
+  Its 316 error rows are the "User is moderated" rows of 2026-11-22 (same count as before this run).
+
 ## Next step
-Owner sets ROBLOX_API_KEY (Windows user variable) → `powershell -File tools/upload/run_unattended.ps1 -UserId
-876999276 -Jobs 6 -Batch 100`. Stop on Rejected, 403, or Reviewing > 45 min (the uploader does this itself).
+Owner: archive the 28 assets of assets/manifest/archive-now.tsv; decide on the 119 flagged images that were
+uploaded before the ban (live_findings_{a..c}.tsv, not part of this task). The key stays on the PC until
+`set_key.ps1 -Remove`.
