@@ -1,0 +1,38 @@
+# n	vpath	asset_id	issue	severity(high/medium/low)	what exactly
+6	darkplaces-icon.jpg	139185775803687	brand/logo	low	darkplaces-icon: DarkPlaces engine logo (bird emblem), third-party engine branding
+8	darkplaces-icon2.jpg	125411424520306	brand/logo	low	darkplaces-icon2: DarkPlaces engine logo
+130	env/newsky_asteroids/asteroids.jpg	119082663393301	text	low	newsky asteroids preview: text "NewSky Asteroids" (third-party skybox pack name)
+136	env/newsky_nebulae/nebulae.jpg	101431984945238	text	low	newsky nebulae preview: text "NewSky Nebulae"
+141	env/newsky_planets/planets.jpg	78730484928130	text	low	newsky planets preview: text "NewSky Planets"
+191	gfx/blood.jpg	102694919490077	blood/gore	high	gfx/blood.jpg: blood splatter decal (dark splat with droplets radiating out); filename literally "blood"
+193	gfx/blood_alpha.jpg	110067246759641	blood/gore	high	gfx/blood_alpha.jpg: alpha mask of the same blood splatter (splat + droplets)
+220	gfx/conback.jpg	103335832635209	text	low	console background: blurred lines of source code (illegible, but text-like)
+223	gfx/conback3_alpha.jpg	123170039395629	brand/logo	low	conback3_alpha: faint "XONOTIC" wordmark + logo at bottom (off-platform game name)
+224	gfx/conback_alpha.jpg	138008225459113	text	low	conback_alpha: blurred source-code text (illegible), could be OCR-ed into random strings
+225	gfx/conback3.jpg	116994473194972	brand/logo	medium	conback3.jpg: large clear "XONOTIC" wordmark with eagle logo (off-platform game brand; earlier strike was xonotic.org)
+246	gfx/crosshair19.jpg	100399166151451	symbol	low	crosshair19: 4-blade pinwheel with rotational symmetry; at a glance could be read as a rotated/hooked-cross-like shape
+389	gfx/crosshairt.jpg	98718433762614	brand/logo	low	crosshairt: lone white lowercase "t" on black square, resembles Tumblr logo
+393	gfx/crosshairt_alpha.jpg	79957342178832	brand/logo	low	crosshairt_alpha: same lowercase "t"
+408	gfx/hud/default/ammo_bullets.jpg	70481975339960	text	low	ammo_bullets: tiny illegible text printed on ammo cans
+416	gfx/hud/default/ammo_rockets.jpg	106172231688583	text	low	ammo_rockets: crate with tiny illegible stenciled text (likely "HIGH EXPLOSIVES")
+495	gfx/hud/default/health.jpg	114189897678774	symbol	low	health: red cross (Red Cross emblem is a protected symbol; common in games)
+547	gfx/hud/default/minigames/bd/brick6.jpg	70635660328228	symbol	low	minigame bd brick6: red cross on brick tile
+558	gfx/hud/default/minigames/c4/board_alpha.jpg	110615530739593	brand/logo	medium	minigame c4 board_alpha: "XONOTIC" wordmark spelled in board holes + eagle logo
+560	gfx/hud/default/minigames/c4/board_under.jpg	128146936449698	brand/logo	medium	minigame c4 board_under: "XONOTIC" wordmark + winged eagle logo
+562	gfx/hud/default/minigames/c4/board_under_alpha.jpg	138653462970605	brand/logo	medium	minigame c4 board_under_alpha: "XONOTIC" wordmark + winged eagle logo
+564	gfx/hud/default/minigames/c4/board.jpg	139200439446594	brand/logo	medium	minigame c4 board: "XONOTIC" wordmark + logo in blue board
+566	gfx/hud/default/minigames/c4/board_over.jpg	111087246913871	brand/logo	low	minigame c4 board_over: faint winged Xonotic logo behind holes
+572	gfx/hud/default/minigames/nmm/board.jpg	130064745212992	brand/logo	low	minigame nmm board: winged Xonotic eagle logo
+575	gfx/hud/default/minigames/nmm/board_alpha.jpg	127760545249429	brand/logo	low	minigame nmm board_alpha: winged Xonotic eagle logo
+583	gfx/hud/default/minigames/pong/board_alpha.jpg	92692108098303	brand/logo	low	minigame pong board_alpha: winged Xonotic eagle logo
+586	gfx/hud/default/minigames/pong/board.jpg	114690429652286	brand/logo	low	minigame pong board: winged Xonotic eagle logo
+599	gfx/hud/default/minigames/pp/piece_taken.jpg	104770575952046	splatter	low	minigame pp piece_taken: white liquid-splat shape; could read as blood splatter if tinted red
+605	gfx/hud/default/minigames/ttt/board_alpha.jpg	126854085396145	brand/logo	low	minigame ttt board_alpha: winged Xonotic eagle logo
+611	gfx/hud/default/minigames/ttt/board.jpg	108271471761891	brand/logo	low	minigame ttt board: winged Xonotic eagle logo
+638	gfx/hud/default/notify_camping.jpg	113859770126940	real photo	low	notify_camping: real photograph of a tent with clothes/items (red items) at entrance
+643	gfx/hud/default/notify_headshot.jpg	93867009513964	text	low	notify_headshot: word "HEAD" alone on a badge (out of context could be misread)
+649	gfx/hud/default/notify_melee_shotgun.jpg	124514453417737	real photo	low	notify_melee_shotgun: real photograph of a trout (fish)
+709	gfx/hud/default/shield.jpg	85528620066246	foreign text	low	shield: kanji 寿 ("longevity") in pink; foreign characters a moderator may not read
+711	gfx/hud/default/strength.jpg	101651235011622	foreign text	low	strength: katakana/kanji 力 ("power") in blue
+1085	gfx/hud/luma/superweapons.jpg	101987207392885	symbol	low	luma superweapons: mushroom-cloud (nuclear explosion) on warning triangle
+# reviewed sheets s000-s030: 36 flagged

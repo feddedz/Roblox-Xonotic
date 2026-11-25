@@ -1,0 +1,51 @@
+particles/particlefont.jpg	gore	maybe	0 128 2048 128	row 1 (tiles 16-31) are white blood-droplet/splat sprites tinted red in-engine; reshape into round soft blobs (and change effectinfo tint only if allowed)
+particles/particlefont-template.jpg	gore	maybe	0 128 2048 128	same splat sprites as particlefont row 1; reshape or exclude template (not used in-game) from upload
+textures/aggressor/numlock.jpg	phone	maybe	whole	keypad digits 1-9 + PANIC/OK/CLR; not a phone number, low risk; if flagged blur digits
+textures/bloodyskull.jpg	gore	high	whole	recolor dark-red blood stains around eyes/nose/jaw to bone colour (match cleanskull.jpg); also rename asset (name contains 'bloody')
+textures/bloodyskull_pants.jpg	gore	maybe	whole	colormap mask of blood areas (white blobs, tinted in-engine); harmless alone but rename asset; replace with cleanskull mask if tint shows red
+textures/bloodyskull_alien.jpg	other	maybe	whole	no blood visible (green alien skull); only asset name contains 'bloody': rename on upload
+textures/bloodyskull_robot.jpg	other	maybe	whole	no blood visible; asset name contains 'bloody': rename on upload (also _glow/_pants variants)
+textures/cockpit.jpg	brand	maybe	0 0 1024 128	real car gauge photos: blur 'COBALT' logo (~95 75 60 13) and AutoGauge logo (~357 72 45 20) and any small maker text on gauge faces
+textures/cockpit_glow.jpg	brand	maybe	0 0 1024 128	glow map of the same gauges; blur same logo areas
+textures/decals/splatter01.jpg	gore	high	whole	dark-red blood splatter decal: recolor to neutral grey/brown soot or reshape into non-blood dirt blob
+textures/decals/splatter01_alpha.jpg	gore	high	whole	alpha of blood splatter; reshape together with splatter01
+textures/decals/splatter02.jpg	gore	high	whole	blood splatter/smear decal: recolor to neutral soot, reshape
+textures/decals/splatter02_alpha.jpg	gore	high	whole	alpha of blood splatter02
+textures/decals/splatter03.jpg	gore	high	whole	blood spray splatter decal: recolor to neutral soot, reshape
+textures/decals/splatter03_alpha.jpg	gore	high	whole	alpha of blood splatter03 (splat-shaped)
+textures/decals/splatter04.jpg	gore	high	whole	blood splatter decal: recolor/reshape
+textures/decals/splatter04_alpha.jpg	gore	high	whole	alpha of blood splatter04
+textures/decals/splatter05.jpg	gore	high	whole	blood spray decal: recolor/reshape
+textures/decals/splatter05_alpha.jpg	gore	high	whole	alpha of blood splatter05
+textures/desertfactory_signs/above_dirty.jpg	gore	high	whole	red blood drops spattered on CAUTION sign: paint drops over with sign yellow/dirt
+textures/desertfactory_shaders/sign_above_dirty.jpg	gore	high	whole	editor copy of above_dirty with blood drops: same fix
+textures/dmask1.jpg	gore	maybe	5 125 95 110	exposed red gums/teeth flesh under helmet; tone down red flesh to darker mechanical/neutral colour
+textures/e7/e7wgrate.jpg	other	maybe	190 70 130 120	pentagram-in-circle grate ornament (occult symbol, low risk); if flagged, change star to plain 5-spoke wheel
+textures/e7/e7wgrate_alpha.jpg	other	maybe	190 70 130 120	alpha of the pentagram grate; same fix
+textures/e7/e7bigwall.jpg	other	maybe	90 300 85 120	inverted pentagram star in circle on gothic panel (low risk); if flagged, rotate/alter star
+textures/evil1_floors/br_tiles_blood.jpg	gore	high	18 88 161 140	blood pool on green tiles: recolor stain to tile green/grey grime (base br_tiles.jpg is clean)
+textures/evil1_floors/br_tiles_brkblood.jpg	gore	high	307 57 162 140	blood stain beside broken tiles: recolor to grime/dirt
+textures/evil1_floors/carpet_drty_blood.jpg	gore	high	whole	large blood stains on carpet (lower right): recolor to carpet brown dirt (base carpet_drty.jpg is clean)
+textures/evil1_floors/carpet_drty_blood2.jpg	gore	high	whole	blood stains on carpet: recolor to brown dirt
+textures/evil1_floors/floortilebig2.jpg	gore	high	87 118 100 87	bright red blood splat on tiles: recolor to dark grime
+textures/evil1_liquids/lavaish.jpg	gore	maybe	whole	bright red mottled lava; not blood but could be read as blood pool; if flagged, shift hue toward orange
+textures/evil1_liquids/lavaishb.jpg	gore	maybe	whole	same red lava variant; shift toward orange if flagged
+textures/evil1_walls/crude_1.jpg	gore	maybe	11 2 237 166	dark red-brown rust drips resemble blood drips; desaturate red toward rust-orange/brown
+textures/evil1_walls/crude_2.jpg	gore	maybe	9 5 239 143	darker rust drips resembling blood; desaturate red
+textures/evil2_basefloor/flr_b-w_drty_bbig.jpg	gore	high	93 218 294 195	blood splatters on checker floor: recolor to black grime
+textures/evil2_basefloor/flr_b-w_drty_bld.jpg	gore	high	30 38 211 194	blood splatters/pools on checker floor: recolor to black grime
+textures/evil2_basefloor/flr_b-w_drty_bld2.jpg	gore	high	126 44 83 145	blood splatter on checker floor: recolor to black grime
+textures/evil2_basefloor/flr_tmtl_drk_bld.jpg	gore	high	96 49 115 89	red blood splat on metal grate floor: recolor to dark oil/grime
+textures/evil2_basewall/cementwall_btm_gore.jpg	gore	high	11 164 216 84	blood smears at bottom of cement wall: recolor to grey/black grime
+textures/evil2_basewall/dirtybrick_faded_stn.jpg	gore	maybe	44 69 178 152	red smeared stain on brick reads as blood: desaturate to brown soot
+textures/evil2_misc/crate_drtycamo2.jpg	gore	high	0 150 256 106	blood splatter along bottom of crate: recolor to dark wood grime (crate_drtycamo.jpg is clean)
+textures/evil2_misc/crate_drtyow.jpg	gore	high	0 150 256 106	blood splatter at bottom of crate: recolor to dark wood grime
+textures/evil2_misc/crate_drtyow_sign.jpg	gore	high	0 150 256 106	blood splatter at bottom of crate (same base as crate_drtyow): recolor to grime
+textures/evil2_misc/ecrate_drty2.jpg	gore	high	0 150 256 106	blood splatter at bottom of crate: recolor to grime
+textures/evil2_misc/ecrate_drty3ow.jpg	gore	high	0 140 256 116	blood splatter at bottom of crate: recolor to grime
+textures/evil3_floors/bdirt_blood.jpg	gore	high	30 19 206 214	large blood pool on cracked dirt: recolor to dirt brown (bdirt.jpg is clean)
+textures/evil3_floors/cemdrk_oddtile_bld.jpg	gore	high	20 20 220 220	large blood pool on tiles: recolor to dark grime
+textures/evil3_floors/cemdrk_oddtile_bldb.jpg	gore	high	20 20 220 220	blood pool with a brain/flesh chunk (~83 55 51 56): remove chunk, recolor blood to grime
+textures/evil3_floors/wd_tile_drk_bld.jpg	gore	high	23 38 185 163	blood splatter on wood floor: recolor to dark wood stain
+textures/evil3_floors/woodvfloor3_brain.jpg	gore	high	40 10 200 230	brain chunk (~150 35 70 45) plus blood pools on wood floor: remove brain, recolor blood to grime
+textures/evil6_support/e6panelsym.jpg	phone	maybe	64 110 40 14	faint stencilled number '332-6x' at bottom could read as phone-number fragment; blur/smudge digits

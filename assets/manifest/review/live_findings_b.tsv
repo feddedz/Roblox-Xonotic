@@ -1,0 +1,42 @@
+# n	vpath	asset_id	issue	severity(high/medium/low)	what exactly
+1224	gfx/hud/luminos/dom_icon_yellow-highlighted.jpg	100672633534579	hate-symbol lookalike	medium	Yellow domination icon: ring with an equal-armed cross extending past the circle (end bars) -> resembles Celtic/sun cross
+1225	gfx/hud/luminos/dom_icon_yellow-highlighted_alpha.jpg	101840611910938	hate-symbol lookalike	medium	Yellow domination icon: ring with an equal-armed cross extending past the circle (end bars) -> resembles Celtic/sun cross
+1226	gfx/hud/luminos/dom_icon_yellow.jpg	101504762525363	hate-symbol lookalike	medium	Yellow domination icon: ring with an equal-armed cross extending past the circle (end bars) -> resembles Celtic/sun cross
+1228	gfx/hud/luminos/dom_icon_yellow_alpha.jpg	84816081599850	hate-symbol lookalike	medium	Yellow domination icon: ring with an equal-armed cross extending past the circle (end bars) -> resembles Celtic/sun cross
+1261	gfx/hud/old/armor.jpg	135871780293023	body-like shape	low	Green muscled armor torso (pecs/abs) - armor, not skin, but body-shaped
+1263	gfx/hud/old/armor_big.jpg	97834622077468	body-like shape	low	Green muscled armor torso (pecs/abs) - armor, not skin, but body-shaped
+1267	gfx/hud/old/armor_mega.jpg	133259190814047	body-like shape	low	Green muscled armor torso (pecs/abs) - armor, not skin, but body-shaped
+1288	gfx/hud/old/dom_icon_yellow-highlighted.jpg	85575972346055	hate-symbol lookalike	medium	Yellow domination icon: ring with an equal-armed cross extending past the circle (end bars) -> resembles Celtic/sun cross
+1289	gfx/hud/old/dom_icon_yellow-highlighted_alpha.jpg	85592337939072	hate-symbol lookalike	medium	Yellow domination icon: ring with an equal-armed cross extending past the circle (end bars) -> resembles Celtic/sun cross
+1290	gfx/hud/old/dom_icon_yellow_alpha.jpg	114996070666957	hate-symbol lookalike	medium	Yellow domination icon: ring with an equal-armed cross extending past the circle (end bars) -> resembles Celtic/sun cross
+1291	gfx/hud/old/dom_icon_yellow.jpg	74942145475222	hate-symbol lookalike	medium	Yellow domination icon: ring with an equal-armed cross extending past the circle (end bars) -> resembles Celtic/sun cross
+1323	gfx/hud/old/health.jpg	97217089429022	trademark lookalike	low	Red cross on dark background (health icon) - Red Cross emblem is protected
+1333	gfx/hud/old/item_large_armor.jpg	129786876110423	body-like shape	low	Green muscled armor torso (pecs/abs) - armor, not skin, but body-shaped
+1417	gfx/leave_em_behind_mini.jpg	71699447678506	hate symbol	high	Leave_em_behind map minimap: cross-shaped layout whose four arms bend the same rotational direction -> reads as a swastika/pinwheel cross at a glance
+1419	gfx/loading.jpg	71240200034349	brand logo	medium	Large XONOTIC logo (phoenix emblem) + "Loading"
+1423	gfx/menu/luma/background_ingame_l2.jpg	93021271349392	brand logo	medium	XONOTIC logo with "0.8.6" version text (menu background layer)
+1424	gfx/menu/luma/background_ingame_l2_alpha.jpg	105812862310546	brand logo	medium	XONOTIC logo with "0.8.6" version text (menu background layer)
+1489	gfx/menu/luma/gametype_ca.jpg	134478987332383	political symbol lookalike	low	Raised clenched fist gametype icons (CA/LMS/Mayhem) - can read as protest/power-fist symbol
+1490	gfx/menu/luma/gametype_ca_alpha.jpg	74592826179820	political symbol lookalike	low	Raised clenched fist gametype icons (CA/LMS/Mayhem) - can read as protest/power-fist symbol
+1513	gfx/menu/luma/gametype_lms_alpha.jpg	130662810043208	political symbol lookalike	low	Raised clenched fist gametype icons (CA/LMS/Mayhem) - can read as protest/power-fist symbol
+1514	gfx/menu/luma/gametype_lms.jpg	74930605631200	political symbol lookalike	low	Raised clenched fist gametype icons (CA/LMS/Mayhem) - can read as protest/power-fist symbol
+1516	gfx/menu/luma/gametype_mayhem_alpha.jpg	75407222790120	political symbol lookalike	low	Raised clenched fist gametype icons (CA/LMS/Mayhem) - can read as protest/power-fist symbol
+1517	gfx/menu/luma/gametype_mayhem.jpg	129588100371637	political symbol lookalike	low	Raised clenched fist gametype icons (CA/LMS/Mayhem) - can read as protest/power-fist symbol
+1528	gfx/menu/luma/gametype_tmayhem.jpg	109307446646417	political symbol lookalike	low	Raised clenched fist gametype icons (CA/LMS/Mayhem) - can read as protest/power-fist symbol
+1530	gfx/menu/luma/gametype_tmayhem_alpha.jpg	81459767145396	political symbol lookalike	low	Raised clenched fist gametype icons (CA/LMS/Mayhem) - can read as protest/power-fist symbol
+1601	gfx/menu/luminos/background_ingame_l2.jpg	93137111588382	brand logo	medium	XONOTIC logo with "0.8.6" version text (menu background layer)
+1602	gfx/menu/luminos/background_ingame_l2_alpha.jpg	125167465192402	brand logo	medium	XONOTIC logo with "0.8.6" version text (menu background layer)
+1738	gfx/menu/luminos/skinpreview.jpg	79398766576361	brand logo + text	low	Small menu-skin preview showing XONOTIC logo and "Beta Release X.X" text
+1751	gfx/menu/wickedx/background_ingame.jpg	131537538930533	brand logo + tiny URL-like text	medium	wickedx menu frame: XONOTIC logo twice + a tiny illegible string under the top bar that looks like an "http://..." URL
+1821	maps/finalrage.jpg	95446489326194	brand logo in scene	low	Finalrage map preview: XONOTIC logo painted on a wall plaque
+1857	maps/leave_em_behind.jpg	96961491406071	brand logo in scene	low	Leave_em_behind map preview: XONOTIC logo decal on floor
+1939	models/containers/crate01.jpg	77413778627203	fictional brand text	low	Crate label "CARGO EXPRESS"
+1942	models/containers/crate01_lod.jpg	79449537597309	fictional brand text	low	Crate label "CARGO EXPRESS"
+1958	models/desertfactory/textures/documents/note02.jpg	74900875715984	real names/software brands	high	"Credits" note listing NetRadiant, Blender, GIMP, Q3Map2, xsane, p7zip, Nexuiz
+1960	models/desertfactory/textures/documents/document01.jpg	98343076901995	text	low	Hand-drawn graph with tiny illegible handwritten notes and numbers (1,000,000 etc.)
+1962	models/desertfactory/textures/documents/note03.jpg	115904010373924	real person username + brand	high	"Credits" note: "Very special thanks go to Tenshihan" (real username), "Blender Texture Disc", "Textures provided with Nexuiz"
+1963	models/desertfactory/textures/documents/writing02_alpha.jpg	97035768395278	other-game brand + text	high	Handwritten "Nexuiz Rulez" (Nexuiz = other game name)
+1965	models/desertfactory/textures/documents/writing04_alpha.jpg	77739989967198	text	low	Handwritten "All generalisations are wrong!"
+1966	models/desertfactory/textures/documents/writing05_alpha.jpg	93960888200802	username graffiti	high	Scribbled tag "MEXL WAR HIER" (German "Mexl was here") - a real author nickname as graffiti
+2068	models/it/lcd.jpg	132156991664373	fictional brand text	low	Monitor bezel text "ALIEN TX"
+# reviewed sheets s031-s060: 40 flagged

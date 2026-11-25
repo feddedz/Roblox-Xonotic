@@ -3,6 +3,7 @@
 #   1. pinned Xonotic 0.8.6 release (-high build; sha512-checked)      -> work/release-high/
 #   2. the three QuakeC programs from the resolved VFS (fs.c order)     -> work/progs/*.dat
 #   3. QuakeC compiled to Luau (tools/qcaot/compile.py)                 -> game/generated/{progs,csprogs,menu}/
+#   4. engine-read startup files (configs, progs.dat) for the server     -> game/generated/vfs/ (pack_runtime.py)
 # Then: rojo serve (or rojo build default.project.json -o xonotic.rbxl).
 # Needs: bash, curl, unzip, python3 (stdlib only for this step). Safe to re-run; skips what is up to date.
 set -euo pipefail
@@ -33,4 +34,6 @@ PY
 for p in progs csprogs menu; do
 	python3 tools/qcaot/compile.py "work/progs/$p.dat" "game/generated/$p"
 done
-echo "build ok: game/generated/{progs,csprogs,menu} ready for rojo"
+python3 tools/pk3/manifest.py --build high --extract >/dev/null
+python3 tools/pk3/pack_runtime.py --build high
+echo "build ok: game/generated/{progs,csprogs,menu,vfs} ready for rojo"

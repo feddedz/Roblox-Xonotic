@@ -1,0 +1,45 @@
+# n	vpath	asset_id	issue	severity(high/medium/low)	what exactly
+3261	textures/cp.jpg	137572817661785	text CP	high	Large "CP" lettering (Onslaught control point) - exact text that caused the ban
+3262	textures/cp_gloss.jpg	137959453837292	text CP	high	"CP" lettering, gloss map - clearly readable
+3263	textures/cp_norm_alpha.jpg	112550785271454	text CP	high	"CP" lettering, normal-map alpha - clearly readable
+3264	textures/cp_glow.jpg	132465057074044	text CP	high	"CP" lettering in orange on black glow - clearly readable
+3265	textures/cp_norm.jpg	104036066166958	text CP	high	"CP" embossed in normal map - readable
+2603	models/desertfactory/textures/shaders/writing02.jpg	78657944090291	other-game brand	high	Large handwritten graffiti "Nexuiz Rulez" (names another game)
+2596	models/desertfactory/textures/documents/note01.jpg	79187336107208	symbol + username	medium	Large circle-with-crossbar emblem behind text (can read as a circled/sun cross) plus "So long sev" and signature (contributor username)
+2252	models/race/checkpoint/outerring.jpg	110702541225803	runic text + username	medium	Vertical rune-style text "MORPHED IS THE BEST / ... IS THE BEST XONOTIC MAP" - S drawn as lightning-bolt Sig rune; names contributor Morphed
+2253	models/race/checkpoint/outerring_bump.jpg	118245371403016	runic text + username	medium	Same rune-style text (bump map), Sig-rune S glyphs, "MORPHED IS THE BEST"
+2254	models/race/checkpoint/outerring_gloss.jpg	89693165001421	runic text + username	low	Same rune-style text in gloss map, faint
+2597	models/desertfactory/textures/documents/writing01_alpha.jpg	102724993332129	username graffiti	medium	"sev was here" graffiti (contributor username)
+2600	models/desertfactory/textures/shaders/writing01.jpg	119286752435446	username graffiti	medium	"sev was here" graffiti (contributor username)
+2605	models/desertfactory/textures/shaders/writing05.jpg	104225085465836	username graffiti	medium	Scribbled "MEXL WAR HIER" (German "Mexl was here", username)
+2593	models/desertfactory/textures/documents/newspaper01.jpg	138056794401669	war/real photo	medium	Newspaper "SPECOP ANNOUNCES WAR" with photo-like image of soldiers in goggles/masks; tiny "by sev" credit
+2366	models/trak/tablet.jpg	91425806467333	profanity abbrev	medium	Reactor report text ends "More technical BS plz" (BS = profanity); small but legible
+2369	models/trak/tablet_xon0.jpg	73377876846964	brand/other game	medium	Xonotic logo + "direct successor of Nexuiz" + "if you are reading this, you're clearly not playing"
+2371	models/trak/tablet_xon1.jpg	138172084660203	brand/off-platform	medium	Xonotic logo + "Xonotic places focus on community involvement"
+2372	models/trak/tablet_xon2.jpg	111150131544914	brand/other game	medium	Xonotic logo + "best possible open-source FPS ... direct successor of the Nexuiz project"
+2373	models/trak/tablet_xon3.jpg	72623604865243	brand/off-platform	medium	Xonotic logo + "JOIN THE COMMUNITY / GL & HF PLAYING XONOTIC" (off-platform solicitation)
+2374	models/trak/tablet_xon4.jpg	117858376725628	brand/occult word	low	Xonotic logo + Latin "Artifex ... oculis occultis"
+2375	models/trak/tablet_xon5.jpg	136563045381827	brand/real person	low	Xonotic logo + quote "- NOT VOLTAIRE" (real person name)
+3227	textures/cockpit.jpg	89294749394228	real photo/watermark	medium	Photographic car gauges incl. "(c) Mehdad Arshad Rad" photographer credit and real product "dPIC ... MADE IN USA"
+3224	textures/cockpit_glow.jpg	139898858670215	real photo	low	Glow map of the same photographic gauges (real product photos)
+2856	models/vehicles/rockets.jpg	121804908035435	blood-like/name/trademark	medium	Large red blob with downward drip (reads as blood), "FALCON PUNCH MISSILE MK.V" (Nintendo meme), signature "Fricka"
+3184	textures/cake/pipe1d_msg.jpg	128361450716495	username	low	Message text "...PIECE O' CAKE. ENJOY! FRUITIEX" (mapper username)
+2363	models/trak/pbox.jpg	101023382192947	fictional brand/name	low	Pizza box "PIZZA GRONDINI'S" (possibly real person surname)
+2364	models/trak/pen.jpg	99311406873339	fictional brand	low	Pen with tiny "Trak Inc." text
+2349	models/trak/ccup_xon.jpg	70794044702469	logo	low	Coffee cup with Xonotic logo
+2583	gfx/winner.jpg	79813390737271	logo	low	Xonotic wordmark logo on burst (winner screen)
+2586	maps/trident.jpg	112201443113056	logo	low	Map screenshot with large Xonotic logo banner
+2458	gfx/menu/wickedx/skinpreview.jpg	101478636283471	logo/screenshot	low	Menu skin preview screenshot with Xonotic logo
+2515	gfx/menu/xaw/skinpreview.jpg	74483853850670	screenshot text	low	Menu screenshot with small text, blurred server list
+2298	models/sprites/minigame_busy.jpg	128608482870656	brand-like	low	Gamepad icon with Xbox-style X/Y/A/B button letters
+3031	particles/particlefont.jpg	97863815698385	blood decal shapes	low	Particle atlas row of white splat shapes (blood decals in-game, tinted red); also red/yellow stripes block
+3030	particles/particlefont-template.jpg	131402502600896	numbers	low	Particle template grid with small cell numbers incl. 14, 69, 88; red/yellow stripes
+3077	textures/alphamod/alpha_014.jpg	121722793310786	number	low	Large "14%" text (alpha test texture)
+3131	textures/alphamod/alpha_069.jpg	136741641248208	number	low	Large "69%" text (alpha test texture)
+3151	textures/alphamod/alpha_088.jpg	73495280635873	number	low	Large "88%" text (alpha test texture)
+3176	textures/bloodyskull.jpg	78231769480081	blood/gore	low	"bloodyskull" skin: skull face with faint brownish stains
+3187	textures/cleanskull.jpg	128619183141701	skull	low	Skull-face skin texture (clean)
+3195	textures/cmp1-dm8/e8circle_pur.jpg	115512202824690	symbol	low	Circle with inscribed cross (generic tech, could read as sun cross)
+2878	models/weapons/g_crylink_luma.jpg	137566636629377	symbol	low	Crylink weapon icon: three-armed spiral (triskele-like)
+2879	models/weapons/g_crylink_luma_alpha.jpg	105797789306498	symbol	low	Crylink icon alpha: three-armed spiral (triskele-like)
+# reviewed sheets s061-s090: 43 flagged

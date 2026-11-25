@@ -48,6 +48,9 @@
 				"$className": "Folder",
 				"progs": {
 					"$path": "game/generated/progs"
+				},
+				"vfs": {
+					"$path": "game/generated/vfs"
 				}
 			}
 		},

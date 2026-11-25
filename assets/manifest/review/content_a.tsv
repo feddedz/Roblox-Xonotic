@@ -1,0 +1,58 @@
+gfx/blood.jpg	gore	high	whole	blood splatter particle decal; reshape into irregular non-splat smudge (keep grey tint mask) or replace with neutral dust puff
+gfx/blood_alpha.jpg	gore	high	whole	alpha of blood.jpg; reshape together with blood.jpg
+gfx/hud/default/notify_death.jpg	gore	high	whole	dark-red blood splat icon; reshape splat into rounded badge/irregular non-blood blob and shift dark red to non-blood colour, keep text
+gfx/hud/default/notify_death_alpha.jpg	gore	high	whole	alpha of blood splat icon; reshape splat into rounded badge/irregular non-blood blob and shift dark red to non-blood colour, keep text
+gfx/hud/default/notify_fall.jpg	gore	high	whole	blood splat with FALL text; reshape splat into rounded badge/irregular non-blood blob and shift dark red to non-blood colour, keep text
+gfx/hud/default/notify_headshot.jpg	gore	high	whole	blood splat with HEAD text; reshape splat into rounded badge/irregular non-blood blob and shift dark red to non-blood colour, keep text
+gfx/hud/default/notify_melee_laser.jpg	gore	high	whole	blood splat with MELEE text; reshape splat into rounded badge/irregular non-blood blob and shift dark red to non-blood colour, keep text
+gfx/hud/default/notify_melee_laser_alpha.jpg	gore	high	whole	alpha of MELEE blood splat; reshape splat into rounded badge/irregular non-blood blob and shift dark red to non-blood colour, keep text
+gfx/hud/default/notify_outofammo.jpg	gore	high	whole	blood splat with AMMO text; reshape splat into rounded badge/irregular non-blood blob and shift dark red to non-blood colour, keep text
+gfx/hud/default/notify_selfkill.jpg	gore	high	whole	blood splat with SELF text; reshape splat into rounded badge/irregular non-blood blob and shift dark red to non-blood colour, keep text
+gfx/hud/default/notify_teamkill_red.jpg	gore	high	whole	red blood splat with TEAM text; reshape splat into rounded badge/irregular non-blood blob and shift dark red to non-blood colour, keep text
+gfx/hud/default/notify_teamkill_blue.jpg	gore	high	whole	blue-tinted splat with TEAM text (same splat shape); reshape splat into rounded badge/irregular non-blood blob and shift dark red to non-blood colour, keep text
+gfx/hud/default/notify_teamkill_blue_alpha.jpg	gore	high	whole	alpha of TEAM splat; reshape splat into rounded badge/irregular non-blood blob and shift dark red to non-blood colour, keep text
+gfx/hud/default/notify_teamkill_pink.jpg	gore	high	whole	pink-tinted splat with TEAM text; reshape splat into rounded badge/irregular non-blood blob and shift dark red to non-blood colour, keep text
+gfx/hud/default/notify_teamkill_yellow.jpg	gore	high	whole	yellow-tinted splat with TEAM text; reshape splat into rounded badge/irregular non-blood blob and shift dark red to non-blood colour, keep text
+gfx/hud/luma/notify_fall.jpg	gore	high	whole	red splat icon; reshape into non-splat blob (e.g. impact star) and recolour away from blood red
+gfx/hud/luma/notify_fall_alpha.jpg	gore	high	whole	alpha of luma splat icon; reshape to match
+models/gibs/chunk.mdl_0.jpg	gore	high	whole	red flesh gib texture; recolour to grey/brown rubble/metal debris
+gfx/hud/default/minigames/pp/piece_taken.jpg	gore	maybe	whole	white liquid-splat shape (tinted in game); reshape into star/burst so it cannot read as blood splat
+maps/darkzone.jpg	gore	maybe	150 170 130 100	map preview: framed reddish fleshy-looking wall panel; verify/recolour panel to neutral
+gfx/menu/xaw/skinpreview.jpg	url	high	420 225 330 195	screenshot server list shows www.radio-bergen.de, www.kylin-servers.com, www.eagle76.fr, IP address and Nexuiz server names; blur list + address field
+gfx/menu/luminos/skinpreview.jpg	url	maybe	140 65 75 60	tiny screenshot server list (illegible but may contain server URLs); blur list area
+gfx/menu/wickedx/skinpreview.jpg	url	maybe	130 65 85 60	tiny screenshot server list; blur list area
+models/trak/tablet_xon3.jpg	url	high	140 75 95 65	text "VISIT: WWW.XONOTIC.ORG / IRC CHANNEL #XONOTIC @ IRC.QUAKENET.ORG / JOIN THE COMMUNITY"; blur/erase text lines
+models/trak/tablet_xon1.jpg	text	maybe	140 75 95 95	tablet text promoting Xonotic/Nexuiz ("free GPL FPS", "successor of Nexuiz"); blur text body if off-platform refs are a concern
+models/trak/tablet_xon2.jpg	text	maybe	140 75 95 95	tablet text about Xonotic/Nexuiz project and community; blur text body if needed
+models/trak/pen.jpg	phone	high	35 8 22 50	pen print "TRaK Inc. 512-843-7884" = phone number; blur/erase digits (keep TRaK Inc. or erase all)
+models/containers/crate01.jpg	phone	maybe	335 498 70 12	serial "32157-5454-DF" looks number-like; blur digits
+models/trak/pbox.jpg	text	maybe	242 50 12 145	pizza box side text "Your destination for space defecation" (crude joke); blur that line; barcode digits at 195 212 25 16 also blur
+models/casing_bronze.jpg	text	maybe	150 120 106 136	shell base engraved "YOUR MOM IS FAT" (insult); blur/erase lettering
+models/desertfactory/textures/documents/note02.jpg	brand	maybe	5 60 250 190	credits list names real software brands (NetRadiant, Blender, GIMP, Q3Map2, xsane, Nexuiz, p7zip); blur list
+models/desertfactory/textures/documents/note03.jpg	brand	maybe	5 130 250 100	credits mention "Blender Texture Disc", "Textures provided with Nexuiz"; blur those lines
+models/desertfactory/textures/documents/note01.jpg	hate	maybe	5 5 245 245	background emblem = ring with cross (can read as Celtic-cross symbol); fade/remove emblem, keep text
+models/desertfactory/textures/documents/newspaper01.jpg	other	maybe	5 120 246 95	realistic photo of helmeted soldiers under headline "SPECOP ANNOUNCES WAR"; replace photo with blurred/abstract image
+models/desertfactory/textures/documents/writing02_alpha.jpg	text	maybe	whole	graffiti "Nexuiz Rulez" (names other game); erase or change wording
+models/desertfactory/textures/shaders/writing02.jpg	text	maybe	whole	preview of "Nexuiz Rulez" graffiti; same fix as writing02_alpha
+models/it/lcd.jpg	brand	maybe	240 296 36 12	monitor bezel label "ALIEN TX" (Alienware-like); blur label
+gfx/conback3.jpg	text	maybe	390 870 634 110	XONOTIC wordmark/logo (game title, no URL); only blur if off-platform game names must go
+gfx/menu/luma/background_ingame_l2.jpg	text	maybe	38 0 1385 450	XONOTIC 0.8.6 logo; keep unless off-platform game title must go
+gfx/menu/luminos/background_ingame_l2.jpg	text	maybe	36 0 1300 422	XONOTIC logo; same as luma
+gfx/loading.jpg	text	maybe	590 385 850 240	XONOTIC logo + "Loading"; same as above
+gfx/menu/wickedx/background_ingame.jpg	text	maybe	whole	header with XONOTIC wordmark; same as above
+gfx/hud/default/minigames/c4/board.jpg	text	maybe	whole	XONOTIC wordmark/logo in board; same as above
+gfx/hud/default/minigames/c4/board_under.jpg	text	maybe	whole	XONOTIC wordmark/logo in board; same as above
+gfx/hud/default/minigames/pong/board.jpg	text	maybe	whole	XONOTIC wordmark/logo in board; same as above
+gfx/hud/default/minigames/ttt/board.jpg	text	maybe	whole	XONOTIC wordmark/logo in board; same as above
+darkplaces-icon.jpg	brand	maybe	whole	DarkPlaces engine logo (third-party project logo); likely not needed in Roblox build - skip upload or replace
+darkplaces-icon2.jpg	brand	maybe	whole	DarkPlaces engine logo (third-party project logo); likely not needed in Roblox build - skip upload or replace
+darkplaces-icon3.jpg	brand	maybe	whole	DarkPlaces engine logo (third-party project logo); likely not needed in Roblox build - skip upload or replace
+darkplaces-icon4.jpg	brand	maybe	whole	DarkPlaces engine logo (third-party project logo); likely not needed in Roblox build - skip upload or replace
+darkplaces-icon5.jpg	brand	maybe	whole	DarkPlaces engine logo (third-party project logo); likely not needed in Roblox build - skip upload or replace
+darkplaces-icon6.jpg	brand	maybe	whole	DarkPlaces engine logo (third-party project logo); likely not needed in Roblox build - skip upload or replace
+darkplaces-icon7.jpg	brand	maybe	whole	DarkPlaces engine logo (third-party project logo); likely not needed in Roblox build - skip upload or replace
+darkplaces-icon8.jpg	brand	maybe	whole	DarkPlaces engine logo (third-party project logo); likely not needed in Roblox build - skip upload or replace
+darkplaces-icon9.jpg	brand	maybe	whole	DarkPlaces engine logo (third-party project logo); likely not needed in Roblox build - skip upload or replace
+env/newsky_asteroids/asteroids.jpg	text	maybe	whole	64px preview with "NewSky" pack-name text; skip upload (preview only) or blur text
+env/newsky_nebulae/nebulae.jpg	text	maybe	whole	64px preview with "NewSky" pack-name text; skip upload (preview only) or blur text
+env/newsky_planets/planets.jpg	text	maybe	whole	64px preview with "NewSky" pack-name text; skip upload (preview only) or blur text

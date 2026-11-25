@@ -12,24 +12,26 @@ sessions test headless with Lune. Many sessions work in turn; `HANDOFF.md` is th
 Never change content for Roblox policy on your own: ask in §QUESTIONS.
 
 ## Session protocol
-1. **Start, without reading the whole repo:** `tools/handoff.sh STATUS RULES TASKS` (prints only those
+1. **Start, without reading the whole repo:** pick your name, register in the roster and read the chat
+   (WELCOME.md §Sessions, `tools/chat.sh`), then `tools/handoff.sh STATUS RULES TASKS` (prints only those
    HANDOFF.md sections), then the top 5 lines of `docs/log/INDEX.md`. Read other sections or
    `docs/subsystems/*.md`, `docs/decisions.md`, `docs/gotchas.md` only when your task needs them. Toolchain: `tools/bootstrap.sh &&
    export PATH="$PWD/.tools/bin:$PATH"`; game data: `tools/release/fetch.sh` + `python3 tools/pk3/manifest.py --build high --extract`.
    Cloud sessions need the "Roblox-Xonotic" environment (its allowlist has dl.xonotic.org etc.; G-013).
 2. **Claim:** pick an `open` task whose deps are `done`, not in a subsystem another session has claimed.
-   Set it to `claimed by <session> <date>` in §TASKS, **commit and push that alone before any work**.
+   Read the chat first. Set it to `claimed by Claude-<Name> <date>` in §TASKS, post it in chat, **commit and push that alone before any work**.
    Branch `<task-id>-<short-name>` (or the branch the environment assigns; D-011).
 3. **Work** in small commits; every message starts with the task ID. Port faithfully (`-- port: file.c
    Func Lstart-Lend @xonotic-v0.8.6`, keep copyright notices), apply the float32 rule (D-004), run
    `lune run tests/run.luau`, `stylua --check engine platform tests game`, `selene engine platform tests`,
    `python3 -m unittest discover -s tools -t . -p "test_*.py"`, and add the tests your subsystem needs.
-4. **Log as you go**, after each meaningful step, in `docs/log/<YYYY-MM-DD>-<session>.md` with sections
+4. **Log as you go** (and post in chat at every major step), after each meaningful step, in `docs/log/<YYYY-MM-DD>-<session>.md` with sections
    `## Goal`, `## Done`, `## Files changed`, `## Tests run and results`, `## Diffs added or closed`,
    `## Decisions`, `## Problems / dead ends`, `## Next step`. Terse.
 5. **Finish:** add one line at the top of `docs/log/INDEX.md`: `<date> <session> <task-id> — <result> → <log>`;
    update §MAP, §DIFFS, §DECISIONS, §QUESTIONS, §GOTCHAS as needed; rewrite §STATUS (≤15 lines); mark the
-   task `done` or unclaim it with a note; push; open a PR with a short description.
+   task `done` or unclaim it with a note; push; open a PR with a short description; post in chat and
+   `tools/chat.sh status finished`.
 6. **Never** delete or skip original functionality or lower visual quality. If something can't work yet,
    stub it so it logs `NOT YET PORTED: <name>`, and add a task.
 7. **Never** guess Roblox limits or APIs from memory: check current docs (create.roblox.com or

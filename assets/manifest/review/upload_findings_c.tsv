@@ -1,0 +1,18 @@
+# n	vpath	issue	severity(high/medium/low)	what exactly (location/text)	suggested subtle fix
+2871	textures/evil4_metals/tekwallmulti_wrn2hfx.jpg	readable text / fictional brand name	medium	yellow stencil text "[KFX] INDUSTRIES" across middle of panel	paint text out with surrounding grey wall texture (clone-fill), keep stripes/lights
+2872	textures/evil4_metals/tekwallmulti_wrn2hfx_norm.jpg	readable text (normal map relief)	low	embossed "[KFX] INDUSTRIES" text in normal map	flatten the text region to neutral normal (128,128,255) matching surrounding
+2873	textures/evil4_metals/tekwallmulti_wrn2hfx_norm_alpha.jpg	readable text (normal alpha/height)	low	"[KFX] INDUSTRIES" visible in height/alpha	smooth text region to match surrounding height
+3294	textures/evil6_trims/e6symbol_b.jpg	possible hate-symbol resemblance	medium	raised glyph: cross with hooked/bent arms, could be read as a broken/rotated swastika-like cross	replace glyph with one of the other e6symbol shapes or alter arm hooks so it no longer reads as a hooked cross
+3319	textures/evil6_walls/e6tdoor.jpg	readable letters/numbers	medium	small stenciled text on left side of door, rotated 90deg, reads roughly "S.E 6/479" / "S.S"-like letters with numbers	blur/clone out the stenciled text, keep panel detail
+3257	textures/evil6_support/e6panelsym.jpg	unidentified emblem/logo	low	embossed circular emblem in panel center (stylized squiggle/letters, could be read as a logo)	soften emblem or replace with plain circle plate
+3263	textures/evil6_support/e6vpanel.jpg	unidentified emblem/logo	low	same circular emblem on vertical panel	soften emblem or replace with plain circle plate
+3264	textures/evil6_support/e6vpanelsupprt.jpg	unidentified emblem/logo	low	same circular emblem at top of V-shaped support panel	soften emblem or replace with plain circle plate
+3515	textures/evil8_fx/e8evilspacetxt.jpg	readable word	low	large stencil word "EVILSPACE" (map title decal)	acceptable map name; if cautious, replace with neutral stencil glyphs/blank plate
+3495	textures/evil8_fx/e8_jumppad02.jpg	faint readable text	low	faint stenciled "JMP-3"-like text on diamond plate in jumppad top half; tiny text on blue side strips	blur faint stencil text
+3497	textures/evil8_fx/e8_jumppad02_gloss.jpg	faint readable text	low	gloss map of jumppad with faint stencil text	blur faint stencil text
+3499	textures/evil8_fx/e8_jumppad02_norm.jpg	faint readable text	low	normal map of jumppad, stencil text faintly embossed	flatten text region
+3500	textures/evil8_fx/e8_jumppad02_norm_alpha.jpg	faint readable text	low	normal alpha of jumppad, stencil text faint	smooth text region
+3501	textures/evil8_fx/e8_jumppad02r.jpg	faint readable text	low	red jumppad variant, same faint stencil text	blur faint stencil text
+3503	textures/evil8_fx/e8_jumppad02w.jpg	faint readable text	low	white/grey jumppad variant, same faint stencil text	blur faint stencil text
+3543	textures/evil8_fx/e8scuffs1.jpg	possible blood-like smear	low	reddish-pink vertical streak/smear on black (scuff decal) could be read as blood smear	desaturate toward brown/grey dirt tone
+# reviewed sheets s072-s107: 16 flagged

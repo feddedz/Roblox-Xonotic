@@ -6,7 +6,9 @@
 
 Reads work/release-<build>/Xonotic/data/*.pk3 (tools/release/fetch.sh), resolves the
 DarkPlaces VFS (tools/pk3/vfs.py) and writes assets/manifest/vfs-<build>.tsv:
-  vpath  kind  pk3  size  sha256  shadowed(pk3s whose copy is hidden, comma-separated)
+  vpath  kind  pk3  size  sha256  shadowed(pk3s whose copy is hidden, comma-separated)  symlink_to
+For a pk3 symlink, size/sha256/extracted bytes are those of the file DarkPlaces really opens
+(FS_OpenReadFile follows the link) and symlink_to is that file's vpath; empty for normal files.
 plus assets/manifest/pk3-<build>.tsv with the sha256 of every pk3.
 --extract writes every winning file to work/vfs-<build>/<vpath> (input for all converters).
 """
@@ -47,7 +49,16 @@ def main():
     rows = []
     for vpath in sorted(vfs.entries):
         e = vfs.entries[vpath]
-        if a.extract:
+        try:
+            real = vfs.resolve(vpath)
+        except KeyError as err:  # broken link: DarkPlaces fails to open it too
+            print(f"warning: {err}", file=sys.stderr)
+            real = None
+        link = (real or "<broken>") if e.symlink else ""
+        size = vfs.entries[real].size if real else e.size
+        if real is None:
+            digest = ""
+        elif a.extract:
             dst = xdir / vpath
             dst.parent.mkdir(parents=True, exist_ok=True)
             blob = vfs.read(vpath)
@@ -55,16 +66,17 @@ def main():
             digest = hashlib.sha256(blob).hexdigest()
         else:
             digest = vfs.sha256(vpath)
-        rows.append(f"{vpath}\t{kind_of(vpath)}\t{e.pk3}\t{e.size}\t{digest}\t{','.join(e.shadowed)}")
+        rows.append(f"{vpath}\t{kind_of(vpath)}\t{e.pk3}\t{size}\t{digest}\t{','.join(e.shadowed)}\t{link}")
     with open(out / f"vfs-{a.build}.tsv", "w") as f:
-        f.write("# vpath\tkind\tpk3\tsize\tsha256\tshadowed\n")
+        f.write("# vpath\tkind\tpk3\tsize\tsha256\tshadowed\tsymlink_to\n")
         f.write("\n".join(rows) + "\n")
     kinds = {}
     for vpath in vfs.entries:
         k = kind_of(vpath)
         kinds[k] = kinds.get(k, 0) + 1
     shadowed = sum(1 for e in vfs.entries.values() if e.shadowed)
-    print(f"{a.build}: {len(vfs.entries)} files, {shadowed} with shadowed copies; " +
+    links = sum(1 for e in vfs.entries.values() if e.symlink)
+    print(f"{a.build}: {len(vfs.entries)} files, {shadowed} with shadowed copies, {links} symlinks; " +
           ", ".join(f"{k}={v}" for k, v in sorted(kinds.items())))
 
 

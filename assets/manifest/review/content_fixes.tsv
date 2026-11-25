@@ -1,0 +1,95 @@
+# vpath	issue	what changed (content_fix.py -> work/upload/fixed2/)
+gfx/menu/wickedx/background_ingame.jpg	url	engraved '.ORG' after XONOTIC and the tiny unreadable engraved line under it removed (panel surface extended over them); XONOTIC wordmark kept
+gfx/menu/wickedx/background_l2.jpg	url	engraved '.ORG' after XONOTIC and the tiny engraved line under it removed (panel surface extended); XONOTIC wordmark kept
+gfx/menu/wickedx/skinpreview.jpg	url	downscaled '.ORG' after the engraved XONOTIC in the bottom frame removed
+gfx/menu/xaw/skinpreview.jpg	url	screenshot server list: host-name column (web addresses) and the Address: IP field blurred unreadable; rest of the screenshot unchanged
+gfx/menu/luminos/skinpreview.jpg	url	tiny screenshot server list rows blurred (possible server domains)
+models/trak/tablet_xon3.jpg	url	tablet text lines 'VISIT: WWW.XONOTIC.ORG / IRC CHANNEL: #XONOTIC @ IRC.QUAKENET.ORG' erased to the paper surface; logo, 'JOIN THE COMMUNITY' and 'GL & HF PLAYING XONOTIC' kept
+models/trak/pen.jpg	phone	printed phone number '512-843-7884' on the pen erased to the pen colour; 'TRaK Inc.' kept
+models/containers/crate01.jpg	phone	stencilled serial '32157-5454-DF' erased to the crate paint
+textures/evil6_support/e6panelsym.jpg	phone	faint stencilled number '332-6x' at the bottom of the panel erased to the panel surface
+gfx/reticle_nex_alpha.jpg	phone	scope readout digits 'm 12345 423--60 -433-00' blurred into an unreadable glow line (alpha only; colour plane is black there)
+models/trak/pbox.jpg	text	pizza-box side slogan 'Your destination for space defecation' erased to the box red; PIZZA GRONDINI'S, artwork and barcode kept
+models/casing_bronze.jpg	text	engraved 'YOUR MOM IS FAT' around the primer erased to the surrounding brass (other engraving and primer kept)
+models/casing_bronze_gloss.jpg	text	engraved 'YOUR MOM IS FAT' around the primer erased to the surrounding brass (other engraving and primer kept)
+models/casing_bronze_reflect.jpg	text	engraved 'YOUR MOM IS FAT' around the primer erased to the surrounding brass (other engraving and primer kept)
+models/casing_bronze_norm.jpg	text	engraved 'YOUR MOM IS FAT' around the primer erased to the surrounding brass (other engraving and primer kept) (normal map: emboss flattened)
+textures/facility114x/wall/corridor01.jpg	sexual	rule 'NO PORNOGRAPHIC MATERIALS ALLOWED BEYOND PERSONAL CUBICLES' and its bullet erased to the flat panel colour; other rules (incl. NO SMOKING) kept
+textures/facility114x/wall/corridor01_gloss.jpg	sexual	bullet of the removed rule erased in the gloss map (keeps it in sync with the colour map)
+textures/facility114x/wall/corridor01b.jpg	sexual	rule 'NO PORNOGRAPHIC MATERIALS ALLOWED BEYOND PERSONAL CUBICLES' and its bullet erased to the flat panel colour; other rules (incl. NO SMOKING) kept
+textures/facility114x/wall/corridor01b_gloss.jpg	sexual	bullet of the removed rule erased in the gloss map (keeps it in sync with the colour map)
+textures/facility114x/wall/corridor01r.jpg	sexual	rule 'NO PORNOGRAPHIC MATERIALS ALLOWED BEYOND PERSONAL CUBICLES' and its bullet erased to the flat panel colour; other rules (incl. NO SMOKING) kept
+textures/facility114x/wall/corridor01r_gloss.jpg	sexual	bullet of the removed rule erased in the gloss map (keeps it in sync with the colour map)
+textures/facility114invx/wall/corridor01inv.jpg	sexual	rule 'NO PORNOGRAPHIC MATERIALS ALLOWED BEYOND PERSONAL CUBICLES' and its bullet erased to the flat panel colour; other rules (incl. NO SMOKING) kept
+textures/facility114invx/wall/corridor01inv_gloss.jpg	sexual	bullet of the removed rule erased in the gloss map (keeps it in sync with the colour map)
+textures/facility114invx/wall/corridor01invr.jpg	sexual	rule 'NO PORNOGRAPHIC MATERIALS ALLOWED BEYOND PERSONAL CUBICLES' and its bullet erased to the flat panel colour; other rules (incl. NO SMOKING) kept
+textures/facility114invx/wall/corridor01invr_gloss.jpg	sexual	bullet of the removed rule erased in the gloss map (keeps it in sync with the colour map)
+textures/facility114x/wall/corridor02.jpg	gore	warning sentence 'THE RED BUTTONS MAY CAUSE DECAPITATION AND EXPLOSIVE EVISCERATION.' erased to the flat panel colour; WARNING title and the rest of the notice kept
+textures/facility114x/wall/corridor02_gloss.jpg	gore	faint ghost of the removed sentence erased in the gloss map
+textures/facility114invx/wall/corridor02inv.jpg	gore	warning sentence 'THE RED BUTTONS MAY CAUSE DECAPITATION AND EXPLOSIVE EVISCERATION.' erased to the flat panel colour; WARNING title and the rest of the notice kept
+textures/facility114invx/wall/corridor02inv_gloss.jpg	gore	faint ghost of the removed sentence erased in the gloss map
+textures/facility114invx/wall/corridor02invr.jpg	gore	warning sentence 'THE RED BUTTONS MAY CAUSE DECAPITATION AND EXPLOSIVE EVISCERATION.' erased to the flat panel colour; WARNING title and the rest of the notice kept
+textures/facility114invx/wall/corridor02invr_gloss.jpg	gore	faint ghost of the removed sentence erased in the gloss map
+textures/trak4x/decal/decal_pills.jpg	drugs	word 'PILLS' removed from 'DID YOU TAKE YOUR PILLS TODAY?' (white background); bottle art kept
+textures/trak4x/decal/decal_pills_alpha.jpg	drugs	word 'PILLS' removed from the decal alpha mask
+textures/cockpit.jpg	brand	real gauge maker marks removed: 'COBALT', 'Auto Meter' + part number, AutoGauge badge on the speedometer (needle kept) and the AutoMeter logo on the boost gauge, all to the gauge-face colour
+textures/cockpit_glow.jpg	brand	AutoMeter logo on the boost gauge glow removed (same box as cockpit.jpg)
+textures/facility114x/misc/door01.jpg	brand	'APERTURE' (Valve trademark) wordmark erased to the flat door grey; small tags beside it kept
+textures/facility114invx/misc/door01inv.jpg	brand	'APERTURE' (Valve trademark) wordmark erased to the flat door grey; small tags beside it kept
+maps/darkzone.jpg	gore	map preview: the reddish fleshy wall panel desaturated to the surrounding wood-brown (luminance kept)
+textures/desertfactory_signs/above_dirty.jpg	gore	red blood drops on the CAUTION sign recoloured to dark brown dirt/oil spots (luminance and shape kept); sign yellow/black unchanged
+textures/desertfactory_shaders/sign_above_dirty.jpg	gore	red blood drops on the CAUTION sign recoloured to dark brown dirt/oil spots (luminance and shape kept); sign yellow/black unchanged
+textures/dmask1.jpg	gore	exposed red gums/flesh under the helmet toned to dark brown-grey (luminance kept)
+textures/evil1_liquids/lavaish.jpg	gore	blood-red lava hue moved ~13 deg toward orange (reads as lava, not a blood pool); brightness/pattern kept
+textures/evil1_liquids/lavaishb.jpg	gore	blood-red lava hue moved ~13 deg toward orange (reads as lava, not a blood pool); brightness/pattern kept
+textures/evil1_walls/crude_1.jpg	gore	dark-red rust drips shifted toward rust-orange/brown and slightly desaturated so they read as rust, not blood
+textures/evil1_walls/crude_2.jpg	gore	dark-red rust drips shifted toward rust-orange/brown and slightly desaturated so they read as rust, not blood
+textures/evil2_basewall/dirtybrick_faded_stn.jpg	gore	red smear on the bricks recoloured with the clean dirtybrick_faded colours (stain luminance kept, reads as brown soot)
+textures/evil2_misc/crate_drtyow_sign.jpg	gore	blood splatter at the bottom of the crate recoloured to the surrounding wood/grime colour (luminance kept)
+textures/eyeblood.jpg	gore	blood-red eye texture recoloured to dark brown-grey (luminance/pattern kept)
+textures/flesh1.jpg	gore	raw-flesh red streaks recoloured to grey-brown rock/metal (luminance kept)
+textures/gib2.jpg	gore	raw-meat red gib texture recoloured to grey-brown rock debris (luminance and structure kept, same recipe as gib1 in gore_fix.py)
+textures/gib3.jpg	gore	raw-meat red gib texture recoloured to grey-brown rock debris (luminance and structure kept, same recipe as gib1 in gore_fix.py)
+textures/gib4.jpg	gore	raw-meat red gib texture recoloured to grey-brown rock debris (luminance and structure kept, same recipe as gib1 in gore_fix.py)
+textures/hook.jpg	gore	dark-red smears on the claw tips recoloured to grey grime (luminance kept)
+textures/map_catharsis/samual_easter.jpg	gore	blood-red 'Samual balance' credit and its splatters recoloured to light grey paint (shapes kept, author name kept)
+textures/spider.jpg	gore	deep-red raw-flesh areas (mouth rim, abdomen pits, side stripes) pulled to the body's brown-orange hue; orange body and everything else unchanged (luminance kept)
+textures/techpanelx/panel/panel_tech2r.jpg	gore	dark maroon paint splotches shifted to a brighter team-red paint (hue +9 deg, saturation x1.4, brightness x1.3) so they read as paint like the b/g/y variants
+particles/particlefont.jpg	gore	UNCHANGED (noted): white droplet/splat sprites tinted red by the engine; shapes kept (tint is code)
+particles/particlefont-template.jpg	gore	UNCHANGED (noted): template copy of particlefont, same white sprites; kept
+gfx/blood.jpg	gore	UNCHANGED (noted): grey tint-mask splat sprite (colour comes from the engine); kept like particlefont
+gfx/blood_alpha.jpg	gore	UNCHANGED (noted): alpha of gfx/blood.jpg; kept
+gfx/hud/default/minigames/pp/piece_taken.jpg	gore	UNCHANGED (noted): white cartoon splat tinted in game; kept like particlefont
+textures/meat.jpg	gore	UNCHANGED (noted): near-black base, flesh colour only from the runtime pants tint; kept
+textures/meat_pants.jpg	gore	UNCHANGED (noted): grey colormap mask (no red in the image); kept
+textures/meat_alien.jpg	gore	UNCHANGED (noted): green alien gib texture, not red; kept
+textures/bloodyskull_alien.jpg	other	UNCHANGED (noted): no blood visible, only the file name; kept (rename is an upload-name matter)
+textures/bloodyskull_robot.jpg	other	UNCHANGED (noted): no blood visible, only the file name; kept
+models/trak/tablet_xon1.jpg	text	UNCHANGED (noted): Xonotic/Nexuiz blurb, no address; Nexuiz mention noted only
+models/trak/tablet_xon2.jpg	text	UNCHANGED (noted): 'direct successor of the Nexuiz project'; Nexuiz mention noted only
+models/trak/tablet_xon0.jpg	text	UNCHANGED (noted): 'successor of Nexuiz' (not flagged by review); Nexuiz mention noted only
+models/desertfactory/textures/documents/writing02_alpha.jpg	text	UNCHANGED (noted): graffiti 'Nexuiz Rulez'; noted only
+models/desertfactory/textures/shaders/writing02.jpg	text	UNCHANGED (noted): graffiti 'Nexuiz Rulez'; noted only
+textures/stralenex1/slimepit_ad-3.jpg	brand	UNCHANGED (noted): 'nexuiz' credit tile; noted only
+textures/stralenex1/slimepit_ad-3_glow.jpg	brand	UNCHANGED (noted): 'nexuiz' credit tile glow; noted only
+models/desertfactory/textures/documents/note02.jpg	brand	UNCHANGED (noted): map author's tool credits (NetRadiant, Blender, GIMP...); kept
+models/desertfactory/textures/documents/note03.jpg	brand	UNCHANGED (noted): texture credits (Blender disc, Nexuiz); kept
+models/desertfactory/textures/documents/note01.jpg	hate	UNCHANGED (noted): ring-and-cross emblem; owner said keep
+models/desertfactory/textures/documents/newspaper01.jpg	other	UNCHANGED (noted): newspaper soldier photo; owner said keep
+models/it/lcd.jpg	brand	UNCHANGED (noted): 'ALIEN TX' is not a real brand name; kept
+models/trak/pbox.jpg#barcode	phone	UNCHANGED (noted): barcode digits are a product code, not phone-like; kept
+textures/aggressor/numlock.jpg	phone	UNCHANGED (noted): keypad digits 1-9, not a number string; kept
+textures/evil9/9screen01.jpg	text	UNCHANGED (noted): tiny engraved line is illegible (no URL visible); NEXX CORP is fictional; kept
+textures/map_space-elevator/screen-blue.jpg	text	UNCHANGED (noted): same illegible line / NEXX CORP as 9screen01; kept
+textures/evil9/9techwall05b.jpg	text	UNCHANGED (noted): NEXX CORP (fictional); kept
+textures/e7/e7wgrate.jpg	other	UNCHANGED (noted): pentagram grate ornament; owner said keep
+textures/e7/e7wgrate_alpha.jpg	other	UNCHANGED (noted): pentagram grate alpha; kept
+textures/e7/e7bigwall.jpg	other	UNCHANGED (noted): star-in-circle ornament; kept
+gfx/reticle_nex.jpg	phone	UNCHANGED (noted): colour plane is black under the digits; only the _alpha needed the change
+textures/trak5x/panel/panel_comp1a_glow.jpg	other	UNCHANGED (noted): illegible filler text; kept
+textures/map_courtfun/screen_obey.jpg	brand	UNCHANGED (noted): generic word OBEY (They Live); kept
+gfx/menu/wickedx/skinpreview.jpg#mp	url	UNCHANGED (noted): multiplayer panel in the screenshot is a map list, no server names; only .ORG removed
+(darkplaces-icon)	text/brand	UNCHANGED (noted): game/engine logo, author nickname or sky credit; owner said keep
+(XONOTIC wordmarks (conback3, loading, luma/luminos l2, c4/pong/ttt boards))	text/brand	UNCHANGED (noted): game/engine logo, author nickname or sky credit; owner said keep
+(author handles (kuniuthefrogg, SMILECYTHE, strahlemann, FRUITIEX, Samual balance))	text/brand	UNCHANGED (noted): game/engine logo, author nickname or sky credit; owner said keep
+(NewSky / sky credits)	text/brand	UNCHANGED (noted): game/engine logo, author nickname or sky credit; owner said keep

@@ -1,0 +1,26 @@
+# old asset id (original, flagged by the review; owner archives it)	vpath	source of the new version
+84343236277196	gfx/hud/default/notify_death.jpg	fixed
+102468579358819	gfx/hud/default/notify_death_alpha.jpg	fixed
+103104883591845	gfx/hud/default/notify_fall.jpg	fixed
+93867009513964	gfx/hud/default/notify_headshot.jpg	fixed
+117938535269542	gfx/hud/default/notify_melee_laser.jpg	fixed
+131550397189425	gfx/hud/default/notify_melee_laser_alpha.jpg	fixed
+123502057489531	gfx/hud/default/notify_outofammo.jpg	fixed
+85776129881684	gfx/hud/default/notify_selfkill.jpg	fixed
+133512703796161	gfx/hud/default/notify_teamkill_blue.jpg	fixed
+109687611772074	gfx/hud/default/notify_teamkill_blue_alpha.jpg	fixed
+74743900050408	gfx/hud/default/notify_teamkill_pink.jpg	fixed
+124022485289975	gfx/hud/default/notify_teamkill_red.jpg	fixed
+139079722212669	gfx/hud/default/notify_teamkill_yellow.jpg	fixed
+108978423525689	gfx/hud/luma/notify_fall.jpg	fixed
+73316593834985	gfx/hud/luma/notify_fall_alpha.jpg	fixed
+79398766576361	gfx/menu/luminos/skinpreview.jpg	fixed2
+131537538930533	gfx/menu/wickedx/background_ingame.jpg	fixed2
+96832978043702	maps/darkzone.jpg	fixed2
+132404055800279	models/casing_bronze.jpg	fixed2
+126829235812949	models/casing_bronze_gloss.jpg	fixed2
+114403533532336	models/casing_bronze_norm.jpg	fixed2
+77413778627203	models/containers/crate01.jpg	fixed2
+101023382192947	models/trak/pbox.jpg	fixed2
+99311406873339	models/trak/pen.jpg	fixed2
+72623604865243	models/trak/tablet_xon3.jpg	fixed2

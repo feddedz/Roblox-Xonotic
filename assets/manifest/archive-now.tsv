@@ -1,0 +1,29 @@
+# asset_id	vpath	why (live-asset review 2026-11-23, work/review3/findings_*.tsv) — owner archives in Creator Dashboard
+102694919490077	gfx/blood.jpg	blood splatter
+110067246759641	gfx/blood_alpha.jpg	blood splatter mask
+71699447678506	gfx/leave_em_behind_mini.jpg	map layout reads as a swastika
+137572817661785	textures/cp.jpg	"CP" letters
+137959453837292	textures/cp_gloss.jpg	"CP" letters
+112550785271454	textures/cp_norm_alpha.jpg	"CP" letters
+104036066166958	textures/cp_norm.jpg	"CP" letters
+74900875715984	models/desertfactory/textures/documents/note02.jpg	credits naming other software/games
+115904010373924	models/desertfactory/textures/documents/note03.jpg	credits thanking a real username
+97035768395278	models/desertfactory/textures/documents/writing02_alpha.jpg	"Nexuiz Rulez"
+78657944090291	models/desertfactory/textures/shaders/writing02.jpg	"Nexuiz Rulez"
+93960888200802	models/desertfactory/textures/documents/writing05_alpha.jpg	author graffiti tag
+104225085465836	models/desertfactory/textures/documents/writing05.jpg	author graffiti tag
+102724993332129	models/desertfactory/textures/documents/writing01_alpha.jpg	"sev was here"
+119286752435446	models/desertfactory/textures/documents/writing01.jpg	"sev was here"
+79187336107208	models/desertfactory/textures/documents/note01.jpg	sun-cross-like emblem + signature
+110702541225803	textures/race/checkpoint/outerring.jpg	SS-rune-like S + contributor name
+118245371403016	textures/race/checkpoint/outerring_bump.jpg	same, bump map
+138056794401669	models/desertfactory/textures/documents/newspaper01.jpg	"SPECOP ANNOUNCES WAR" + masked soldiers photo
+91425806467333	models/trak/tablet.jpg	"BS" profanity abbreviation
+73377876846964	models/trak/tablet_xon0.jpg	off-platform community text
+138172084660203	models/trak/tablet_xon1.jpg	off-platform community text
+111150131544914	models/trak/tablet_xon2.jpg	off-platform community text
+72623604865243	models/trak/tablet_xon3.jpg	URL (already flagged earlier)
+89294749394228	textures/cockpit.jpg	real photo with photographer credit + real brand
+121804908035435	models/vehicles/rockets.jpg	blood-like red drip + meme/signature
+131537538930533	gfx/menu/wickedx/background_ingame.jpg	tiny URL-like string
+93867009513964	(HEAD icon, earlier list)	flagged earlier

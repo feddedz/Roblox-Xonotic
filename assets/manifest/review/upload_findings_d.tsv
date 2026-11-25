@@ -1,0 +1,54 @@
+# n	vpath	issue	severity(high/medium/low)	what exactly (location/text)	suggested subtle fix
+3914	textures/evil9/9screen01.jpg	readable text + corp logo	medium	Red screen: 'WARNING...', 'SOLARIS NEBULA CLOSE TO DESTRUCTION... MUST EXIT IMMEDIATELY...COUNTDOWN TO TERMINATION... 10..9..8..7..6..'; 'NEXX CORP' logo top-center; tiny grey line bottom-left (~y230) '...DIGITAL MATRIX LICENSED'-like text	Blur/smear text lines into illegible glyph scanlines (keep red layout/glow); remove NEXX CORP wordmark and bottom-left small print
+3917	textures/evil9/9techwall05b.jpg	brand-like wordmark	low	Faint 'NEXX CORP' wordmark + arc logo in center panel (NEXX is also a real helmet/smart-home brand)	Clone-stamp out the wordmark letters, keep the faint arc shape or panel grime
+4833	textures/eye.jpg	disembodied bloodshot eye	low	Full image: brown iris on white sclera with grey branching vein lines (stylised bloodshot eye); no red blood but reads as body part/vein	Lighten/thin the vein lines so it reads as a plain stylised eye; or accept as-is (no gore)
+4834	textures/eyeblood.jpg	asset name contains 'blood'	low	64x64 dark grey noise; no visible blood in pixels. Only the filename/asset name says 'blood'	Upload under a neutral asset name (e.g. hashed id); pixels need no change
+4837	textures/facility114invx/ceiling/ceiling00inv.jpg	small readable UI text	low	Top HUD strip: 'SPACE-TIME SYNTHESIS', 'NO USE' x2, tiny unreadable lines; 'D12'-like label under round icon	Smear/blur the small-print words into unreadable bars; keep layout and blue stripes
+4842	textures/facility114invx/ceiling/ceiling00invr.jpg	small readable UI text	low	Same top HUD strip as ceiling00inv (red variant): 'SPACE-TIME SYNTHESIS', 'NO USE'	Same as #4837
+4844	textures/facility114invx/ceiling/ceiling01inv.jpg	Chinese text	low	Center blue band: '这屋顶并不安全。' (='This roof is not safe.'); benign but non-Latin text a moderator may not be able to verify	Replace with abstract glyph bars of same width/colour
+4848	textures/facility114invx/ceiling/ceiling01invr.jpg	Chinese text	low	Center red band: '这屋顶并不安全。' (='This roof is not safe.')	Same as #4844
+4858	textures/facility114invx/misc/door01inv.jpg	readable text + number possibly '1688'	medium	'VECTOR' logo-box top-left with small print; 'SHOOT TO OPEN'; 'PLEASE DO NOT BLOCK OPENING'; 'SUBGATE 4'; right-side box shows small 4-digit number that reads like '1688' (contains 88); bottom strip 'TASK', 'NOM', 'DBE', '-ACAMIN'-like small print	Blur/replace the 4-digit number and small print with dashes; 'SHOOT TO OPEN' can stay or become an arrow icon; remove 'VECTOR' wordmark
+4859	textures/facility114invx/misc/door01inv_gloss.jpg	faint text (gloss of #4858)	low	Faint ghost of door01inv text bands (SHOOT TO OPEN / PLEASE DO NOT BLOCK OPENING) in gloss map	Apply same edit as #4858 to keep maps consistent
+4896	textures/facility114invx/wall/corridor01inv.jpg	readable text: smoking + 'lethal termination'	medium	Left panel 'ATTENTION TO PERSONNEL': 'NO TALKING DURING LUNCH HOURS', 'NO SINGING', 'NO SMOKING EXCEPT WHEN INSTRUCTED TO DO SO AS PART OF AN EXPERIMENTAL PROCEDURE', 'DO NOT PRESS THE RED BUTTONS', 'FAILURE TO COMPLY ... WILL RESULT IN IMMEDIATE LETHAL TERMINATION OF EMPLOYMENT CONTRACT'; right panel 'WELCOME TO FACILITY 114'; tiny top-left small print	Replace the rules paragraph with unreadable placeholder bars (keep header/box/colours); keep 'WELCOME TO FACILITY 114' or blur too
+4897	textures/facility114invx/wall/corridor01inv_gloss.jpg	faint text ghost	low	Gloss of #4896; faint rules-box text/114 visible	Apply same edit as #4896
+4899	textures/facility114invx/wall/corridor01invr.jpg	readable text: smoking + 'lethal termination'	medium	Red variant of #4896, same rules text	Same as #4896
+4900	textures/facility114invx/wall/corridor01invr_gloss.jpg	faint text ghost	low	Gloss of #4899; faint red rules text visible in left box	Apply same edit as #4896
+4901	textures/facility114invx/wall/corridor02inv.jpg	readable joke text	low	'WARNING / THE MANAGEMENT IS NOT RESPONSIBLE FOR ANY ACCIDENTS THAT MAY OCCUR FROM PRESSING THE RED BUTTON. SINCERELY, THE MANAGEMENT'; 'DO NOT PRESS' over button	Probably fine; if cautious, blur paragraph into bars and keep 'WARNING'/'DO NOT PRESS'
+4904	textures/facility114invx/wall/corridor02invr.jpg	readable joke text	low	Red variant of #4901	Same as #4901
+4921	textures/facility114x/ceiling/ceiling00.jpg	small readable UI text	low	Top HUD strip 'SPACE-TIME SYNTHESIS', 'NO USE' (same as #4837), orange variant	Same as #4837
+4923	textures/facility114x/ceiling/ceiling00b.jpg	small readable UI text	low	Same strip, blue variant	Same as #4837
+4925	textures/facility114x/ceiling/ceiling00r.jpg	small readable UI text	low	Same strip, red variant	Same as #4837
+4927	textures/facility114x/ceiling/ceiling01.jpg	Chinese text	low	Orange band: '这屋顶并不安全。' (='This roof is not safe.')	Replace with abstract glyph bars
+4929	textures/facility114x/ceiling/ceiling01b.jpg	Chinese text	low	Blue band: '这屋顶并不安全。'	Same as #4927
+4931	textures/facility114x/ceiling/ceiling01r.jpg	Chinese text	low	Red band: '这屋顶并不安全。'	Same as #4927
+4939	textures/facility114x/misc/door01.jpg	readable text + number possibly '1688'	medium	Yellow/orange variant of #4858: 'VECTOR' box, 'SHOOT TO OPEN', 'PLEASE DO NOT BLOCK OPENING', 'SUBGATE 4', 4-digit '1688'-like number in right box, small print bottom	Same as #4858
+4940	textures/facility114x/misc/door01_gloss.jpg	faint text ghost	low	Gloss of #4939, faint text bands	Same as #4858
+4979	textures/facility114x/wall/corridor01.jpg	readable text: smoking + 'lethal termination'	medium	Orange/white variant of #4896, same rules text	Same as #4896
+4980	textures/facility114x/wall/corridor01_gloss.jpg	faint text ghost	low	Gloss of #4979; faint orange rules text visible	Apply same edit as #4896
+4981	textures/facility114x/wall/corridor01b.jpg	readable text: smoking + 'lethal termination'	medium	Blue/white variant of #4896, same rules text	Same as #4896
+4982	textures/facility114x/wall/corridor01b_gloss.jpg	faint text ghost	low	Gloss of #4981; faint blue rules text visible	Apply same edit as #4896
+4983	textures/facility114x/wall/corridor01r.jpg	readable text: smoking + 'lethal termination'	medium	Red/white variant of #4896, same rules text	Same as #4896
+4984	textures/facility114x/wall/corridor01r_gloss.jpg	faint text ghost	low	Gloss of #4983; faint red rules text visible	Apply same edit as #4896
+4985	textures/facility114x/wall/corridor02.jpg	readable joke text	low	White/yellow variant of #4901	Same as #4901
+4998	textures/final_rage/lamp2.jpg	CJK character	low	Large kanji '力' (power/strength) in emblem, plus 'I' and '5'-like shapes; benign but foreign glyph	Likely fine; if cautious replace '力' with an abstract bolt glyph
+5001	textures/final_rage/lamp2_glow.jpg	CJK character (faint)	low	Glow map of #4998, faint '力' emblem	Same as #4998
+5009	textures/final_rage/nd-lava.jpg	editor text	low	Big red text 'LAVA NODRAW' over lava (editor-only marker)	Should never render in game; skip upload or blank the text
+5021	textures/fireball_pants.jpg	skull with drips	medium	Lower-left (~x690-760,y1380-1550 of 2048): skull decal with dripping streaks below it plus tally marks; '15' numeral right-middle (pants/colormap mask)	Remove drips under skull (keep clean skull) or remove skull decal entirely from mask
+5023	textures/flamethrower.jpg	brand-like text	low	Same 'AT CORP' text (upside down, faint) at ~x330-390,y235 of 512	Smear text
+5024	textures/flamethrower_gloss.jpg	brand-like text	low	Center-right: upside-down 'AT CORP' + 'AV'-like logo; vertical small text near top center	Smear text; keep panel shapes
+5030	textures/flesh1.jpg	asset name 'flesh'	low	128x128 grey/beige streaky abstract; pixels harmless, only name	Upload under neutral asset name
+5054	textures/gib1.jpg	gore (gib texture)	medium	Whole image: dark organic flesh/innards-like shapes (ribbed tubes, folds) used on gib chunks; muted colours, no bright red	Desaturate further / push toward rocky-mechanical look, or tint as metallic debris; upload under neutral asset name
+5055	textures/gib2.jpg	gore (gib texture)	low	UV atlas of furry/fleshy dark-brown patches for gib model; ambiguous but intended as body chunk	Same as #5054; also apply to gib2_gloss/gib2_norm (#5056-5057)
+5058	textures/gib3.jpg	gore (gib texture)	low	UV atlas of fleshy grey-brown patches for gib model (#5059-5060 gloss/norm)	Same as #5054
+5061	textures/gib4.jpg	gore (gib texture)	low	UV atlas of fleshy grey-brown patches for gib model (#5062-5063 gloss/norm)	Same as #5054
+5072	textures/glsight01_glow.jpg	readable HUD text	low	Scope overlay: 'TYPE: IMPACT', 'RANGE: 2000M', 'RAPIDRELOAD ENABLED / SECONDARY FIRE MODE AVAILABLE'	Fine as game UI; if cautious blur the small print
+5073	textures/glsight02_glow.jpg	readable HUD text	low	Same as #5072	Same as #5072
+5074	textures/glsight03_glow.jpg	readable HUD text	low	Same as #5072	Same as #5072
+5101	textures/harlequin_sky/nebula_qer1.jpg	real person name	medium	Editor preview tile reading 'Nebula by Justin Fisher' (real artist name)	Editor-only (qer image) - do not upload; or replace with plain swatch
+5102	textures/harlequin_sky/nebula_qer2.jpg	real person name	medium	Editor preview tile 'Nebula NO-GLOW by Justin Fisher'	Editor-only - do not upload; or replace with plain swatch
+5136	textures/ignishead.jpg	unwrapped human face/skin + text	low	Skin-tone unwrapped bearded face with empty eye/mouth holes, separate pink ears, eyeball; black tattoo on face and back of head with mirrored text 'IGNIS'. Not a real person, but flat skin UV with pink ear blobs could be misread	Probably acceptable (fictional character skin); if cautious darken ear interiors slightly; text 'IGNIS' is the character name (keep)
+5137	textures/ignishead_gloss.jpg	unwrapped face (reddish)	low	Dark-red tinted version of face UV, reads slightly like a skinned/bloody face at thumbnail size	Neutral-grey the gloss map (it is a gloss, colour not needed)
+5142	textures/ignisheadfb.jpg	unwrapped human face/skin + text	low	Same as #5136 (fullbright variant)	Same as #5136
+5145	textures/items/a_bullets.jpg	text/brand-like	low	Mirrored stencil text 'MACHINEGUN AMMO' and 'AT CORP' on camo ammo box	Keep 'MACHINEGUN AMMO' or blur; smear 'AT CORP'
+5151	textures/items/explosiveammo.jpg	readable text	low	Stencil text 'EXPLOSIVES' (twice, rotated) on ammo crate UV; also in gloss #5152-5153	Fine as game item; if cautious replace with hazard pictogram
+# reviewed sheets s108-s143: 52 flagged
