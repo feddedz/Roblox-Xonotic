@@ -20,8 +20,12 @@ Every section except §MAP and §DIFFS stays under ~60 lines; detail lives in `d
 - **Owner's account: clear again** after a child-safety ban (2026-11-22 13:40 UTC) over textures/cp_glow.jpg
   (letters "CP" = Control Point, read as CSAM slang; appeal granted, G-051). **Texture upload finished
   2026-11-24 (below). Any further upload: only reviewed files, gated in batches of 100, with the owner's OK.**
-- **Owner to archive 28 live assets:** assets/manifest/archive-now.tsv (blood decal, CP textures, swastika-shaped
-  minimap, author credits/"Nexuiz" text, SS-rune-like text, real photo, ...).
+- **Account check 2026-11-25** (tools/upload/check_assets.py → assets/manifest/roblox-assets-state.tsv, read-only):
+  nothing is archived yet. **Do NOT archive archive-now.tsv as it is: 25 of its 28 assets are still the ones the
+  game uses (no fixed version exists), incl. all five textures/cp*.jpg (Approved + Active).** 112 of the 119
+  flagged live images (live_findings_*.tsv) are in use unfixed (13 high, 31 medium, 68 low) → task UPLOAD-FIX4.
+  Safe to archive now: the 25 of replace-after-review.tsv (22 Approved, 3 Rejected; all superseded).
+  New: gfx/menu/luminos/background_ingame_alpha.jpg (needed) is Rejected by Roblox → fix it in UPLOAD-FIX4.
 - **Strict re-review done (2026-11-23):** remaining 7,637 images → 275 flagged (2 high, 54 medium):
   assets/manifest/review/upload_findings_{a..f}.tsv; live 3,273 → 119 flagged: live_findings_{a..c}.tsv.
   Sheets: tools/upload/review_sheets.py. **Fixed and uploaded** (UPLOAD-FIX3, Claude-Quartz, DIFF-009):
@@ -32,15 +36,15 @@ Every section except §MAP and §DIFFS stays under ~60 lines; detail lives in `d
   key via tools/upload/set_key.ps1): 7,634 uploaded in 77 batches, every batch all Approved, 0 Rejected, no 403.
   All 10,910 rows of upload-ready.tsv now have an asset id in roblox-images.tsv (its 316 error rows are from
   the 2026-11-22 ban, all re-uploaded since).
-- **Assets on Roblox:** sounds 804/805; textures 10,930 (28 old ones to archive). **Still open:** the 119
-  flagged images among the 3,273 uploaded before the ban (live_findings_{a..c}.tsv) were not part of UPLOAD-FIX3.
+- **Assets on Roblox:** sounds 804/805 Approved (cdtracks/heavymetal.ogg Rejected, Q-013); textures: 10,909 of
+  the 10,910 needed are Approved (3,270 read live 2026-11-25 + 7,634 by the upload gate), 1 Rejected (above).
 - **M2-RUNNER done** (stormkeep entities load, first StartFrame spawns them; world builtins wait on M3).
   ~170 builtins ported; server state (engine/server.luau), SZ/MSG writes, mathlib bit-exact.
 - **M2-AOT-SHIP (claimed, Claude-Anvil):** lazy chunk loading + background preload; Q-014 (startup 17.7 s).
 - **Tests:** 14 Lune files, all pass; StyLua/Selene clean; check_port_lines 0 wrong.
 - **Stale claims:** M3-BSPLOAD and REF-DP branches have only claim commits from 2026-11-20 — owner to reassign.
-- **Next:** owner archives the 28 assets and decides on the 119 flagged live ones; M3-BSPLOAD (if reassigned)
-  → world builtins.
+- **Next:** UPLOAD-FIX4 (fix + re-upload the flagged live images, then archive the old ones); heavymetal.ogg
+  appeal or change (owner); M3-BSPLOAD (if reassigned) → world builtins.
 
 ## §RULES (condensed from the owner's brief; absolute)
 
@@ -147,6 +151,7 @@ before working. One claimed task per subsystem at a time. Details per task in th
 | M2-RUNNER | Headless runner: rest of PRVM_Prog_Load (required fields/globals of svvm, field lookup), edict alloc, strings, all builtins stubbed + logged; done = server QC runs worldspawn on a stock map | done (Claude-Anvil 2026-11-22: stormkeep entities load, first StartFrame spawns them; world builtins stubbed for M3/M4) | tests/, engine/prvm_*.luau, engine/sv_main.luau, engine/svvm_cmds.luau | M2-AOT, M2-INTERP |
 | M2-FSWRITE | Persist files QC writes (fopen append/write, fs.realfiles in engine/fs.luau) across server restarts (Roblox DataStore or similar); in memory today | open | engine/fs.luau, platform/ | M2-RUNNER |
 | UPLOAD-FIX3 | Fix the 275 images flagged by the 2026-11-23 strict review (assets/manifest/review/upload_findings_*.tsv) as subtly as possible (D-025): all high+medium, plus low items with names/brands/blood/symbols/ambiguous letters or digits; keep harmless signage; matching _norm/_gloss/_alpha; owner sees before/after; then gated upload (batches of 100, stop on Reviewing > 45 min, Rejected or 403) | done (Claude-Quartz 2026-11-24: 124 fixed, 153 kept, owner approved, 7,634 uploaded in 77 gated batches, all Approved) | tools/upload/, work/upload/fixed3 | — |
+| UPLOAD-FIX4 | Same as UPLOAD-FIX3 for the images uploaded before the ban: the 112 flagged live images still in use (assets/manifest/review/live_findings_*.tsv; 13 high incl. textures/cp*.jpg, gfx/blood*.jpg, gfx/leave_em_behind_mini.jpg) + the Rejected gfx/menu/luminos/background_ingame_alpha.jpg. Fix subtly (D-025), keep-list with reasons, owner sees before/after, gated upload (batch 100), then archive the old assets (archive-now.tsv, replace-after-review.tsv + the newly replaced ones). Check with tools/upload/check_assets.py | open | tools/upload/ | UPLOAD-FIX3 |
 | M2-DEBUG | Rebuild progs.dat from qcsrc with the pinned gmqcc; prove byte-identical; emit line-number debug info | open | tools/qcaot/ | M2-PROGS |
 | REF-CVARLIST | From REF-DP's dedicated server after startup: `cvarlist` (name/value/default/flags) and `cmdlist` → tests/reference/cvars/; diff against engine/host.luau's result (validates tools/engine/gen_cvars.py and the config chain) | open | tests/reference/cvars/, tests/integration/ | REF-DP, M2-RUNNER |
 | REF-DP | Instrumented DarkPlaces (from release source) that records traces, server frames, net messages, particles | open | tools/darkplaces-ref/ | M0-PIN |

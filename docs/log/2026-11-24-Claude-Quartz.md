@@ -56,7 +56,13 @@ None new (D-025 + the owner's brief of 2026-11-24 applied).
 - Check: all 10,910 rows of upload-ready.tsv (incl. the 122 fixed3 rows) have an asset id in roblox-images.tsv.
   Its 316 error rows are the "User is moderated" rows of 2026-11-22 (same count as before this run).
 
+## Account check (2026-11-25, owner asked "is the account side 100% done?")
+- tools/upload/check_assets.py (read-only GETs, 429-limited: ~4,100 reads ≈ 20 min) →
+  assets/manifest/roblox-assets-state.tsv. `--skip-last 7634` = do not re-read what the gate just approved.
+- Sounds: 804 needed Approved, cdtracks/heavymetal.ogg Rejected. Images: 3,270 older needed Approved + Active,
+  1 needed Rejected (gfx/menu/luminos/background_ingame_alpha.jpg). Nothing is Archived.
+- archive-now.tsv: 25 of 28 are still needed (upload-ready.tsv has no fixed version for them), incl. all five
+  textures/cp*.jpg. 112 of the 119 live findings are in use unfixed → new task UPLOAD-FIX4.
+
 ## Next step
-Owner: archive the 28 assets of assets/manifest/archive-now.tsv; decide on the 119 flagged images that were
-uploaded before the ban (live_findings_{a..c}.tsv, not part of this task). The key stays on the PC until
-`set_key.ps1 -Remove`.
+UPLOAD-FIX4. Owner: heavymetal.ogg (appeal or change). The key stays on the PC until `set_key.ps1 -Remove`.
