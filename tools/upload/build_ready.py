@@ -5,13 +5,15 @@
 
 For every unique texture of the release (one per sha256, like tools/upload/upload_images.py), the file that
 goes to Roblox is, in priority order:
+  0. work/upload/fixed4/<vpath>  fixes of the flagged images uploaded before the ban (tools/upload/content_fix4.py,
+                                 UPLOAD-FIX4); built on top of 1-4, so it must win
   1. work/upload/fixed3/<vpath>  strict-review fixes (tools/upload/content_fix3.py, UPLOAD-FIX3, G-051); built on
                                  top of 2-4, so it must win
   2. work/upload/fixed/<vpath>   gore fixes (tools/upload/gore_fix.py, owner decisions D-022/D-024 style)
   3. work/upload/fixed2/<vpath>  content fixes: text/URL/phone/brand/drug/blood (tools/upload/content_fix.py)
   4. work/upload/blurred/<vpath> text blurs (tools/upload/blur_text.py, D-024)
   5. the original                work/vfs-high/<vpath>
-Manifest columns: vpath, source (fixed3|fixed|fixed2|blurred|original), sha256 of the ready file, original
+Manifest columns: vpath, source (fixed4|fixed3|fixed|fixed2|blurred|original), sha256 of the ready file, original
 sha256, already_uploaded (asset id of the ORIGINAL if it went up before the review; a fixed version is a new asset).
 """
 import hashlib, shutil
@@ -35,7 +37,7 @@ def main() -> None:
             continue
         seen.add(sha)
         src, kind = ROOT / "work/vfs-high" / v, "original"
-        for k, d in (("fixed3", "work/upload/fixed3"), ("fixed", "work/upload/fixed"), ("fixed2", "work/upload/fixed2"),
+        for k, d in (("fixed4", "work/upload/fixed4"), ("fixed3", "work/upload/fixed3"), ("fixed", "work/upload/fixed"), ("fixed2", "work/upload/fixed2"),
                      ("blurred", "work/upload/blurred")):
             p = ROOT / d / v
             if p.exists():

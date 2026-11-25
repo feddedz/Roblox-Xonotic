@@ -15,10 +15,11 @@ import numpy as np
 from PIL import Image, ImageDraw
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import content_fix3 as F  # noqa: E402
+N = "4" if "--fix4" in sys.argv else "3"  # --fix4: the same sheets for UPLOAD-FIX4 (content_fix4.py -> work/review_fix4)
+F = __import__("content_fix" + N)
 
 ROOT = F.ROOT
-OUT = ROOT / "work/review_fix3"
+OUT = ROOT / f"work/review_fix{N}"
 S, LBL, ROWS = 232, 30, 7
 
 
@@ -56,7 +57,9 @@ def main() -> None:
         for r, (n, v, sev, issue, what) in enumerate(part):
             b = Image.open(F.src_path(v)).convert("RGB")
             a = Image.open(F.DST / v).convert("RGB")
-            diff = np.abs(np.asarray(b).astype(int) - np.asarray(a).astype(int)).max(-1) > 10
+            if a.size != b.size:  # the one resized file of UPLOAD-FIX4 (1x1 -> 4x4): compare at the new size
+                b = b.resize(a.size, Image.NEAREST)
+            diff =np.abs(np.asarray(b).astype(int) - np.asarray(a).astype(int)).max(-1) > 10
             ys, xs = np.nonzero(diff)
             if len(ys):
                 pad = max(6, int(0.15 * max(xs.max() - xs.min(), ys.max() - ys.min())))

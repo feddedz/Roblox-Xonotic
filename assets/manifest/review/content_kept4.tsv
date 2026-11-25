@@ -1,0 +1,78 @@
+# n	vpath	severity	issue	kept unchanged because
+6	darkplaces-icon.jpg	low	brand/logo	the engine's own icon (bird in a ring), no text; this game runs on that engine
+8	darkplaces-icon2.jpg	low	brand/logo	the engine's own icon (bird in a ring), no text; this game runs on that engine
+130	env/newsky_asteroids/asteroids.jpg	low	text	64x64 sky preview with a plain descriptive label ('NewSky Asteroids/Nebulae/Planets'): harmless signage
+136	env/newsky_nebulae/nebulae.jpg	low	text	64x64 sky preview with a plain descriptive label ('NewSky Asteroids/Nebulae/Planets'): harmless signage
+141	env/newsky_planets/planets.jpg	low	text	64x64 sky preview with a plain descriptive label ('NewSky Asteroids/Nebulae/Planets'): harmless signage
+220	gfx/conback.jpg	low	text	console background: blurred, illegible lines of program code
+223	gfx/conback3_alpha.jpg	low	brand/logo	the game's own XONOTIC wordmark/eagle emblem, no URL or address: kept on the owner's rule (brief of 2026-11-24)
+224	gfx/conback_alpha.jpg	low	text	console background: blurred, illegible lines of program code
+225	gfx/conback3.jpg	medium	brand/logo	the game's own XONOTIC wordmark/eagle emblem, no URL or address: kept on the owner's rule (brief of 2026-11-24)
+246	gfx/crosshair19.jpg	low	symbol	crosshair made of four plain triangles (bow-tie); straight edges, no hooked arms
+389	gfx/crosshairt.jpg	low	brand/logo	T-shaped crosshair (an italic 't'); a single letter, not a logo
+393	gfx/crosshairt_alpha.jpg	low	brand/logo	T-shaped crosshair (an italic 't'); a single letter, not a logo
+408	gfx/hud/default/ammo_bullets.jpg	low	text	ammo icons; the stencilled text on them is too small to read
+416	gfx/hud/default/ammo_rockets.jpg	low	text	ammo icons; the stencilled text on them is too small to read
+495	gfx/hud/default/health.jpg	low	symbol	health cross, the usual video-game health sign (dark/red 3D cross on black, a red tile); not red on white
+547	gfx/hud/default/minigames/bd/brick6.jpg	low	symbol	health cross, the usual video-game health sign (dark/red 3D cross on black, a red tile); not red on white
+558	gfx/hud/default/minigames/c4/board_alpha.jpg	medium	brand/logo	the game's own XONOTIC wordmark/eagle emblem, no URL or address: kept on the owner's rule (brief of 2026-11-24)
+560	gfx/hud/default/minigames/c4/board_under.jpg	medium	brand/logo	the game's own XONOTIC wordmark/eagle emblem, no URL or address: kept on the owner's rule (brief of 2026-11-24)
+562	gfx/hud/default/minigames/c4/board_under_alpha.jpg	medium	brand/logo	the game's own XONOTIC wordmark/eagle emblem, no URL or address: kept on the owner's rule (brief of 2026-11-24)
+564	gfx/hud/default/minigames/c4/board.jpg	medium	brand/logo	the game's own XONOTIC wordmark/eagle emblem, no URL or address: kept on the owner's rule (brief of 2026-11-24)
+566	gfx/hud/default/minigames/c4/board_over.jpg	low	brand/logo	the game's own XONOTIC wordmark/eagle emblem, no URL or address: kept on the owner's rule (brief of 2026-11-24)
+572	gfx/hud/default/minigames/nmm/board.jpg	low	brand/logo	the game's own XONOTIC wordmark/eagle emblem, no URL or address: kept on the owner's rule (brief of 2026-11-24)
+575	gfx/hud/default/minigames/nmm/board_alpha.jpg	low	brand/logo	the game's own XONOTIC wordmark/eagle emblem, no URL or address: kept on the owner's rule (brief of 2026-11-24)
+583	gfx/hud/default/minigames/pong/board_alpha.jpg	low	brand/logo	the game's own XONOTIC wordmark/eagle emblem, no URL or address: kept on the owner's rule (brief of 2026-11-24)
+586	gfx/hud/default/minigames/pong/board.jpg	low	brand/logo	the game's own XONOTIC wordmark/eagle emblem, no URL or address: kept on the owner's rule (brief of 2026-11-24)
+599	gfx/hud/default/minigames/pp/piece_taken.jpg	low	splatter	white paint-splat game piece on black; nothing red in the image
+605	gfx/hud/default/minigames/ttt/board_alpha.jpg	low	brand/logo	the game's own XONOTIC wordmark/eagle emblem, no URL or address: kept on the owner's rule (brief of 2026-11-24)
+611	gfx/hud/default/minigames/ttt/board.jpg	low	brand/logo	the game's own XONOTIC wordmark/eagle emblem, no URL or address: kept on the owner's rule (brief of 2026-11-24)
+638	gfx/hud/default/notify_camping.jpg	low	real photo	harmless photo icons (a tent; a trout), no people, text or brand
+649	gfx/hud/default/notify_melee_shotgun.jpg	low	real photo	harmless photo icons (a tent; a trout), no people, text or brand
+709	gfx/hud/default/shield.jpg	low	foreign text	single kanji used as power-up icons (longevity; power): ordinary words
+711	gfx/hud/default/strength.jpg	low	foreign text	single kanji used as power-up icons (longevity; power): ordinary words
+1085	gfx/hud/luma/superweapons.jpg	low	symbol	warning-triangle icon with a mushroom cloud: a hazard sign, no gore
+1263	gfx/hud/old/armor_big.jpg	low	body-like shape	plated armour suits with glowing lights and a helmet: clearly armour, not a body
+1267	gfx/hud/old/armor_mega.jpg	low	body-like shape	plated armour suits with glowing lights and a helmet: clearly armour, not a body
+1323	gfx/hud/old/health.jpg	low	trademark lookalike	health cross, the usual video-game health sign (dark/red 3D cross on black, a red tile); not red on white
+1333	gfx/hud/old/item_large_armor.jpg	low	body-like shape	plated armour suits with glowing lights and a helmet: clearly armour, not a body
+1419	gfx/loading.jpg	medium	brand logo	the game's own XONOTIC wordmark/eagle emblem, no URL or address: kept on the owner's rule (brief of 2026-11-24)
+1423	gfx/menu/luma/background_ingame_l2.jpg	medium	brand logo	the game's own XONOTIC wordmark/eagle emblem, no URL or address: kept on the owner's rule (brief of 2026-11-24)
+1424	gfx/menu/luma/background_ingame_l2_alpha.jpg	medium	brand logo	the game's own XONOTIC wordmark/eagle emblem, no URL or address: kept on the owner's rule (brief of 2026-11-24)
+1489	gfx/menu/luma/gametype_ca.jpg	low	political symbol lookalike	game-mode icons with a clenched fist (fight/last-man-standing): a common game icon, no slogan or emblem
+1490	gfx/menu/luma/gametype_ca_alpha.jpg	low	political symbol lookalike	game-mode icons with a clenched fist (fight/last-man-standing): a common game icon, no slogan or emblem
+1513	gfx/menu/luma/gametype_lms_alpha.jpg	low	political symbol lookalike	game-mode icons with a clenched fist (fight/last-man-standing): a common game icon, no slogan or emblem
+1514	gfx/menu/luma/gametype_lms.jpg	low	political symbol lookalike	game-mode icons with a clenched fist (fight/last-man-standing): a common game icon, no slogan or emblem
+1516	gfx/menu/luma/gametype_mayhem_alpha.jpg	low	political symbol lookalike	game-mode icons with a clenched fist (fight/last-man-standing): a common game icon, no slogan or emblem
+1517	gfx/menu/luma/gametype_mayhem.jpg	low	political symbol lookalike	game-mode icons with a clenched fist (fight/last-man-standing): a common game icon, no slogan or emblem
+1528	gfx/menu/luma/gametype_tmayhem.jpg	low	political symbol lookalike	game-mode icons with a clenched fist (fight/last-man-standing): a common game icon, no slogan or emblem
+1530	gfx/menu/luma/gametype_tmayhem_alpha.jpg	low	political symbol lookalike	game-mode icons with a clenched fist (fight/last-man-standing): a common game icon, no slogan or emblem
+1601	gfx/menu/luminos/background_ingame_l2.jpg	medium	brand logo	the game's own XONOTIC wordmark/eagle emblem, no URL or address: kept on the owner's rule (brief of 2026-11-24)
+1602	gfx/menu/luminos/background_ingame_l2_alpha.jpg	medium	brand logo	the game's own XONOTIC wordmark/eagle emblem, no URL or address: kept on the owner's rule (brief of 2026-11-24)
+1821	maps/finalrage.jpg	low	brand logo in scene	map preview screenshot; the only finding is the game's own XONOTIC emblem on a wall/floor: the game's own XONOTIC wordmark/eagle emblem, no URL or address: kept on the owner's rule (brief of 2026-11-24)
+1857	maps/leave_em_behind.jpg	low	brand logo in scene	map preview screenshot; the only finding is the game's own XONOTIC emblem on a wall/floor: the game's own XONOTIC wordmark/eagle emblem, no URL or address: kept on the owner's rule (brief of 2026-11-24)
+1942	models/containers/crate01_lod.jpg	low	fictional brand text	crate label 'CARGO EXPRESS': made-up harmless signage
+1960	models/desertfactory/textures/documents/document01.jpg	low	text	hand-drawn graph with tiny handwriting: no name, brand or code
+1965	models/desertfactory/textures/documents/writing04_alpha.jpg	low	text	graffiti 'All generalisations are wrong!': a harmless sentence
+2068	models/it/lcd.jpg	low	fictional brand text	monitor bezel with a tiny made-up label 'ALIEN TX'
+2298	models/sprites/minigame_busy.jpg	low	brand-like	generic gamepad drawing with A/B/X/Y buttons; no maker's logo
+2349	models/trak/ccup_xon.jpg	low	logo	the game's own XONOTIC wordmark/eagle emblem, no URL or address: kept on the owner's rule (brief of 2026-11-24)
+2371	models/trak/tablet_xon1.jpg	medium	brand/off-platform	XONOTIC emblem and a harmless sentence about the project's community; no other game, name or address: the game's own XONOTIC wordmark/eagle emblem, no URL or address: kept on the owner's rule (brief of 2026-11-24)
+2374	models/trak/tablet_xon4.jpg	low	brand/occult word	XONOTIC emblem, a Latin motto and 'good luck and have fun': harmless text
+2375	models/trak/tablet_xon5.jpg	low	brand/real person	XONOTIC emblem and a famous quotation signed '- NOT VOLTAIRE': a joke about a historical author (died 1778), not a user, handle or living person
+2458	gfx/menu/wickedx/skinpreview.jpg	low	logo/screenshot	the game's own XONOTIC wordmark/eagle emblem, no URL or address: kept on the owner's rule (brief of 2026-11-24)
+2515	gfx/menu/xaw/skinpreview.jpg	low	screenshot text	menu-skin preview screenshot; its small text is blurred and unreadable
+2583	gfx/winner.jpg	low	logo	the game's own XONOTIC wordmark/eagle emblem, no URL or address: kept on the owner's rule (brief of 2026-11-24)
+2586	maps/trident.jpg	low	logo	map preview screenshot; the only finding is the game's own XONOTIC emblem on a wall/floor: the game's own XONOTIC wordmark/eagle emblem, no URL or address: kept on the owner's rule (brief of 2026-11-24)
+2878	models/weapons/g_crylink_luma.jpg	low	symbol	weapon icon: three rounded commas in a ring (the Japanese tomoe motif); round blobs, no straight hooked arms
+2879	models/weapons/g_crylink_luma_alpha.jpg	low	symbol	weapon icon: three rounded commas in a ring (the Japanese tomoe motif); round blobs, no straight hooked arms
+3030	particles/particlefont-template.jpg	low	numbers	particle-sheet template: every cell carries its running index number in tiny digits; no number stands alone
+3031	particles/particlefont.jpg	low	blood decal shapes	particle sheet: small white smoke/spark/splat sprites; nothing red, no text beyond 'used for beam'
+3187	textures/cleanskull.jpg	low	skull	plain bone-coloured skull skin: no blood, wound or gore
+643	gfx/hud/default/notify_headshot.jpg	low	text	not kept: already replaced by an earlier fix (gore_fix/content_fix), the flagged upload is no longer used and is on the archive list
+1738	gfx/menu/luminos/skinpreview.jpg	low	brand logo + text	not kept: already replaced by an earlier fix (gore_fix/content_fix), the flagged upload is no longer used and is on the archive list
+1751	gfx/menu/wickedx/background_ingame.jpg	medium	brand logo + tiny URL-like text	not kept: already replaced by an earlier fix (gore_fix/content_fix), the flagged upload is no longer used and is on the archive list
+1939	models/containers/crate01.jpg	low	fictional brand text	not kept: already replaced by an earlier fix (gore_fix/content_fix), the flagged upload is no longer used and is on the archive list
+2363	models/trak/pbox.jpg	low	fictional brand/name	not kept: already replaced by an earlier fix (gore_fix/content_fix), the flagged upload is no longer used and is on the archive list
+2364	models/trak/pen.jpg	low	fictional brand	not kept: already replaced by an earlier fix (gore_fix/content_fix), the flagged upload is no longer used and is on the archive list
+2373	models/trak/tablet_xon3.jpg	medium	brand/off-platform	not kept: already replaced by an earlier fix (gore_fix/content_fix), the flagged upload is no longer used and is on the archive list
