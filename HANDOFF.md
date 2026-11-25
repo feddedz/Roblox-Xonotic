@@ -16,24 +16,32 @@ Every section except §MAP and §DIFFS stays under ~60 lines; detail lives in `d
 | §GOTCHAS | Verified limits (with date) and hard-won lessons. |
 
 <!-- §STATUS -->
-## §STATUS (rewritten 2026-11-24, Claude-Anvil)
-- **Owner's account: clear again** after a child-safety ban (2026-11-22 13:40 UTC) over textures/cp_glow.jpg
-  (letters "CP" = Control Point, read as CSAM slang; appeal granted, G-051). **Uploads stopped. Do not upload
-  anything until the owner says so, and only after the fixes below.**
-- **Owner to archive 28 live assets:** assets/manifest/archive-now.tsv (blood decal, CP textures, swastika-shaped
-  minimap, author credits/"Nexuiz" text, SS-rune-like text, real photo, ...).
-- **Strict re-review done (2026-11-23):** remaining 7,637 images → 275 flagged (2 high, 54 medium):
-  assets/manifest/review/upload_findings_{a..f}.tsv; live 3,273 → 119 flagged: live_findings_{a..c}.tsv.
-  Sheets: tools/upload/review_sheets.py. **Fixes NOT done** (task UPLOAD-FIX3): write
-  tools/upload/content_fix3.py → work/upload/fixed3/, add fixed3 first in tools/upload/build_ready.py, rebuild
-  upload-ready.tsv, show the owner before/after, then gated upload in batches of 100.
-- **Assets on Roblox:** sounds 804/805; textures 3,296 (28 to archive).
+## §STATUS (rewritten 2026-11-25, Claude-Quartz)
+- **Owner's account: clear** after a child-safety ban (2026-11-22) over textures/cp_glow.jpg (letters "CP" =
+  Control Point; appeal granted, G-051). **Any further upload: only reviewed files, gated in batches of 100
+  (tools/upload/run_unattended.ps1 / .sh), with the owner's OK.** Key on the owner's PC: tools/upload/set_key.ps1.
+- **Textures: done.** All 13,676 texture files (10,905 assets) have an Approved asset. Three review rounds made
+  Roblox-safe versions (DIFF-008, DIFF-009, DIFF-010): gore_fix/content_fix (fixed, fixed2), content_fix3
+  (UPLOAD-FIX3: 124 fixed, 153 kept), content_fix4 (UPLOAD-FIX4: 43 of the pre-ban flagged images fixed incl. the
+  CP sign, 70 kept; reasons in assets/manifest/review/content_{fixes,kept}{3,4}.tsv). Owner approved both sheets.
+- **THE LOOKUP THE GAME MUST USE: platform/render/texture_assets.luau** (5 data parts; vpath → current asset id)
+  = assets/manifest/texture-assets.tsv, written by tools/upload/asset_index.py --write (re-run after every
+  upload; tools/upload/test_asset_index.py fails if it is stale). Never read ids from roblox-images.tsv directly:
+  it is an upload log that also holds the old, replaced uploads. Sounds: platform/sound/audio_assets.luau.
+- **Sounds:** 804 of 805 Approved; sound/cdtracks/heavymetal.ogg Rejected (Q-013: owner appeals or decides).
+- **Old uploads:** 16 old rejected sound uploads archived by API (assets/manifest/roblox-archived.tsv). Images
+  cannot be archived by Open Cloud (G-052); 68 unused old images stay on the account (assets/manifest/
+  archive-now.tsv: old CP set, blood decal, ...; none is used by the game; owner chose to leave them).
+  State of every asset: tools/upload/check_assets.py → assets/manifest/roblox-assets-state.tsv.
 - **M2-RUNNER done** (stormkeep entities load, first StartFrame spawns them; world builtins wait on M3).
   ~170 builtins ported; server state (engine/server.luau), SZ/MSG writes, mathlib bit-exact.
 - **M2-AOT-SHIP (claimed, Claude-Anvil):** lazy chunk loading + background preload; Q-014 (startup 17.7 s).
 - **Tests:** 14 Lune files, all pass; StyLua/Selene clean; check_port_lines 0 wrong.
 - **Stale claims:** M3-BSPLOAD and REF-DP branches have only claim commits from 2026-11-20 — owner to reassign.
-- **Next:** UPLOAD-FIX3 → owner OK → upload; M3-BSPLOAD (if reassigned) → world builtins.
+- **Branches (2026-11-25):** PRs 1, 2, 3 merged into main: start every new branch from main (D-012). Owner
+  decided NOT to archive the 68 old images (archive-now.tsv is only a list).
+- **Next:** owner: heavymetal.ogg appeal (optional); M1-TEX / M5-RENDER use texture_assets.luau;
+  M3-BSPLOAD (if reassigned) → world builtins.
 
 ## §RULES (condensed from the owner's brief; absolute)
 
@@ -139,7 +147,8 @@ before working. One claimed task per subsystem at a time. Details per task in th
 | M2-INTERP-DEBUG | Port tracing/profiling/coverage/watchpoints of prvm_exec.c (console commands use them) | open | engine/prvm_exec.luau | M2-INTERP | tools/qcaot/, game/generated/ | M2-PROGS |
 | M2-RUNNER | Headless runner: rest of PRVM_Prog_Load (required fields/globals of svvm, field lookup), edict alloc, strings, all builtins stubbed + logged; done = server QC runs worldspawn on a stock map | done (Claude-Anvil 2026-11-22: stormkeep entities load, first StartFrame spawns them; world builtins stubbed for M3/M4) | tests/, engine/prvm_*.luau, engine/sv_main.luau, engine/svvm_cmds.luau | M2-AOT, M2-INTERP |
 | M2-FSWRITE | Persist files QC writes (fopen append/write, fs.realfiles in engine/fs.luau) across server restarts (Roblox DataStore or similar); in memory today | open | engine/fs.luau, platform/ | M2-RUNNER |
-| UPLOAD-FIX3 | Fix the 275 images flagged by the 2026-11-23 strict review (assets/manifest/review/upload_findings_*.tsv) as subtly as possible (D-025): all high+medium, plus low items with names/brands/blood/symbols/ambiguous letters or digits; keep harmless signage; matching _norm/_gloss/_alpha; owner sees before/after; then gated upload (batches of 100, stop on Reviewing > 45 min, Rejected or 403) | open | tools/upload/, work/upload/fixed3 | — |
+| UPLOAD-FIX3 | Fix the 275 images flagged by the 2026-11-23 strict review (assets/manifest/review/upload_findings_*.tsv) as subtly as possible (D-025): all high+medium, plus low items with names/brands/blood/symbols/ambiguous letters or digits; keep harmless signage; matching _norm/_gloss/_alpha; owner sees before/after; then gated upload (batches of 100, stop on Reviewing > 45 min, Rejected or 403) | done (Claude-Quartz 2026-11-24: 124 fixed, 153 kept, owner approved, 7,634 uploaded in 77 gated batches, all Approved) | tools/upload/, work/upload/fixed3 | — |
+| UPLOAD-FIX4 | Same as UPLOAD-FIX3 for the images uploaded before the ban: the 112 flagged live images still in use (assets/manifest/review/live_findings_*.tsv; 13 high incl. textures/cp*.jpg, gfx/blood*.jpg, gfx/leave_em_behind_mini.jpg) + the Rejected gfx/menu/luminos/background_ingame_alpha.jpg. Fix subtly (D-025), keep-list with reasons, owner sees before/after, gated upload (batch 100), then archive the old assets (archive-now.tsv, replace-after-review.tsv + the newly replaced ones). Check with tools/upload/check_assets.py | done (Claude-Quartz 2026-11-25: 43 fixed + uploaded, all Approved; 70 kept; texture_assets.luau; 16 sounds archived; 68 images left for the owner to archive, G-052) | tools/upload/ | UPLOAD-FIX3 |
 | M2-DEBUG | Rebuild progs.dat from qcsrc with the pinned gmqcc; prove byte-identical; emit line-number debug info | open | tools/qcaot/ | M2-PROGS |
 | REF-CVARLIST | From REF-DP's dedicated server after startup: `cvarlist` (name/value/default/flags) and `cmdlist` → tests/reference/cvars/; diff against engine/host.luau's result (validates tools/engine/gen_cvars.py and the config chain) | open | tests/reference/cvars/, tests/integration/ | REF-DP, M2-RUNNER |
 | REF-DP | Instrumented DarkPlaces (from release source) that records traces, server frames, net messages, particles | open | tools/darkplaces-ref/ | M0-PIN |
@@ -324,6 +333,8 @@ If it isn't here, it isn't allowed.
 | DIFF-006 | soldier/coms/meet: besides the DIFF-005 bleep (wider: mid "your".."to"), pitch +3% (≈ half a semitone), same length | bleep only (2 versions): rejected | Roblox moderation (likely matched to the rejected recording) | Roblox policy, owner decision D-023 | slight pitch change; timing identical |
 | DIFF-007 | Textures with web addresses / phone-number text: those text areas blurred (list + boxes in assets/manifest, tool tools/upload/blur_text.py) | uploading as-is: account warnings + 2 one-day suspensions (off-platform links) | Roblox Community Standards (off-platform links) | Roblox policy, owner decision D-024 | only the text areas differ |
 | DIFF-008 | 106 textures changed for Roblox (gore: splat icons → blobs, blood decals → soot, stains → grime, gibs/flesh → rock; text: URLs/IP/phone digits/"NO PORNOGRAPHIC..."/"PILLS"/crude lines/brands removed or blurred). Lists: assets/manifest/review/{gore_fixes,content_fixes}.tsv; tools/upload/{gore_fix,content_fix,blur_text}.py; set: tools/upload/build_ready.py → assets/manifest/upload-ready.tsv | originals uploaded: warnings + 2 suspensions | Roblox Community Standards | Roblox policy, owner decisions D-022/D-024/D-025 | only the listed areas differ |
+| DIFF-009 | 124 more textures changed for Roblox after the strict review (G-051), on top of DIFF-008: blood-splatter tiles → clean sibling tile + faint dirt shadow (2 brain-like lumps gone); splatter decals → soft grey smudge (colour + alpha); point-down stars turned point-up (e7); cross-in-ring lamp lenses turned 45° to an X (28 files incl. normal/height/glow); hooked-arm glyph e6symbol_b → sibling rune; tags/handles/real names/brand-like marks erased ([HFX], [KFX] INDUSTRIES, NEXX CORP, VECTOR, '100% katoen', kuniuthefrogg, strahlemann, SMILECYTHE, Samual, 'by Justin', Cuinn Herrick, Justin Fisher, TRAK sticker); Nexuiz name/logo blanked (billboard frame, stained glass, lamp2); OBEY screen → XON; NO SMOKING rule + word LETHAL, pill bottle, skull drips, HELP drips, digit string '1688', 'S.S'-like door stencil, 'FK'/'KK' in screen noise removed; gib skins/gloss neutral grey; pyria skin patches smoothed. Lists: assets/manifest/review/content_fixes3.tsv (what changed per file) and content_kept3.tsv (153 kept, with reasons); tool tools/upload/content_fix3.py | originals / earlier fixed versions: flagged by the strict review after the child-safety moderation over 'CP' | Roblox Community Standards + moderation false positives | Roblox policy, owner decision D-025 + owner brief 2026-11-24 | only the listed areas differ; same size and mode |
+| DIFF-010 | 43 more textures changed for Roblox (UPLOAD-FIX4): the flagged images that were uploaded before the ban. 'CP' control-point sign (5 maps): the P is the mirror image of the C → one symmetric ring emblem, no letters; gfx/blood (+alpha): splat and droplets blurred to a soft cloud; gfx/leave_em_behind_mini: the two empty yards hatched (corridors unchanged); desertfactory notes/graffiti: usernames (sev, Tenshihan, MEXL), program names and 'Nexuiz' erased; newspaper credit 'by sev' erased; race checkpoint ring: rune-style text column → plain stone (colour, bump, gloss); tablets: 'BS', the Nexuiz sentences erased; rockets: red paint → red-orange, 'FALCON PUNCH' and 'Fricka' erased; cockpit: photographer credit and LCD letters 'dPIC' erased; yellow domination icon (8 files) and e8circle_pur turned 45° (cross → X); hud/old/armor muscle relief smoothed; alphamod labels '14%', '69%', '88%' blanked; bloodyskull = cleanskull; 'FRUITIEX' erased; gfx/menu/luminos/background_ingame_alpha 1x1 → 4x4 of the same grey (Roblox rejected the 1x1 file). List: assets/manifest/review/content_fixes4.tsv; 70 kept with reasons: content_kept4.tsv (incl. 11 'medium' XONOTIC-logo findings kept on the owner's wordmark rule) | originals / earlier fixed versions: the live assets flagged by the 2026-11-23 live review (assets/manifest/review/live_findings_*.tsv) | Roblox Community Standards + moderation (G-051: ambiguous letters, look-alike symbols, real names/handles, other games' names) | Roblox policy, owner decision D-025 + owner's brief of 2026-11-24/25 ("fix everything") | only the listed areas differ; same size and mode (one 1x1 → 4x4, identical when stretched); tools/upload/content_fix4.py is deterministic |
 (DIFF-001 withdrawn 2026-11-20, see D-015.)
 
 Candidates already known (become entries when the subsystem lands, after real attempts):
@@ -503,4 +514,5 @@ One line each; **details and sources: `docs/gotchas.md`** (add to both). Roblox 
 - **G-049** Xonotic spawns map entities lazily: its engine-called SV_OnEntityPreSpawnFunction (qcsrc/lib/_all.inc) sets `__spawnfunc_expecting`, so PRVM_ED_LoadFromFile only queues them; the first StartFrame runs the world constructor (real worldspawn), which spawns the queue. Engine-called functions read `this` from leftover OFS_PARM0 or `self`, so builtins must leave parameter globals exactly as DP does.
 - **G-050** qsort in buf_sort: comparators are inconsistent for NULL/empty strings, so the result depends on the algorithm. Ported as glibc's msort (top-down merge sort, glibc ≤ 2.37 as at the 0.8.6 release); newer glibc may order empty strings differently.
 - **G-051** (2026-11-22) Roblox moderation flagged textures/cp_glow.jpg (big letters "CP" meaning Control Point) as child-safety and moderated the account (appeal granted). Review for *ambiguous* letters/numbers too (CP, SS, 88, 14, 69, 420), symbol look-alikes (map layouts, rotated crosses, sun crosses), real names/handles and other games' names — not only URLs/gore. A batch item stuck in "Reviewing" for hours preceded the ban: treat a long review as a warning.
+- **G-052** (read 2026-11-25) Open Cloud can archive assets: `POST /assets/v1/assets/{id}:archive` (no body, scope asset:write, beta) → `"state": "Archived"` (gone from the website, not usable in experiences); `...:restore` undoes it. `GET /assets/v1/assets/{id}?readMask=moderationResult,state` shows both states; GETs are rate-limited (429 with x-ratelimit-reset; ~4,100 reads ≈ 20 min). A 1x1 grey JPEG was Rejected while 1x1 colour swatches were Approved: moderation of tiny images is not predictable. **Tried: only Audio can be archived; Image answers 400 "not an archivable asset type" → dashboard only.** tools/upload/check_assets.py, archive_assets.py.
 <!-- /§GOTCHAS -->
