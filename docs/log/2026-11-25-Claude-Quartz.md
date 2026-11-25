@@ -46,9 +46,21 @@ None new.
 - First q3bsp reference in plain Python was quadratic (re-sliced lumps in loops) and never finished; fixed.
 - math.ceil gives -0 in Luau where C's (int)ceil gives 0: `+ 0` after the conversion (light grid imins).
 
+## Part 3 (same day)
+- Mod_MakeCollisionBIH + the submodel loop of Mod_Q3BSP_Load (bounds, radii, sorted surfaces, collision and
+  render BIH per submodel) + model_shared.c Mod_MakeSortedSurfaces. q3bsp_load: 84,795 checks, 42 s for 30
+  maps; 2.0 M BIH leafs. MATERIALFLAG_MESHCOLLISIONS surfaces are not in the collision BIH yet (needs
+  Mod_LoadTextureFromQ3Shader: basematerialflags are 0). Memory note: a BIH leaf is 3 Luau tables; the render
+  BIH of a big map is ~1 M leafs. model_brush.build_render_bih = false skips it; a buffer layout for bih leafs
+  would be a pure representation change if Roblox memory needs it.
+- Debug viewers: tools/studio/export_surfaces.luau + render_map.py (headless picture; stormkeep correct, sent
+  to the owner) and tools/studio/mapview (Studio MeshParts; ran: 49 parts, load 0.7 s). The Studio window
+  opened from the built .rbxl had no 3D viewport on the owner's PC (ViewportSize 1x1, panels doubled), also
+  after Window > Reset Layout; closed it. The owner's cloud Xonotic Studio window was not touched.
+- PR 5 (part 1-2) merged into main.
+
 ## Next step
-1. Mod_MakeCollisionBIH (model_brush.c L7680-7813) + the submodel loop of Mod_Q3BSP_Load (bounds, radius,
-   firstmodelsurface...; Mod_MakeSortedSurfaces is in model_shared.c).
+1. (done, see part 3)
 2. Traces: Mod_CollisionBIH_TracePoint/Line/Brush/Box, Collision_TraceLineBrushFloat,
    Collision_TraceBrushBrushFloat, triangle variants; vectors from the C build the same way (collision.c with
    synthetic brushes; whole-map traces need REF-DP).

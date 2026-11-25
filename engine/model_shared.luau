@@ -258,4 +258,33 @@ function model_shared.Mod_RemoveDegenerateTriangles(
 	return outtriangles
 end
 
+-- port: model_shared.c Mod_MakeSortedSurfaces L3055-3086 @xonotic-v0.8.6
+-- (mod.sortedmodelsurfaces: 1-based array of surface indexes, C element j at [j + 1])
+function model_shared.Mod_MakeSortedSurfaces(mod: any)
+	-- make an optimal set of texture-sorted batches to draw...
+	local t: number
+	if not mod.sortedmodelsurfaces then
+		mod.sortedmodelsurfaces = table.create(mod.nummodelsurfaces, 0)
+	end
+	local sorted: { number } = mod.sortedmodelsurfaces
+	local firstsurfacefortexture = table.create(mod.num_textures, 0)
+	local numsurfacesfortexture = table.create(mod.num_textures, 0)
+	for j = 0, mod.nummodelsurfaces - 1 do
+		local surface = mod.data_surfaces[j + mod.firstmodelsurface + 1]
+		t = surface.texture.index
+		numsurfacesfortexture[t + 1] += 1
+	end
+	local j = 0
+	for ti = 0, mod.num_textures - 1 do
+		firstsurfacefortexture[ti + 1] = j
+		j += numsurfacesfortexture[ti + 1]
+	end
+	for k = 0, mod.nummodelsurfaces - 1 do
+		local surface = mod.data_surfaces[k + mod.firstmodelsurface + 1]
+		t = surface.texture.index
+		sorted[firstsurfacefortexture[t + 1] + 1] = k + mod.firstmodelsurface
+		firstsurfacefortexture[t + 1] += 1
+	end
+end
+
 return model_shared

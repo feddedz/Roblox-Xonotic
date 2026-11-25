@@ -41,10 +41,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 	    buffers. Element k of a float array is buffer.readf32(b, 4 * k).
 	NOT YET PORTED (each logs once when reached): Mod_LoadTextureFromQ3Shader (model_shared.c; texture_t has
 	only name / surfaceflags / supercontents), Mod_Q3BSP_LoadLightmaps and the lightmap parts of
-	Mod_Q3BSP_LoadFaces (surfaces load as on a dedicated server), Mod_Q1BSP_MakePortals, Mod_Q1BSP_CreateShadowMesh, the submodel loop of Mod_Q3BSP_Load
-	(bounds, sorted surfaces, Mod_MakeCollisionBIH), all tracing / PVS / light-point functions, the Q1 / Q2 /
+	Mod_Q3BSP_LoadFaces (surfaces load as on a dedicated server), Mod_Q1BSP_MakePortals, Mod_Q1BSP_CreateShadowMesh, the model registry (submodels are only in
+	brush.submodels), all tracing / PVS / light-point functions, the Q1 / Q2 /
 	HL BSP and OBJ loaders, Mod_BrushInit (cvar registration: the cvars are read with their defaults).
 ]]
+local bih = require("./bih")
 local collision = require("./collision")
 local curves = require("./curves")
 local common = require("./common")
@@ -114,6 +115,11 @@ local PATCH_LOD_VISUAL = curves.PATCH_LOD_VISUAL
 
 -- cls.state == ca_dedicated. Only the dedicated path of the loader is ported so far (no lightmap textures).
 model_brush.dedicated = true
+
+-- The render BIH (every render triangle of the model, used by Mod_CollisionBIH_TraceLineAgainstSurfaces and
+-- BIH_GetTriangleListForBox) is built like in C when true. Port support: a memory switch for hosts that never
+-- trace against render surfaces; it does not change any result of the collision BIH.
+model_brush.build_render_bih = true
 
 -- Test hook (port support, no C counterpart): called with the model after Mod_Q3BSP_LoadTriangles, while the
 -- brushq3 vertex and triangle arrays still exist (Mod_Q3BSP_LoadFaces frees them).
@@ -1926,6 +1932,147 @@ local function Mod_Q3BSP_LoadPVS(l: lump_t)
 	loadmodel.brush.data_pvsclusters = pvs
 end
 
+-- model_brush.h MATERIALFLAG_* L73-123 (the ones read here)
+local MATERIALFLAG_MESHCOLLISIONS = 0x00000001
+local MATERIALFLAG_SKY = 0x00000080
+local MATERIALFLAG_WATERSHADER = 0x00040000
+local MATERIALFLAG_REFRACTION = 0x00080000
+local MATERIALFLAG_REFLECTION = 0x00100000
+local MATERIALFLAG_CAMERA = 0x02000000
+
+-- bounds of triangle (three vertex indexes at byte offset e of element3i) in vertex3f, each -1 / +1 (float)
+local function trianglebounds(vertex3f: buffer, element3i: buffer, e: number): ({ number }, { number })
+	local a, b, c = readi32(element3i, e) * 12, readi32(element3i, e + 4) * 12, readi32(element3i, e + 8) * 12
+	local mins, maxs = { 0, 0, 0 }, { 0, 0, 0 }
+	for k = 0, 2 do
+		local x0, x1, x2 = readf32(vertex3f, a + k * 4), readf32(vertex3f, b + k * 4), readf32(vertex3f, c + k * 4)
+		mins[k + 1] = R(math.min(x0, math.min(x1, x2)) - 1)
+		maxs[k + 1] = R(math.max(x0, math.max(x1, x2)) + 1)
+	end
+	return mins, maxs
+end
+
+-- port: model_brush.c Mod_MakeCollisionBIH L7680-7813 @xonotic-v0.8.6
+-- (returns nil when there is nothing to put in the tree, as C returns NULL and leaves *out untouched)
+local function Mod_MakeCollisionBIH(model: dp_model_t, userendersurfaces: boolean, out: bih.bih_t): bih.bih_t?
+	local bihnumleafs: number
+	local bihmaxnodes: number
+	local nummodelbrushes: number = model.nummodelbrushes
+	local nummodelsurfaces: number = model.nummodelsurfaces
+	local surfaces: { any } = model.data_surfaces
+	local brushes: { q3mbrush_t } = model.brush.data_brushes
+	local function flags(surface: any): number
+		return if surface.texture then surface.texture.basematerialflags else 0
+	end
+	-- find out how many BIH leaf nodes we need
+	bihnumleafs = 0
+	if userendersurfaces then
+		for j = 0, nummodelsurfaces - 1 do
+			bihnumleafs += surfaces[model.firstmodelsurface + j + 1].num_triangles
+		end
+	else
+		for brushindex = 0, nummodelbrushes - 1 do
+			if brushes[brushindex + model.firstmodelbrush + 1].colbrushf then
+				bihnumleafs += 1
+			end
+		end
+		for j = 0, nummodelsurfaces - 1 do
+			local surface = surfaces[model.firstmodelsurface + j + 1]
+			if bit32.band(flags(surface), MATERIALFLAG_MESHCOLLISIONS) ~= 0 then
+				bihnumleafs += surface.num_triangles + surface.num_collisiontriangles
+			else
+				bihnumleafs += surface.num_collisiontriangles
+			end
+		end
+	end
+	if bihnumleafs == 0 then
+		return nil
+	end
+	-- allocate the memory for the BIH leaf nodes
+	local bihleafs: { bih.bih_leaf_t } = table.create(bihnumleafs)
+	-- now populate the BIH leaf nodes
+	local bihleafindex = 0
+	-- add render surfaces
+	local renderelement3i: buffer = model.surfmesh.data_element3i
+	local rendervertex3f: buffer = model.surfmesh.data_vertex3f
+	for j = 0, nummodelsurfaces - 1 do
+		local surface = surfaces[model.firstmodelsurface + j + 1]
+		if not userendersurfaces and bit32.band(flags(surface), MATERIALFLAG_MESHCOLLISIONS) == 0 then
+			continue
+		end
+		for triangleindex = 0, surface.num_triangles - 1 do
+			local mins, maxs =
+				trianglebounds(rendervertex3f, renderelement3i, (3 * surface.num_firsttriangle + 3 * triangleindex) * 4)
+			bihleafindex += 1
+			bihleafs[bihleafindex] = {
+				type = bih.BIH_RENDERTRIANGLE,
+				textureindex = surface.texture.index,
+				surfaceindex = surface.index,
+				itemindex = triangleindex + surface.num_firsttriangle,
+				mins = mins,
+				maxs = maxs,
+			}
+		end
+	end
+	if not userendersurfaces then
+		-- add collision brushes
+		for brushindex = 0, nummodelbrushes - 1 do
+			local brush = brushes[brushindex + model.firstmodelbrush + 1]
+			if not brush.colbrushf then
+				continue
+			end
+			local cb = brush.colbrushf
+			bihleafindex += 1
+			bihleafs[bihleafindex] = {
+				type = bih.BIH_BRUSH,
+				textureindex = brush.texture.index,
+				surfaceindex = -1,
+				itemindex = brushindex + model.firstmodelbrush,
+				mins = { cb.mins[1], cb.mins[2], cb.mins[3] },
+				maxs = { cb.maxs[1], cb.maxs[2], cb.maxs[3] },
+			}
+		end
+		-- add collision surfaces
+		local collisionelement3i: buffer = model.brush.data_collisionelement3i
+		local collisionvertex3f: buffer = model.brush.data_collisionvertex3f
+		for j = 0, nummodelsurfaces - 1 do
+			local surface = surfaces[model.firstmodelsurface + j + 1]
+			for triangleindex = 0, surface.num_collisiontriangles - 1 do
+				local mins, maxs = trianglebounds(
+					collisionvertex3f,
+					collisionelement3i,
+					(3 * surface.num_firstcollisiontriangle + 3 * triangleindex) * 4
+				)
+				bihleafindex += 1
+				bihleafs[bihleafindex] = {
+					type = bih.BIH_COLLISIONTRIANGLE,
+					textureindex = surface.texture.index,
+					surfaceindex = surface.index,
+					itemindex = triangleindex + surface.num_firstcollisiontriangle,
+					mins = mins,
+					maxs = maxs,
+				}
+			end
+		end
+	end
+	-- allocate buffers for the produced and temporary data
+	bihmaxnodes = bihnumleafs + 1
+	-- now build it
+	bih.BIH_Build(out, bihnumleafs, bihleafs, bihmaxnodes)
+	-- we're done with the temporary data
+	out.leafsort = {}
+	out.leafsortscratch = {}
+	-- resize the BIH nodes array if it over-allocated
+	if out.maxnodes > out.numnodes then
+		out.maxnodes = out.numnodes
+		for k = #out.nodes, out.numnodes + 1, -1 do
+			out.nodes[k] = nil
+		end
+	end
+	return out
+end
+model_brush.Mod_MakeCollisionBIH = Mod_MakeCollisionBIH
+
 -- port: model_brush.c Mod_Q3BSP_RecursiveFindNumLeafs L7875-7886 @xonotic-v0.8.6
 local function Mod_Q3BSP_RecursiveFindNumLeafs(node: mnode_t)
 	while node.plane do
@@ -1938,7 +2085,7 @@ local function Mod_Q3BSP_RecursiveFindNumLeafs(node: mnode_t)
 	end
 end
 
--- port: model_brush.c Mod_Q3BSP_Load L7888-8154 @xonotic-v0.8.6 (PARTIAL: up to the submodel loop)
+-- port: model_brush.c Mod_Q3BSP_Load L7888-8154 @xonotic-v0.8.6
 -- buffer / bufferend are the file contents as a string.
 local function Mod_Q3BSP_Load(mod: dp_model_t, data: string)
 	local filesize = #data
@@ -2051,7 +2198,141 @@ local function Mod_Q3BSP_Load(mod: dp_model_t, data: string)
 	loadmodel.brush.num_leafs = 0
 	Mod_Q3BSP_RecursiveFindNumLeafs(loadmodel.brush.data_nodes[1])
 
-	NOT_YET_PORTED("Mod_Q3BSP_Load submodel loop (model_brush.c L8050-8131): bounds, sorted surfaces, collision BIH")
+	if loadmodel.brush.numsubmodels ~= 0 then
+		loadmodel.brush.submodels = table.create(loadmodel.brush.numsubmodels)
+	end
+	loadmodel.collision_bih = bih.new()
+	loadmodel.render_bih = bih.new()
+
+	mod = loadmodel
+	for i = 0, loadmodel.brush.numsubmodels - 1 do
+		if i > 0 then
+			-- duplicate the basic information
+			local name = string.sub(string.format("*%i", i), 1, 9) -- dpsnprintf(name, sizeof(name), "*%i", i)
+			-- C: mod = Mod_FindName(name, loadmodel->name); *mod = *loadmodel. The model registry
+			-- (model_shared.c Mod_FindName) is NOT YET PORTED: the clone is reachable through
+			-- loadmodel.brush.submodels only. A C struct copy copies the embedded structs (brush, brushq3,
+			-- surfmesh, the two bih_t) by value and shares everything they point to: shallow clones.
+			-- copy the base model to this one
+			mod = table.clone(loadmodel)
+			mod.brush = table.clone(loadmodel.brush)
+			mod.brushq3 = table.clone(loadmodel.brushq3)
+			mod.surfmesh = table.clone(loadmodel.surfmesh)
+			mod.collision_bih = table.clone(loadmodel.collision_bih)
+			mod.render_bih = table.clone(loadmodel.render_bih)
+			mod.normalmins, mod.normalmaxs = table.clone(loadmodel.normalmins), table.clone(loadmodel.normalmaxs)
+			mod.rotatedmins, mod.rotatedmaxs = table.clone(loadmodel.rotatedmins), table.clone(loadmodel.rotatedmaxs)
+			mod.yawmins, mod.yawmaxs = table.clone(loadmodel.yawmins), table.clone(loadmodel.yawmaxs)
+			-- rename the clone back to its proper name
+			mod.name = name
+			mod.brush.parentmodel = loadmodel
+			-- textures and memory belong to the main model
+			mod.texturepool = nil
+			mod.mempool = nil
+			mod.brush.GetPVS = nil
+			mod.brush.FatPVS = nil
+			mod.brush.BoxTouchingPVS = nil
+			mod.brush.BoxTouchingLeafPVS = nil
+			mod.brush.BoxTouchingVisibleLeafs = nil
+			mod.brush.FindBoxClusters = nil
+			mod.brush.LightPoint = nil
+			mod.brush.AmbientSoundLevelsForPoint = nil
+		end
+		mod.brush.submodel = i
+		if loadmodel.brush.submodels then
+			loadmodel.brush.submodels[i + 1] = mod
+		end
+
+		-- make the model surface list (used by shadowing/lighting)
+		local dm: q3dmodel_t = mod.brushq3.data_models[i + 1]
+		mod.firstmodelsurface = dm.firstface
+		mod.nummodelsurfaces = dm.numfaces
+		mod.firstmodelbrush = dm.firstbrush
+		mod.nummodelbrushes = dm.numbrushes
+		mod.sortedmodelsurfaces = table.create(mod.nummodelsurfaces, 0)
+		model_shared.Mod_MakeSortedSurfaces(mod)
+
+		local normalmins = { dm.mins[1], dm.mins[2], dm.mins[3] }
+		local normalmaxs = { dm.maxs[1], dm.maxs[2], dm.maxs[3] }
+		mod.normalmins, mod.normalmaxs = normalmins, normalmaxs
+		-- enlarge the bounding box to enclose all geometry of this model,
+		-- because q3map2 sometimes lies (mostly to affect the lightgrid),
+		-- which can in turn mess up the farclip (as well as culling when
+		-- outside the level - an unimportant concern)
+		local vertex3f: buffer = mod.surfmesh.data_vertex3f
+		for j = 0, mod.nummodelsurfaces - 1 do
+			local surface = mod.data_surfaces[j + mod.firstmodelsurface + 1]
+			if surface.num_vertices == 0 then
+				continue
+			end
+			local v = 12 * surface.num_firstvertex
+			for _ = 0, surface.num_vertices - 1 do
+				local x, y, z = readf32(vertex3f, v), readf32(vertex3f, v + 4), readf32(vertex3f, v + 8)
+				normalmins[1] = math.min(normalmins[1], x)
+				normalmins[2] = math.min(normalmins[2], y)
+				normalmins[3] = math.min(normalmins[3], z)
+				normalmaxs[1] = math.max(normalmaxs[1], x)
+				normalmaxs[2] = math.max(normalmaxs[2], y)
+				normalmaxs[3] = math.max(normalmaxs[3], z)
+				v += 12
+			end
+		end
+		local corner = {
+			math.max(math.abs(normalmins[1]), math.abs(normalmaxs[1])),
+			math.max(math.abs(normalmins[2]), math.abs(normalmaxs[2])),
+			math.max(math.abs(normalmins[3]), math.abs(normalmaxs[3])),
+		}
+		local modelradius =
+			R(math.sqrt(R(R(R(corner[1] * corner[1]) + R(corner[2] * corner[2])) + R(corner[3] * corner[3]))))
+		local yawradius = R(math.sqrt(R(R(corner[1] * corner[1]) + R(corner[2] * corner[2]))))
+		mod.rotatedmins = { -modelradius, -modelradius, -modelradius }
+		mod.rotatedmaxs = { modelradius, modelradius, modelradius }
+		mod.yawmaxs = { yawradius, yawradius, normalmaxs[3] }
+		mod.yawmins = { -yawradius, -yawradius, normalmins[3] }
+		mod.radius = modelradius
+		mod.radius2 = R(modelradius * modelradius)
+
+		-- this gets altered below if sky or water is used
+		-- (C stores the function pointers R_Q1BSP_DrawSky / R_Q1BSP_DrawAddWaterPlanes; here true = set)
+		mod.DrawSky = nil
+		mod.DrawAddWaterPlanes = nil
+
+		for j = 0, mod.nummodelsurfaces - 1 do
+			local texture = mod.data_surfaces[j + mod.firstmodelsurface + 1].texture
+			if texture and bit32.band(texture.basematerialflags, MATERIALFLAG_SKY) ~= 0 then
+				mod.DrawSky = true
+				break
+			end
+		end
+
+		for j = 0, mod.nummodelsurfaces - 1 do
+			local texture = mod.data_surfaces[j + mod.firstmodelsurface + 1].texture
+			if
+				texture
+				and bit32.band(
+						texture.basematerialflags,
+						MATERIALFLAG_WATERSHADER
+							+ MATERIALFLAG_REFRACTION
+							+ MATERIALFLAG_REFLECTION
+							+ MATERIALFLAG_CAMERA
+					)
+					~= 0
+			then
+				mod.DrawAddWaterPlanes = true
+				break
+			end
+		end
+
+		Mod_MakeCollisionBIH(mod, false, mod.collision_bih)
+		if model_brush.build_render_bih then
+			Mod_MakeCollisionBIH(mod, true, mod.render_bih)
+		end
+
+		-- generate VBOs and other shared data before cloning submodels
+		-- (i == 0: Mod_BuildVBOs builds OpenGL vertex buffers; nothing to do without a GL backend)
+	end
+
+	-- (mod_q3bsp_sRGBlightmaps: loadmodel->lightmapscale *= 2.336f, with the lightmaps; NOT YET PORTED)
 
 	Con_DPrintf(
 		'Stats for q3bsp model "%s": %i faces, %i nodes, %i leafs, %i clusters, %i clusterportals, mesh: %i vertices, %i triangles, %i surfaces\n',
