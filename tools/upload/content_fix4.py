@@ -288,9 +288,9 @@ fix(T + "bloodyskull.jpg", "replaced by its clean sibling textures/cleanskull.jp
     "skull without the stains)", lambda a, v: _arr(src_path(T + "cleanskull.jpg")))
 fix(T + "cake/pipe1d_msg.jpg", "the mapper's nickname 'FRUITIEX' on the last line erased to the green board; the "
     "message and 'ENJOY!' kept", lambda a, v: heal_lines(a, [(0, 235, 92, 21)], "all", 0, grain=False))
-fix([T + "cmp1-dm8/e8circle_pur.jpg", T + "cmp1-dm8/e8circle_pur_alpha.jpg"],
+fix(T + "cmp1-dm8/e8circle_pur.jpg",
     "the upright cross inside the ring (sun-cross look) turned 45 degrees inside the ring, so it is a diagonal X; "
-    "ring and outside unchanged (same as the lamp lenses in UPLOAD-FIX3)",
+    "ring and outside unchanged (same as the lamp lenses in UPLOAD-FIX3); its _alpha map is only the ring, unchanged",
     lambda a, v: F3.rot_disc(a, 63.5, 63.5, 56.5, 45.0, 1.0))
 
 # --- the needed image Roblox rejected (1x1 grey; identical re-uploads of a rejected file are refused at once)
