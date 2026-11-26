@@ -2938,6 +2938,31 @@ function prvm_cmds.VM_buf_writefile(prog: any)
 	SET_G_FLOAT(prog, OFS_RETURN, 1)
 end
 
+-- port: prvm_cmds.c VM_SetTraceGlobals L5998-6013 @xonotic-v0.8.6 (trace: collision.trace_t; trace.ent is an
+-- edict number or nil = NULL; the qboolean fields are stored as 1 / 0, the double fraction / endpos as float)
+function prvm_cmds.VM_SetTraceGlobals(prog: any, trace: any)
+	local function b(x: boolean): number
+		return if x then 1 else 0
+	end
+	SET_G_FLOAT(prog, GlobalOfs(prog, "trace_allsolid"), b(trace.allsolid))
+	SET_G_FLOAT(prog, GlobalOfs(prog, "trace_startsolid"), b(trace.startsolid))
+	SET_G_FLOAT(prog, GlobalOfs(prog, "trace_fraction"), trace.fraction)
+	SET_G_FLOAT(prog, GlobalOfs(prog, "trace_inwater"), b(trace.inwater))
+	SET_G_FLOAT(prog, GlobalOfs(prog, "trace_inopen"), b(trace.inopen))
+	SET_G_VECTOR(prog, GlobalOfs(prog, "trace_endpos"), trace.endpos)
+	SET_G_VECTOR(prog, GlobalOfs(prog, "trace_plane_normal"), trace.plane.normal)
+	SET_G_FLOAT(prog, GlobalOfs(prog, "trace_plane_dist"), trace.plane.dist)
+	SET_G_INT(prog, GlobalOfs(prog, "trace_ent"), if trace.ent ~= nil then trace.ent else 0)
+	SET_G_FLOAT(prog, GlobalOfs(prog, "trace_dpstartcontents"), trace.startsupercontents)
+	SET_G_FLOAT(prog, GlobalOfs(prog, "trace_dphitcontents"), trace.hitsupercontents)
+	SET_G_FLOAT(prog, GlobalOfs(prog, "trace_dphitq3surfaceflags"), trace.hitq3surfaceflags)
+	SET_G_INT(
+		prog,
+		GlobalOfs(prog, "trace_dphittexturename"),
+		if trace.hittexture then prvm_edict.PRVM_SetTempString(prog, trace.hittexture.name) else 0
+	)
+end
+
 prvm_cmds.BUILTINS = {
 	VM_cvar = prvm_cmds.VM_cvar,
 	VM_cvar_type = prvm_cmds.VM_cvar_type,

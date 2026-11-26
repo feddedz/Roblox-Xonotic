@@ -1212,4 +1212,52 @@ function sv_phys.SV_LinkEdict(ent: number)
 	world.World_LinkEdict(server.sv.world, ent, mins, maxs)
 end
 
+-- port: sv_phys.c SV_NudgeOutOfSolid L1525-1563 @xonotic-v0.8.6 (ent: edict number)
+function sv_phys.SV_NudgeOutOfSolid(ent: number): boolean
+	local prog = cvar.prvm_prog_list[0]
+	local sv = server.sv
+	local sepvar = cvar.Cvar_FindVar("sv_gameplayfix_nudgeoutofsolid_separation")
+	local separation = if sepvar then sepvar.value else R(0.03125)
+	if sv.worldmodel and sv.worldmodel.brushq1 and (sv.worldmodel.brushq1.numclipnodes or 0) ~= 0 then
+		separation = 0.0 -- when using hulls, it can not be enlarged
+	end
+	local stuckmins = EV(prog, ent, "mins")
+	local stuckmaxs = EV(prog, ent, "maxs")
+	for k = 1, 3 do
+		stuckmins[k] = R(stuckmins[k] - separation)
+		stuckmaxs[k] = R(stuckmaxs[k] + separation)
+	end
+	-- first pass we try to get it out of brush entities
+	-- second pass we try to get it out of world only (can't win them all)
+	for pass = 0, 1 do
+		local stuckorigin = EV(prog, ent, "origin")
+		for _ = 0, 9 do
+			local stucktrace = sv_phys.SV_TraceBox(
+				stuckorigin,
+				stuckmins,
+				stuckmaxs,
+				stuckorigin,
+				if pass ~= 0 then MOVE_WORLDONLY else MOVE_NOMONSTERS,
+				ent,
+				sv_phys.SV_GenericHitSuperContentsMask(ent),
+				0,
+				0,
+				collision.cv.collision_extendmovelength.value
+			)
+			if not stucktrace.bmodelstartsolid or stucktrace.startdepth >= 0 then
+				-- found a good location, use it
+				SET_EV(prog, ent, "origin", stuckorigin)
+				return true
+			end
+			local nudge = R(-stucktrace.startdepth) -- vec_t nudge = -(double)
+			-- VectorMA(stuckorigin, nudge, stucktrace.startdepthnormal, stuckorigin): float + float * double
+			local n = stucktrace.startdepthnormal
+			stuckorigin[1] = R(stuckorigin[1] + nudge * n[1])
+			stuckorigin[2] = R(stuckorigin[2] + nudge * n[2])
+			stuckorigin[3] = R(stuckorigin[3] + nudge * n[3])
+		end
+	end
+	return false
+end
+
 return sv_phys
