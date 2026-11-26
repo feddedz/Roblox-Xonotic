@@ -469,6 +469,7 @@ static void smv_actor(int n, int kind)
 }
 
 // a resting origin for n's box on something below a random point (world, a bmodel or a box entity)
+static float smv_maxnz = 2; // < 1: only floors at least this steep (the steep slope cases)
 static int smv_floor(int n, float *org, float minnz)
 {
 	prvm_prog_t *prog = SVVM_prog;
@@ -476,7 +477,7 @@ static int smv_floor(int n, float *org, float minnz)
 	float s[3], e[3];
 	trace_t t;
 	int i;
-	for (i = 0; i < 80; i++)
+	for (i = 0; i < (smv_maxnz < 1 ? 400 : 80); i++)
 	{
 		s[0] = tv_frand(-540, 540);
 		s[1] = tv_frand(-540, 540);
@@ -484,7 +485,7 @@ static int smv_floor(int n, float *org, float minnz)
 		VectorCopy(s, e);
 		e[2] -= 900;
 		t = SV_TraceBox(s, PRVM_serveredictvector(ed, mins), PRVM_serveredictvector(ed, maxs), e, MOVE_NORMAL, ed, SV_GenericHitSuperContentsMask(ed), 0, 0, 0);
-		if (!t.startsolid && t.fraction < 1 && t.plane.normal[2] > minnz)
+		if (!t.startsolid && t.fraction < 1 && t.plane.normal[2] > minnz && t.plane.normal[2] <= smv_maxnz)
 		{
 			VectorCopy(t.endpos, org);
 			return 1;
@@ -580,17 +581,23 @@ static void smv_obstacle(int n)
 		maxs[j] = tv_frand(4, 40);
 	}
 	smv_setsize(n, mins, maxs);
-	if (r < 55)
+	if (r < 50)
 		PRVM_serveredictfloat(ed, solid) = SOLID_BBOX;
-	else if (r < 65)
+	else if (r < 58)
 	{
 		PRVM_serveredictfloat(ed, solid) = SOLID_SLIDEBOX;
 		PRVM_serveredictfloat(ed, flags) = FL_MONSTER | FL_ONGROUND;
 	}
-	else if (r < 85)
+	else if (r < 85) // big triggers with touch functions: moves relinked into them call the touch functions
 	{
 		PRVM_serveredictfloat(ed, solid) = SOLID_TRIGGER;
 		PRVM_serveredictfunction(ed, touch) = 1 + (int)(tv_rnd() % 50);
+		for (j = 0; j < 3; j++)
+		{
+			mins[j] = -tv_frand(30, 160);
+			maxs[j] = tv_frand(30, 160);
+		}
+		smv_setsize(n, mins, maxs);
 	}
 	else if (r < 93)
 	{
@@ -885,6 +892,11 @@ static void smv_case_closeenough(void)
 	static const float dists[6] = {-10, 0, 1, 16, 64, 300};
 	int a = SMV_A0 + (int)(tv_rnd() % SMV_NA), g = (tv_rnd() % 3) ? SMV_GOAL : 1 + (int)(tv_rnd() % 24), r = 0;
 	float d = dists[tv_rnd() % 6];
+	if (tv_rnd() % 2) // the goal next to the actor
+	{
+		smv_placegoal(a, (int)(tv_rnd() % 9), tv_frand(0, 50));
+		g = SMV_GOAL;
+	}
 	smv_begin();
 	printf("CE\t%d\t%d", a, g);
 	tv_pf(d);
@@ -1445,6 +1457,10 @@ static void smv_run(void)
 		smv_case_checkbottom(i % 10 == 0);
 	for (i = 0; i < 1400; i++)
 		smv_case_walk();
+	smv_maxnz = 0.55f; // walkers standing on steep slopes
+	for (i = 0; i < 200; i++)
+		smv_case_walk();
+	smv_maxnz = 2;
 	for (i = 0; i < 500; i++)
 		smv_case_fly(0);
 	for (i = 0; i < 500; i++)
@@ -1494,6 +1510,16 @@ static void smv_run(void)
 	SMV_SETCV(sv_gameplayfix_nostepmoveonsteepslopes, 1);
 	for (i = 0; i < 500; i++)
 		smv_case_walk();
+	smv_maxnz = 0.55f;
+	for (i = 0; i < 300; i++)
+		smv_case_walk();
+	smv_maxnz = 2;
+	SMV_SETCV(sv_stepheight, 31);
+	smv_maxnz = 0.55f;
+	for (i = 0; i < 300; i++)
+		smv_case_walk();
+	smv_maxnz = 2;
+	SMV_SETCV(sv_stepheight, 18);
 	for (i = 0; i < 200; i++)
 		smv_case_checkbottom(0);
 	for (i = 0; i < 200; i++)
