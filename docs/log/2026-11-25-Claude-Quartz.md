@@ -59,9 +59,33 @@ None new.
   after Window > Reset Layout; closed it. The owner's cloud Xonotic Studio window was not touched.
 - PR 5 (part 1-2) merged into main.
 
+## Part 4 (same day): traces
+- collision.c: Collision_Init (cvars), nearestplanedist_float, Collision_CalcEdgeDirsForPolygonBrushFloat,
+  Collision_CalcPlanesForTriangleBrushFloat (three side-plane modes), Collision_TraceBrushBrushFloat,
+  Collision_TraceLineBrushFloat, Collision_PointInsideBrushFloat, Collision_TracePointBrushFloat,
+  Collision_SnapCopyPoints, Collision_TraceBrushTriangleMeshFloat, Collision_TraceLineTriangleMeshFloat,
+  Collision_TraceBrushTriangleFloat, Collision_BrushForBox, Collision_TraceLineTriangleFloat,
+  Collision_BoundingBoxOfBrushTraceSegment; trace_t (collision.newtrace / cleartrace).
+- model_brush.c: Mod_BrushInit (the 4 trace cvars), Mod_CollisionBIH_TracePoint / TraceLineShared / TraceLine /
+  TraceBrush / TraceBox / PointSuperContents / TraceLineOfSight / TraceLineAgainstSurfaces / *_Mesh,
+  Mod_Q3BSP_TracePoint / TraceLine / TraceBrush / TraceBox / PointSuperContents (BIH, submodel brush list and
+  BSP-tree recursion paths), Mod_Q3BSP_TraceLineOfSight(+RecursiveNodeCheck); mathlib.c BoxOnPlaneSide. The
+  loader now sets the model's trace function pointers. host.luau calls Collision_Init and Mod_BrushInit.
+- Reference: tools/testgen/trace_vectors.c includes model_brush.c (statics reachable), builds a synthetic map
+  (70 brushes, 4 patch-like surfaces with strides 16 / 0 / -1 / 4, a 120-node BSP tree, a submodel) and runs
+  the real C functions: 5.8k lines in tests/vectors/trace.tsv. tests/unit/trace.test.luau: 4,905 checks, every
+  trace_t field bit-identical, on the first run. Cvar variations covered: mod_collision_bih 0/1,
+  mod_q3bsp_curves_collisions 0, collision_bih_fullrecursion 1, collision_debug_tracelineasbox 1, both other
+  triangle side-plane modes, mod_q3bsp_optimizedtraceline 0, mod_q3bsp_tracelineofsight_brushes 1.
+- Stock maps: tests/integration/q3bsp_trace.test.luau (stormkeep, dance, afterslime, xoylent + submodels):
+  1,296 BIH traces equal a plain loop over all leafs; the BSP-tree path equals the BIH on 1,294 of 1,296; a
+  player box dropped from 77 of 77 spawn points lands on a floor.
+- Tests: 20 Lune files, 0 failed (trace 4,905, q3bsp_trace 662, q3bsp_load 84,795); StyLua / Selene clean;
+  check_port_lines 0 wrong; Python 26 run (same 3 Windows-only errors).
+
 ## Next step
-1. (done, see part 3)
-2. Traces: Mod_CollisionBIH_TracePoint/Line/Brush/Box, Collision_TraceLineBrushFloat,
-   Collision_TraceBrushBrushFloat, triangle variants; vectors from the C build the same way (collision.c with
-   synthetic brushes; whole-map traces need REF-DP).
-3. Mod_LoadTextureFromQ3Shader (basematerialflags decide what is drawn / collided), lightmaps.
+1. Mod_LoadTextureFromQ3Shader (model_shared.c; basematerialflags / currentmaterialflags decide what collides
+   and what the skip masks see), then Mod_Q3BSP_LoadLightmaps, the model registry (Mod_FindName).
+2. M3-TRACE: world.c, Collision_ClipToWorld / ClipToGenericEntity / CombineTraces, SV_TraceBox and the world
+   builtins (traceline, tracebox, pointcontents, droptofloor) that M2-RUNNER waits for.
+3. Memory layout of BIH leafs for Roblox if needed (see part 3).
