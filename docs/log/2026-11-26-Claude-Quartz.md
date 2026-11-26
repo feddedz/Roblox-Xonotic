@@ -48,12 +48,41 @@ None new. (sv.models uses the C index directly, matching model_precache; noted i
 - The frameblend / skeleton arguments of the entity traces are nil (VM_GenerateFrameGroupBlend,
   VM_FrameBlendFromFrameGroupBlend, VM_UpdateEdictSkeleton: NOT YET PORTED, logged once).
 
+## Part 2 (same day): M4-PHYS claimed — movers, sv_move, C reference for the sv traces
+- PR 11 merged. M4-PHYS claimed on main (sv_phys.c movers, sv_move.c). Branch M4-PHYS-movers. Three Opus
+  sub-agents again; their work re-run and committed by this session.
+- **sv traces now checked against the C build:** tools/testgen/svphys_vectors.{c,sh} (includes trace_vectors.c
+  for the synthetic map, links the real sv_phys.c, sv_main.c, world.c, collision.c ...; prog with hand-made
+  field / global offsets), tests/vectors/svphys.tsv, tests/unit/sv_phys_ref.test.luau: 2,524 checks, no
+  difference found (363 SV_LinkEdict, 372 touch calls, 860 traces of which 417 hit an entity, 120
+  SV_PointSuperContents, 130 SV_EntitiesInBox, 80 SV_NudgeOutOfSolid, cvar variants).
+- engine/sv_phys.luau: the rest of sv_phys.c in C order: SV_TestEntityPosition, SV_CheckContentsTransition,
+  SV_CheckVelocity, SV_RunThink, SV_Impact, ClipVelocity, SV_FlyMove, SV_Gravity,
+  SV_NudgeOutOfSolid_PivotIsKnownGood, SV_PushEntity, SV_PushMove, SV_Physics_Pusher, SV_UnstickEntity(+
+  ReturnOffset), SV_CheckStuck, SV_CheckWater, SV_WallFriction, SV_WalkMove, SV_Physics_Follow,
+  SV_CheckWaterTransition, SV_Physics_Toss, SV_Physics_Step, SV_Physics_Entity, SV_Physics_ClientEntity*,
+  SV_Physics_ClientMove, SV_Physics. Also there for now, with their own port lines: SV_Trace_Toss
+  (svvm_cmds.c L703-748) and AngleVectorsFLU (mathlib.c L498-550) -- move them to their modules later.
+  engine/server.luau: sv.frametime, server.host_client. New per-edict tables: prog.ed_move,
+  ed_waterposition_forceupdate / _origin, ed_moved_from / _fromangles, ed_cullmins / ed_cullmaxs.
+- engine/sv_move.luau (new, all of sv_move.c): SV_CheckBottom, SV_movestep, SV_StepDirection,
+  SV_FixCheckBottom, SV_NewChaseDir, SV_CloseEnough, VM_SV_MoveToGoal. Builtins: #32 walkmove, #40
+  checkbottom, #67 movetogoal, #64 tracetoss. SVVM_init_edict sets ed_move false.
+- Stubs (log once): SV_StartSound, SV_ClientThink, World_Physics_Frame (ODE), frameblend / skeleton;
+  host_client.cmd is an empty table; ed_cullmins / maxs stay zero until SV_PrepareEntityForSending exists
+  (so SV_Physics_Toss's still-touching-ground check returns early).
+- Tests: unit 20 files, 0 failed (sv_phys_movers 161, sv_move 129, sv_phys_ref 2,524). StyLua, Selene clean,
+  check_port_lines 0 wrong. **The movers, sv_move and the builtins are NOT checked against the C build yet.**
+  Helpers' own risk list: SV_PushMove (rotation, crush path, entity order), SV_FlyMove / SV_WalkMove step
+  logic, float-vs-double in the frametime updates, cos / sin and the rand() order in sv_move.
+
 ## Next step
-1. C reference for sv_phys.luau + the world builtins: a generator that builds a prog with the entity fields by
-   hand (like tools/testgen/world_vectors.c does for the area grid) and runs the real SV_TraceBox / SV_LinkEdict
-   on the synthetic map of trace_vectors.c.
-2. Still stubs: tracetoss #64 (SV_Trace_Toss, SV_CheckVelocity), walkmove #32 (sv_move.c SV_movestep),
-   checkbottom #40 (SV_CheckBottom), setmodel #3 (Mod_ForName / model registry), checkclient / checkpvs / aim (PVS).
-3. Then M4: sv_phys.c movers (SV_FlyMove, SV_PushMove, SV_Physics_*), sv_move.c, SV_SpawnServer filling
-   sv.worldmodel / sv.models / World_SetSize, so the stormkeep entity load of M2-RUNNER runs with real traces.
-4. Mod_Q3BSP_LoadLightmaps, tokenizer speed, BIH leaf memory layout (see 2026-11-25 log).
+1. C reference for the movers and sv_move: extend tools/testgen/svphys_vectors.c (it already has the prog,
+   the map and an ExecuteProgram stub) to run SV_Physics frames, SV_FlyMove, SV_PushMove, SV_Physics_Toss /
+   Step, SV_WalkMove, SV_movestep, SV_NewChaseDir on scripted entities and print every edict field after each
+   call; the builtins (static in svvm_cmds.c) need a generator that includes svvm_cmds.c.
+2. Still stubs: setmodel #3 (Mod_ForName / model registry), checkclient / checkpvs / aim (PVS), SV_StartSound,
+   SV_ClientThink (sv_user.c).
+3. SV_SpawnServer (sv_main.c): worldmodel, sv.models, World_SetSize, then the stormkeep entity load of
+   M2-RUNNER with real traces, then the host frame loop calling SV_Physics.
+4. Mod_Q3BSP_LoadLightmaps, tokenizer speed, BIH leaf memory, cached field offsets in sv_phys / builtins.

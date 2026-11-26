@@ -681,6 +681,99 @@ local function VM_SV_pointcontents(prog: any)
 end
 PORTED.VM_SV_pointcontents = VM_SV_pointcontents
 
+-- monster movement (engine/sv_move.luau; required inside the builtins: sv_move -> sv_phys -> sv_main -> svvm_cmds)
+local FL_FLY, FL_SWIM = 1, 2 -- server.h L367-368
+local M_PI = math.pi -- mathlib.h L28
+
+--[[
+===============
+VM_SV_walkmove
+
+float(float yaw, float dist[, settrace]) walkmove
+===============
+]]
+-- port: svvm_cmds.c VM_SV_walkmove L1072-1120 @xonotic-v0.8.6
+local function VM_SV_walkmove(prog: any)
+	local move = { 0, 0, 0 }
+
+	SAFEPARMCOUNTRANGE(prog, 2, 3, "VM_SV_walkmove")
+
+	-- assume failure if it returns early
+	SET_G_FLOAT(prog, OFS_RETURN, 0)
+
+	local ent = buffer.readi32(prog.globals, GlobalOfs(prog, "self") * 4)
+	if ent == 0 then
+		prvm_cmds.VM_Warning(prog, "walkmove: can not modify world entity\n")
+		return
+	end
+	if prog.ed_free[ent] then
+		prvm_cmds.VM_Warning(prog, "walkmove: can not modify free entity\n")
+		return
+	end
+	local yaw = G_FLOAT(prog, OFS_PARM0)
+	local dist = G_FLOAT(prog, OFS_PARM1)
+	local settrace = prog.argc >= 3 and G_FLOAT(prog, OFS_PARM2) ~= 0
+
+	if bit32.band(toint(EF(prog, ent, "flags")), bit32.bor(FL_ONGROUND, FL_FLY, FL_SWIM)) == 0 then
+		return
+	end
+
+	-- float * M_PI (double) * 2 / 360 in double, stored into the float yaw
+	yaw = R(yaw * M_PI * 2 / 360)
+
+	-- cos / sin take and return double; * dist (double), stored float
+	move[1] = R(math.cos(yaw) * dist)
+	move[2] = R(math.sin(yaw) * dist)
+	move[3] = 0
+
+	-- save program state, because SV_movestep may call other progs
+	local oldf = prog.xfunction
+	local oldself = buffer.readi32(prog.globals, GlobalOfs(prog, "self") * 4)
+
+	SET_G_FLOAT(prog, OFS_RETURN, if require("./sv_move").SV_movestep(ent, move, true, false, settrace) then 1 else 0)
+
+	-- restore program state
+	prog.xfunction = oldf
+	buffer.writei32(prog.globals, GlobalOfs(prog, "self") * 4, oldself)
+end
+PORTED.VM_SV_walkmove = VM_SV_walkmove
+
+--[[
+=============
+VM_SV_checkbottom
+=============
+]]
+-- port: svvm_cmds.c VM_SV_checkbottom L1253-1257 @xonotic-v0.8.6
+local function VM_SV_checkbottom(prog: any)
+	SAFEPARMCOUNT(prog, 1, "VM_SV_checkbottom")
+	SET_G_FLOAT(prog, OFS_RETURN, if require("./sv_move").SV_CheckBottom(G_INT(prog, OFS_PARM0)) then 1 else 0)
+end
+PORTED.VM_SV_checkbottom = VM_SV_checkbottom
+
+-- port: svvm_cmds.c VM_SV_tracetoss L750-771 @xonotic-v0.8.6
+-- (SV_Trace_Toss, svvm_cmds.c L703-748, is in engine/sv_phys.luau for now: it needs that module's movers and
+-- sv_phys requires this module, so it cannot be called from here at load time)
+local function VM_SV_tracetoss(prog: any)
+	SAFEPARMCOUNT(prog, 2, "VM_SV_tracetoss")
+
+	local ent = G_INT(prog, OFS_PARM0)
+	if ent == 0 then
+		prvm_cmds.VM_Warning(prog, "tracetoss: can not use world entity\n")
+		return
+	end
+	local ignore = G_INT(prog, OFS_PARM1)
+
+	local trace = require("./sv_phys").SV_Trace_Toss(prog, ent, ignore)
+
+	prvm_cmds.VM_SetTraceGlobals(prog, trace)
+end
+PORTED.VM_SV_tracetoss = VM_SV_tracetoss
+
+-- #67 movetogoal: sv_move.c VM_SV_MoveToGoal (engine/sv_move.luau)
+PORTED.VM_SV_MoveToGoal = function(prog: any)
+	require("./sv_move").VM_SV_MoveToGoal(prog)
+end
+
 svvm_cmds.PORTED = PORTED
 
 -- Builds prog.builtins / prog.numbuiltins like `prog->builtins = vm_sv_builtins` (sv_main.c SV_VM_Setup).

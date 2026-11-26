@@ -90,9 +90,15 @@ function sv_main.SVVM_end_increase_edicts(prog: any)
 	end
 end
 
--- port: sv_main.c SVVM_init_edict L3604-3655 @xonotic-v0.8.6 (priv.server->move: not ported yet, sv_phys)
+-- port: sv_main.c SVVM_init_edict L3604-3655 @xonotic-v0.8.6
 function sv_main.SVVM_init_edict(prog: any, e: number)
+	-- LordHavoc: for consistency set these here
 	local num = e - 1
+
+	-- e->priv.server->move = false; // don't move on first frame (prog.ed_move, read by engine/sv_phys.luau)
+	prog.ed_move = prog.ed_move or {}
+	prog.ed_move[e] = false
+
 	if num >= 0 and num < host_cmd.svs.maxclients then
 		local c = client(num)
 		-- set colormap and team on newly created player entity
