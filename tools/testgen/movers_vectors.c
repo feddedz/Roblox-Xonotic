@@ -2012,6 +2012,52 @@ static void mv_edgecases(void)
 		mv_commit(n);
 		mv_call(MV_WM, n);
 	}
+	// running up the stairs without sv_gameplayfix_stepmultipletimes: the step up runs into the next stair
+	// (SV_WallFriction), and falling into the corner of the walls without a step height (a crease of 3 planes)
+	MV_SETCV(sv_gameplayfix_stepmultipletimes, 0);
+	for (i = 0; i < 8; i++)
+	{
+		n = MV_DYN0 + 46;
+		ed = mv_ed + n;
+		mv_fresh(n, MOVETYPE_WALK, 3, 0);
+		PRVM_serveredictvector(ed, velocity)[0] = tv_frand(900, 1500);
+		PRVM_serveredictfloat(ed, solid) = SOLID_SLIDEBOX;
+		PRVM_serveredictfloat(ed, flags) = FL_ONGROUND;
+		PRVM_serveredictedict(ed, groundentity) = MV_SCENE0;
+		PRVM_serveredictfloat(ed, dphitcontentsmask) = 0;
+		PRVM_serveredictfunction(ed, touch) = 0;
+		mv_commit(n);
+		mv_call(MV_WM, n);
+	}
+	MV_SETCV(sv_gameplayfix_stepmultipletimes, 1);
+	for (i = 0; i < 8; i++)
+	{
+		n = MV_DYN0 + 46;
+		ed = mv_ed + n;
+		mv_fresh(n, MOVETYPE_STEP, 2, 0);
+		VectorSet(PRVM_serveredictvector(ed, velocity), tv_frand(600, 1500), tv_frand(600, 1500), -tv_frand(300, 900));
+		PRVM_serveredictvector(ed, origin)[2] += tv_frand(0, 4);
+		PRVM_serveredictfloat(ed, solid) = SOLID_SLIDEBOX;
+		PRVM_serveredictfloat(ed, flags) = 0;
+		PRVM_serveredictfloat(ed, dphitcontentsmask) = 0;
+		PRVM_serveredictfunction(ed, touch) = 0;
+		mv_commit(n);
+		printf("C\tFLY\t%d", n);
+		tv_pf((float)sv.frametime);
+		printf("\t1\t1\t%d", SV_GenericHitSuperContentsMask(ed));
+		tv_pf(0);
+		printf("\n");
+		mv_snap();
+		{
+			float sn[3] = {0, 0, 0};
+			char s1[64], ret[128];
+			k = SV_FlyMove(ed, (float)sv.frametime, true, sn, SV_GenericHitSuperContentsMask(ed), 0, 0, 0);
+			mv_flyblocked[k & 15]++;
+			mv_vstr(s1, sn);
+			sprintf(ret, "%d\t%s", k, s1);
+			mv_end(ret);
+		}
+	}
 	// an entity spawned during the frame below the spawner's number gets its move in the second pass
 	// (sv_gameplayfix_delayprojectiles < 0)
 	MV_SETCV(sv_gameplayfix_delayprojectiles, -1);
