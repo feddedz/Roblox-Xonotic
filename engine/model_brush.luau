@@ -42,8 +42,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 	Textures go through model_shared.Mod_LoadTextureFromQ3Shader (scripts/*.shader through engine/fs.luau: set
 	the VFS provider before loading a map, or every texture takes the no-shader path).
 	NOT YET PORTED (each logs once when reached): Mod_Q3BSP_LoadLightmaps and the lightmap parts of
-	Mod_Q3BSP_LoadFaces (surfaces load as on a dedicated server), Mod_Q1BSP_MakePortals, Mod_Q1BSP_CreateShadowMesh, the model registry (submodels are only in
-	brush.submodels), the PVS / light-point functions, the Q1 / Q2 /
+	Mod_Q3BSP_LoadFaces (surfaces load as on a dedicated server), Mod_Q1BSP_MakePortals, Mod_Q1BSP_CreateShadowMesh, the PVS / light-point functions, the Q1 / Q2 /
 	HL BSP and OBJ loaders, Mod_BrushInit (cvar registration: the cvars are read with their defaults).
 ]]
 local bih = require("./bih")
@@ -248,25 +247,10 @@ export type q3dmodel_t = {
 export type lump_t = { fileofs: number, filelen: number }
 export type dp_model_t = { [string]: any }
 
--- A zeroed dp_model_t (C: Mod_FindName allocates it with Mem_Alloc; model_shared.c is not ported yet).
+-- A zeroed dp_model_t outside the model registry (port support for loading a map on its own; the engine path
+-- is model_shared.Mod_ForName, which allocates the record in the registry).
 function model_brush.newmodel(name: string): dp_model_t
-	return {
-		name = name,
-		brush = {},
-		brushq3 = {
-			num_lightgrid_cellsize = { 0, 0, 0 },
-			num_lightgrid_scale = { 0, 0, 0 },
-			num_lightgrid_imins = { 0, 0, 0 },
-			num_lightgrid_imaxs = { 0, 0, 0 },
-			num_lightgrid_isize = { 0, 0, 0 },
-			num_lightgrid_indexfromworld = matrixlib.new(),
-			num_lightgrid = 0,
-			deluxemapping = false,
-			deluxemapping_modelspace = false,
-		},
-		num_surfaces = 0,
-		lit = false,
-	}
+	return model_shared.Mod_NewModel(name)
 end
 
 -- model_shared.c globals
@@ -3956,12 +3940,21 @@ local function Mod_Q3BSP_Load(mod: dp_model_t, data: string)
 		if i > 0 then
 			-- duplicate the basic information
 			local name = string.sub(string.format("*%i", i), 1, 9) -- dpsnprintf(name, sizeof(name), "*%i", i)
-			-- C: mod = Mod_FindName(name, loadmodel->name); *mod = *loadmodel. The model registry
-			-- (model_shared.c Mod_FindName) is NOT YET PORTED: the clone is reachable through
-			-- loadmodel.brush.submodels only. A C struct copy copies the embedded structs (brush, brushq3,
-			-- surfmesh, the two bih_t) by value and shares everything they point to: shallow clones.
+			if model_shared.Mod_IsRegistered(loadmodel) then
+				mod = model_shared.Mod_FindName(name, loadmodel.name)
+			else
+				-- port support: a model loaded outside the registry (model_brush.newmodel) keeps its
+				-- submodels outside it too (reachable through loadmodel.brush.submodels only)
+				mod = {}
+			end
 			-- copy the base model to this one
-			mod = table.clone(loadmodel)
+			-- (*mod = *loadmodel: the registry record keeps its identity and gets every field of loadmodel. A C
+			-- struct copy copies the embedded structs (brush, brushq3, surfmesh, the two bih_t, the bounding
+			-- boxes) by value and shares everything they point to: shallow clones.)
+			table.clear(mod)
+			for k, v in loadmodel do
+				mod[k] = v
+			end
 			mod.brush = table.clone(loadmodel.brush)
 			mod.brushq3 = table.clone(loadmodel.brushq3)
 			mod.surfmesh = table.clone(loadmodel.surfmesh)
@@ -4106,5 +4099,10 @@ function model_brush.Mod_IBSP_Load(mod: dp_model_t, data: string)
 		Host_Error("Mod_IBSP_Load: unknown/unsupported version %i", i)
 	end
 end
+
+-- model_shared.c Mod_LoadModel / Mod_Init call these; model_shared.luau cannot require this module (this
+-- module requires it), so they are installed as hooks here, like collision.Collision_ClipTrace_Box.
+model_shared.Mod_IBSP_Load = model_brush.Mod_IBSP_Load
+model_shared.Mod_BrushInit = model_brush.Mod_BrushInit
 
 return model_brush
