@@ -191,7 +191,7 @@ textures/tv/refract
 textures/tv/scroll
 {
 	dpwaterscroll -8 0.3
-	dpglossintensitymod nan
+	dpglossintensitymod 3e-45
 	dpglossexponentmod -inf
 	dprtlightambient 0x10
 }

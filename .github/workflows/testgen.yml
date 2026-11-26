@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
   push:
     branches-ignore: [main]
-    paths: ["tools/testgen/**", ".github/workflows/testgen.yml"]
+    paths: ["tools/testgen/**", "tests/fixtures/shaders/**", ".github/workflows/testgen.yml"]
 jobs:
   vectors:
     runs-on: ubuntu-latest
