@@ -63,6 +63,8 @@ Every section except §MAP and §DIFFS stays under ~60 lines; detail lives in `d
   the model registry; then M3-TRACE (world.c area grid, sv_phys.c SV_Trace*, the world builtins). C
   reference vectors: push tools/testgen/*_vectors.{c,sh} -> the Testgen workflow builds them on GitHub (no C
   compiler on the owner's PC, G-054) -> `gh run download`.
+- **M3-TRACE (claimed, Claude-Quartz):** engine/world.luau = world.c area grid, checked against the C build
+  (tests/unit/world.test.luau). Next: sv_phys.c SV_Trace* / SV_LinkEdict, sv.world, the world builtins.
 - **Branches (2026-11-25):** PRs 1, 2, 3 merged into main: start every new branch from main (D-012). Owner
   decided NOT to archive the 68 old images (archive-now.tsv is only a list).
 - **Next:** owner: heavymetal.ogg appeal (optional); M1-TEX / M5-RENDER use texture_assets.luau;
