@@ -9,6 +9,7 @@
 	NOT YET PORTED: the rest of mathlib.c (planes, matrices, BoxOnPlaneSide, ...), added with their users.
 ]]
 local f32 = require("./_port/f32")
+local libm = require("./_port/libm")
 
 local mathlib = {}
 
@@ -76,11 +77,11 @@ end
 -- port: mathlib.c AngleVectors L444-496 @xonotic-v0.8.6 (PITCH 1, YAW 2, ROLL 3 here)
 function mathlib.AngleVectors(angles: vec3, forward: vec3?, right: vec3?, up: vec3?)
 	local angle = angles[2] * (M_PI * 2 / 360)
-	local sy = math.sin(angle)
-	local cy = math.cos(angle)
+	local sy = libm.sin(angle)
+	local cy = libm.cos(angle)
 	angle = angles[1] * (M_PI * 2 / 360)
-	local sp = math.sin(angle)
-	local cp = math.cos(angle)
+	local sp = libm.sin(angle)
+	local cp = libm.cos(angle)
 	if forward then
 		forward[1] = R(cp * cy)
 		forward[2] = R(cp * sy)
@@ -89,8 +90,8 @@ function mathlib.AngleVectors(angles: vec3, forward: vec3?, right: vec3?, up: ve
 	if right or up then
 		if angles[3] ~= 0 then
 			angle = angles[3] * (M_PI * 2 / 360)
-			local sr = math.sin(angle)
-			local cr = math.cos(angle)
+			local sr = libm.sin(angle)
+			local cr = libm.cos(angle)
 			if right then
 				right[1] = R(-1 * (sr * sp * cy + cr * -sy))
 				right[2] = R(-1 * (sr * sp * sy + cr * cy))
@@ -121,23 +122,23 @@ function mathlib.AnglesFromVectors(angles: vec3, forward: vec3, up: vec3?, flipp
 	if forward[1] == 0 and forward[2] == 0 then
 		if forward[3] > 0 then
 			angles[1] = R(-M_PI * 0.5)
-			angles[2] = if up then R(math.atan2(-up[2], -up[1])) else 0
+			angles[2] = if up then R(libm.atan2(-up[2], -up[1])) else 0
 		else
 			angles[1] = R(M_PI * 0.5)
-			angles[2] = if up then R(math.atan2(up[2], up[1])) else 0
+			angles[2] = if up then R(libm.atan2(up[2], up[1])) else 0
 		end
 		angles[3] = 0
 	else
-		angles[2] = R(math.atan2(forward[2], forward[1]))
-		angles[1] = R(-math.atan2(forward[3], math.sqrt(R(R(forward[1] * forward[1]) + R(forward[2] * forward[2])))))
+		angles[2] = R(libm.atan2(forward[2], forward[1]))
+		angles[1] = R(-libm.atan2(forward[3], math.sqrt(R(R(forward[1] * forward[1]) + R(forward[2] * forward[2])))))
 		-- note: we know that angles[PITCH] is in ]-pi/2..pi/2[ due to atan2(anything, positive)
 		if up then
-			local cp, sp = R(math.cos(angles[1])), R(math.sin(angles[1]))
+			local cp, sp = R(libm.cos(angles[1])), R(libm.sin(angles[1]))
 			-- note: we know cp > 0, due to the range angles[pitch] is in
-			local cy, sy = R(math.cos(angles[2])), R(math.sin(angles[2]))
+			local cy, sy = R(libm.cos(angles[2])), R(libm.sin(angles[2]))
 			local tleft = { -sy, cy, 0 }
 			local tup = { R(sp * cy), R(sp * sy), cp }
-			angles[3] = R(-math.atan2(DotProduct(up, tleft), DotProduct(up, tup)))
+			angles[3] = R(-libm.atan2(DotProduct(up, tleft), DotProduct(up, tup)))
 			-- for up == '0 0 1', this is
 			-- angles[ROLL] = -atan2(0, cp);
 			-- which is 0

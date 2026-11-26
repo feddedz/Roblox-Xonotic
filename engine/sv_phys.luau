@@ -43,6 +43,7 @@ local collision = require("./collision")
 local console = require("./console")
 local cvar = require("./cvar")
 local f32 = require("./_port/f32")
+local libm = require("./_port/libm")
 local libc = require("./_port/libc")
 local matrixlib = require("./matrixlib")
 local prvm_cmds = require("./prvm_cmds")
@@ -1412,11 +1413,11 @@ end
 local function AngleVectorsFLU(angles: { number }, forward: { number }?, left: { number }?, up: { number }?)
 	local M_PI = 3.14159265358979323846
 	local angle = angles[YAW] * (M_PI * 2 / 360)
-	local sy = math.sin(angle)
-	local cy = math.cos(angle)
+	local sy = libm.sin(angle)
+	local cy = libm.cos(angle)
 	angle = angles[PITCH] * (M_PI * 2 / 360)
-	local sp = math.sin(angle)
-	local cp = math.cos(angle)
+	local sp = libm.sin(angle)
+	local cp = libm.cos(angle)
 	if forward then
 		forward[1] = R(cp * cy)
 		forward[2] = R(cp * sy)
@@ -1425,8 +1426,8 @@ local function AngleVectorsFLU(angles: { number }, forward: { number }?, left: {
 	if left or up then
 		if angles[ROLL] ~= 0 then
 			angle = angles[ROLL] * (M_PI * 2 / 360)
-			local sr = math.sin(angle)
-			local cr = math.cos(angle)
+			local sr = libm.sin(angle)
+			local cr = libm.cos(angle)
 			if left then
 				left[1] = R(sr * sp * cy + cr * -sy)
 				left[2] = R(sr * sp * sy + cr * cy)

@@ -17,6 +17,7 @@ local utf8lib = require("./utf8lib")
 local filematch = require("./filematch")
 local common = require("./common")
 local f32 = require("./_port/f32")
+local libm = require("./_port/libm")
 local fs = require("./fs")
 local mdfour = require("./mdfour")
 local sha256 = require("./_port/sha256")
@@ -222,7 +223,7 @@ end
 -- port: prvm_cmds.c VM_pow L1750-1754 @xonotic-v0.8.6
 function prvm_cmds.VM_pow(prog: any)
 	SAFEPARMCOUNT(prog, 2, "VM_pow")
-	SET_G_FLOAT(prog, OFS_RETURN, G_FLOAT(prog, OFS_PARM0) ^ G_FLOAT(prog, OFS_PARM0 + 3))
+	SET_G_FLOAT(prog, OFS_RETURN, libm.pow(G_FLOAT(prog, OFS_PARM0), G_FLOAT(prog, OFS_PARM0 + 3)))
 end
 
 -- port: prvm_cmds.c VM_strlen L2170-2176 @xonotic-v0.8.6
@@ -1668,7 +1669,7 @@ function prvm_cmds.VM_vectoyaw(prog: any)
 	local v = G_VECTOR(prog, OFS_PARM0)
 	local yaw = 0
 	if not (v[2] == 0 and v[1] == 0) then
-		yaw = libc.toint(math.atan2(v[2], v[1]) * 180 / M_PI)
+		yaw = libc.toint(libm.atan2(v[2], v[1]) * 180 / M_PI)
 		if yaw < 0 then
 			yaw += 360
 		end
@@ -1700,26 +1701,26 @@ prvm_cmds.VM_ceil = math1("VM_ceil", math.ceil)
 -- port: prvm_cmds.c VM_fabs L809-817 @xonotic-v0.8.6
 prvm_cmds.VM_fabs = math1("VM_fabs", math.abs)
 -- port: prvm_cmds.c VM_sin L1524-1528 @xonotic-v0.8.6
-prvm_cmds.VM_sin = math1("VM_sin", math.sin)
+prvm_cmds.VM_sin = math1("VM_sin", libm.sin)
 -- port: prvm_cmds.c VM_cos L1536-1540 @xonotic-v0.8.6
-prvm_cmds.VM_cos = math1("VM_cos", math.cos)
+prvm_cmds.VM_cos = math1("VM_cos", libm.cos)
 -- port: prvm_cmds.c VM_sqrt L1549-1553 @xonotic-v0.8.6
 prvm_cmds.VM_sqrt = math1("VM_sqrt", math.sqrt)
 -- port: prvm_cmds.c VM_asin L1562-1566 @xonotic-v0.8.6
-prvm_cmds.VM_asin = math1("VM_asin", math.asin)
+prvm_cmds.VM_asin = math1("VM_asin", libm.asin)
 -- port: prvm_cmds.c VM_acos L1574-1578 @xonotic-v0.8.6
-prvm_cmds.VM_acos = math1("VM_acos", math.acos)
+prvm_cmds.VM_acos = math1("VM_acos", libm.acos)
 -- port: prvm_cmds.c VM_atan L1586-1590 @xonotic-v0.8.6
-prvm_cmds.VM_atan = math1("VM_atan", math.atan)
+prvm_cmds.VM_atan = math1("VM_atan", libm.atan)
 -- port: prvm_cmds.c VM_tan L1610-1614 @xonotic-v0.8.6
-prvm_cmds.VM_tan = math1("VM_tan", math.tan)
+prvm_cmds.VM_tan = math1("VM_tan", libm.tan)
 -- port: prvm_cmds.c VM_log L1756-1760 @xonotic-v0.8.6
-prvm_cmds.VM_log = math1("VM_log", math.log)
+prvm_cmds.VM_log = math1("VM_log", libm.log)
 
 -- port: prvm_cmds.c VM_atan2 L1598-1602 @xonotic-v0.8.6
 function prvm_cmds.VM_atan2(prog: any)
 	SAFEPARMCOUNT(prog, 2, "VM_atan2")
-	SET_G_FLOAT(prog, OFS_RETURN, math.atan2(G_FLOAT(prog, OFS_PARM0), G_FLOAT(prog, OFS_PARM0 + 3)))
+	SET_G_FLOAT(prog, OFS_RETURN, libm.atan2(G_FLOAT(prog, OFS_PARM0), G_FLOAT(prog, OFS_PARM0 + 3)))
 end
 
 -- port: prvm_cmds.c VM_randomvec L1625-1631 @xonotic-v0.8.6 (VectorRandom, mathlib.h L133)
