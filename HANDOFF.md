@@ -50,7 +50,8 @@ Every section except §MAP and §DIFFS stays under ~60 lines; detail lives in `d
   mesh helpers, matrixlib.c (4 functions). model_brush.c: the Q3 BSP loader (all lumps except lightmaps,
   collision + render BIH, submodels; 30 stock maps match an independent decoder, q3bsp_load 84,795 checks) and
   **all Q3BSP trace functions** (Mod_CollisionBIH_* and the BSP-tree path Mod_Q3BSP_Trace*, PointSuperContents,
-  TraceLineOfSight): tests/unit/trace.test.luau = 4,905 checks bit-identical to the C build on a synthetic map
+  TraceLineOfSight) and Collision_ClipTo* / Collision_CombineTraces / Collision_ClipTrace_Box+Point with the
+  entity-matrix helpers of matrixlib.c: tests/unit/trace.test.luau = 8,685 checks bit-identical to the C build on a synthetic map
   (tools/testgen/trace_vectors.c includes model_brush.c to reach its statics); tests/integration/
   q3bsp_trace.test.luau on stock maps (BIH = plain loop over all leafs, 77/77 spawn points land). The loader
   sets mod.TraceBox / TraceBrush / TraceLine / TracePoint / PointSuperContents / TraceLineAgainstSurfaces /
@@ -59,7 +60,7 @@ Every section except §MAP and §DIFFS stays under ~60 lines; detail lives in `d
   Mod_LoadTextureFromQ3Shader ported (all 2,447 release shaders agree with tools/shaders/parse.py; map textures
   get basematerialflags, shader passes, skybox name; load maps with the VFS provider set; not yet checked
   against the C build). **Next in this task:** a C reference for the shader code (fixture shaders), lightmaps,
-  the model registry; then M3-TRACE (world.c, Collision_ClipTo*, Collision_CombineTraces, the trace cache). C
+  the model registry; then M3-TRACE (world.c area grid, sv_phys.c SV_Trace*, the world builtins). C
   reference vectors: push tools/testgen/*_vectors.{c,sh} -> the Testgen workflow builds them on GitHub (no C
   compiler on the owner's PC, G-054) -> `gh run download`.
 - **Branches (2026-11-25):** PRs 1, 2, 3 merged into main: start every new branch from main (D-012). Owner

@@ -107,8 +107,26 @@ None new.
 - NOT yet checked against the C build (parser and texture setup): needs a generator with fixture shader
   files and stubbed FS_Search / FS_LoadFile, because the runner has no game data.
 
+## Part 6 (same day): clipping against the world and entities
+- PR 8 (shaders) merged into main. Branch M3-BSPLOAD-clip.
+- collision.c: Collision_TranslateBrush, Collision_TransformBrush, Collision_ClipExtendPrepare / Finish,
+  Collision_ClipToGenericEntity, ClipToWorld, ClipLineToGenericEntity, ClipLineToWorld,
+  ClipPointToGenericEntity, ClipPointToWorld, Collision_CombineTraces. model_brush.c: Collision_ClipTrace_Box /
+  _Point (stored into the collision module at load: collision cannot require model_brush). matrixlib.c:
+  Matrix4x4_Invert_Simple, CreateIdentity, CreateFromQuakeEntity, Transform, TransformPositivePlane.
+- trace_vectors.c now also runs 180 scenes: a world trace (box / line / point, with `extend`), then three
+  entities (the submodel under an entity matrix with yaw / pitch / roll / scale, or a plain box body) and
+  Collision_CombineTraces after each. tests/unit/trace.test.luau: 8,685 checks, all bit-identical, including
+  the 540 entity matrices built with the platform's sin / cos (CreateFromQuakeEntity) and trace endpos.
+- This is everything SV_TraceBox / SV_TraceLine / SV_TracePoint call below the area grid.
+
 ## Next step
-1. C reference for Mod_LoadQ3Shaders + Mod_LoadTextureFromQ3Shader: tools/testgen/shader_vectors.c with fixture
+1. M3-TRACE: world.c area grid (World_SetSize, World_LinkEdict, World_EntitiesInBox, ...), sv_phys.c
+   SV_GenericHitSuperContentsMask / SV_TracePoint / SV_TraceLine / SV_TraceBox / SV_PointSuperContents /
+   SV_EntitiesInBox / SV_LinkEdict, then the world builtins (traceline, tracebox, pointcontents, droptofloor,
+   setorigin, setsize, findradius ...) that M2-RUNNER waits for. Needs the model registry for brush entities
+   (`*N` submodels: brush.submodels) -- port Mod_FindName / Mod_ForName or wire SV_GetModelByIndex first.
+2. C reference for Mod_LoadQ3Shaders + Mod_LoadTextureFromQ3Shader: tools/testgen/shader_vectors.c with fixture
    .shader files (tests/fixtures) and stubbed FS_Search / FS_LoadFile; print every q3shaderinfo_t field and
    the texture fields. Plan: the generator `#include "model_shared.c"` (q3shader_data is static), links
    common.c + com_crc16.c, stubs FS_Search / FS_LoadFile / FS_FreeSearch (read tests/fixtures/shaders/ in a
@@ -120,7 +138,5 @@ None new.
    dpshaderkill forms, 63-character names, empty name), d_redeclare.shader (redeclarations, killed / replaced,
    missing `{`, end of file inside a body), custinfoparms.txt. Luau side: a fixture provider for fs.SetProvider
    ({ files, load, pack }, see tests/_lib/vfs_provider.luau).
-2. Mod_Q3BSP_LoadLightmaps, the model registry (Mod_FindName / Mod_ForName).
-3. M3-TRACE: world.c, Collision_ClipToWorld / ClipToGenericEntity / CombineTraces, SV_TraceBox and the world
-   builtins (traceline, tracebox, pointcontents, droptofloor) that M2-RUNNER waits for.
+3. Mod_Q3BSP_LoadLightmaps, the model registry (Mod_FindName / Mod_ForName).
 4. Speed: the tokenizer (3.7 s for the 706 KB of shader scripts); memory layout of BIH leafs for Roblox.

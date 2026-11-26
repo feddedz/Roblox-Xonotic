@@ -542,7 +542,13 @@ static void tv_makemodels(void)
 	w->brush.data_collisionelement3i = tv_celem;
 	w->surfmesh.data_vertex3f = tv_rvert;
 	w->surfmesh.data_element3i = tv_relem;
+	// the function pointers Mod_Q3BSP_Load sets
+	w->TraceBox = Mod_Q3BSP_TraceBox;
+	w->TraceBrush = Mod_Q3BSP_TraceBrush;
 	w->TraceLine = Mod_Q3BSP_TraceLine;
+	w->TracePoint = Mod_Q3BSP_TracePoint;
+	w->PointSuperContents = Mod_Q3BSP_PointSuperContents;
+	w->TraceLineAgainstSurfaces = Mod_CollisionBIH_TraceLine;
 	*s = *w;
 	w->brush.submodel = 0;
 	w->firstmodelbrush = 0;
@@ -1053,6 +1059,187 @@ static void tv_xlos(int m)
 	printf("\t%d\n", (int)Mod_Q3BSP_TraceLineOfSight(tv_model + m, start, end, amins, amaxs));
 }
 
+// ---- collision.c Collision_ClipTo* / Collision_CombineTraces: a world trace, then the submodel and plain
+// boxes as entities with a matrix, combined the way SV_TraceBox combines them
+static matrix4x4_t tv_mat, tv_imat;
+static void tv_setmatrix(int kind, const float *origin)
+{
+	double a[3] = {0, 0, 0}, scale = 1;
+	int i, j;
+	switch (kind)
+	{
+	case 1: // yaw
+		a[1] = tv_frand(-180, 180);
+		break;
+	case 2: // pitch and yaw
+		a[0] = tv_frand(-80, 80);
+		a[1] = tv_frand(-180, 180);
+		break;
+	case 3: // all three
+		a[0] = tv_frand(-80, 80);
+		a[1] = tv_frand(-180, 180);
+		a[2] = tv_frand(-60, 60);
+		break;
+	case 4: // yaw and scale
+		a[1] = tv_frand(-180, 180);
+		scale = tv_frand(0.5f, 2);
+		break;
+	default: // translation only
+		break;
+	}
+	Matrix4x4_CreateFromQuakeEntity(&tv_mat, origin[0], origin[1], origin[2], a[0], a[1], a[2], scale);
+	Matrix4x4_Invert_Simple(&tv_imat, &tv_mat);
+	printf("MATIN\t%016llx\t%016llx\t%016llx\t%016llx\t%016llx\t%016llx\t%016llx\n", tv_dbits(origin[0]), tv_dbits(origin[1]),
+		tv_dbits(origin[2]), tv_dbits(a[0]), tv_dbits(a[1]), tv_dbits(a[2]), tv_dbits(scale));
+	printf("MAT");
+	for (i = 0; i < 4; i++)
+		for (j = 0; j < 4; j++)
+			tv_pf(tv_mat.m[i][j]);
+	for (i = 0; i < 4; i++)
+		for (j = 0; j < 4; j++)
+			tv_pf(tv_imat.m[i][j]);
+	printf("\n");
+}
+static void tv_endpos(const trace_t *t)
+{
+	printf("EP\t%016llx\t%016llx\t%016llx\n", tv_dbits(t->endpos[0]), tv_dbits(t->endpos[1]), tv_dbits(t->endpos[2]));
+}
+static void tv_clipstate(const trace_t *t) // every field Collision_CombineTraces touches
+{
+	printf("CS\t%d\t%d\t%d\t%d\t%016llx\t%016llx\t%016llx\t%016llx", t->allsolid, t->startsolid, t->bmodelstartsolid, t->inwater,
+		tv_dbits(t->fraction), tv_dbits(t->endpos[0]), tv_dbits(t->endpos[1]), tv_dbits(t->endpos[2]));
+	tv_pv(t->plane.normal);
+	tv_pf(t->plane.dist);
+	printf("\t%d\t%d\t%d\t%d\t%d\t%016llx\t%016llx\t%016llx\t%016llx\n", (int)(intptr_t)t->ent, t->hitsupercontents, t->hitq3surfaceflags,
+		tv_texidx(t->hittexture), t->startsupercontents, tv_dbits(t->startdepth), tv_dbits(t->startdepthnormal[0]),
+		tv_dbits(t->startdepthnormal[1]), tv_dbits(t->startdepthnormal[2]));
+}
+static void tv_clipscene(void)
+{
+	static const float extends[5] = {0, 0, 1, 16, 0.03125f};
+	static const int bodycontents[3] = {1, 0x20, 2};
+	trace_t clip, t;
+	float start[3], end[3], mins[3], maxs[3], lstart[3], lend[3], wstart[3], wend[3], origin[3], bodymins[3], bodymaxs[3], dir[3], extend, a, b;
+	int hit, skip, mat, j, k, kind = (int)(tv_rnd() % 3), hitsurfaces, usemodel, bodysc, isbmodel;
+	tv_aim(0, start, end, 0);
+	tv_boxsize(mins, maxs);
+	tv_masks(&hit, &skip, &mat);
+	extend = extends[tv_rnd() % 5];
+	hitsurfaces = (int)(tv_rnd() % 2);
+	if (kind == 0)
+	{
+		printf("XCW\t0\t%d\t%d\t%d", hit, skip, mat);
+		tv_pv(start);
+		tv_pv(mins);
+		tv_pv(maxs);
+		tv_pv(end);
+		tv_pf(extend);
+		printf("\n");
+		Collision_ClipToWorld(&t, tv_model, start, mins, maxs, end, hit, skip, mat, extend);
+	}
+	else if (kind == 1)
+	{
+		printf("XCLW\t0\t%d\t%d\t%d", hit, skip, mat);
+		tv_pv(start);
+		tv_pv(end);
+		tv_pf(extend);
+		printf("\t%d\n", hitsurfaces);
+		Collision_ClipLineToWorld(&t, tv_model, start, end, hit, skip, mat, extend, hitsurfaces);
+	}
+	else
+	{
+		printf("XCPW\t0\t%d\t%d\t%d", hit, skip, mat);
+		tv_pv(start);
+		printf("\n");
+		Collision_ClipPointToWorld(&t, tv_model, start, hit, skip, mat);
+	}
+	tv_state("E", 0, &t);
+	tv_endpos(&t);
+	printf("SETCLIP\n");
+	clip = t;
+	for (k = 0; k < 3; k++)
+	{
+		usemodel = (tv_rnd() % 4) != 0;
+		bodysc = bodycontents[tv_rnd() % 3];
+		for (j = 0; j < 3; j++)
+			origin[j] = tv_frand(-200, 200);
+		if (usemodel)
+		{
+			// a line in the submodel's own space, moved into the world by the entity matrix
+			tv_aim(1, lstart, lend, 0);
+			VectorSet(bodymins, -8, -8, -8);
+			VectorSet(bodymaxs, 8, 8, 8);
+			tv_setmatrix((int)(tv_rnd() % 5), origin);
+		}
+		else
+		{
+			// a plain box body (no model): the matrix has no rotation, as SV_TraceBox ensures
+			tv_boxsize(bodymins, bodymaxs);
+			if (VectorCompare(bodymins, bodymaxs))
+			{
+				VectorSet(bodymins, -16, -16, -24);
+				VectorSet(bodymaxs, 16, 16, 45);
+			}
+			tv_randnormal(dir);
+			a = kind == 2 ? tv_frand(0, 40) : tv_frand(30, 220); // point traces: often inside the box
+			b = tv_frand(-40, 120);
+			for (j = 0; j < 3; j++)
+			{
+				float c = tv_frand(-12, 12);
+				lstart[j] = c + dir[j] * a;
+				lend[j] = c - dir[j] * b;
+			}
+			if (tv_rnd() % 6 == 0)
+				VectorCopy(lstart, lend);
+			tv_setmatrix(0, origin);
+		}
+		Matrix4x4_Transform(&tv_mat, lstart, wstart);
+		Matrix4x4_Transform(&tv_mat, lend, wend);
+		if (kind == 0)
+		{
+			printf("XCG\t%d\t%d\t%d\t%d\t%d", usemodel ? 1 : -1, hit, skip, mat, bodysc);
+			tv_pv(bodymins);
+			tv_pv(bodymaxs);
+			tv_pv(wstart);
+			tv_pv(mins);
+			tv_pv(maxs);
+			tv_pv(wend);
+			tv_pf(extend);
+			printf("\n");
+			Collision_ClipToGenericEntity(&t, usemodel ? tv_model + 1 : NULL, NULL, NULL, bodymins, bodymaxs, bodysc, &tv_mat, &tv_imat,
+				wstart, mins, maxs, wend, hit, skip, mat, extend);
+		}
+		else if (kind == 1)
+		{
+			printf("XCLG\t%d\t%d\t%d\t%d\t%d", usemodel ? 1 : -1, hit, skip, mat, bodysc);
+			tv_pv(bodymins);
+			tv_pv(bodymaxs);
+			tv_pv(wstart);
+			tv_pv(wend);
+			tv_pf(extend);
+			printf("\t%d\n", hitsurfaces);
+			Collision_ClipLineToGenericEntity(&t, usemodel ? tv_model + 1 : NULL, NULL, NULL, bodymins, bodymaxs, bodysc, &tv_mat, &tv_imat,
+				wstart, wend, hit, skip, mat, extend, hitsurfaces);
+		}
+		else
+		{
+			printf("XCPG\t%d\t%d\t%d\t%d\t%d", usemodel ? 1 : -1, hit, skip, mat, bodysc);
+			tv_pv(bodymins);
+			tv_pv(bodymaxs);
+			tv_pv(wstart);
+			printf("\n");
+			Collision_ClipPointToGenericEntity(&t, usemodel ? tv_model + 1 : NULL, NULL, NULL, bodymins, bodymaxs, bodysc, &tv_mat, &tv_imat,
+				wstart, hit, skip, mat);
+		}
+		tv_state("E", 0, &t);
+		tv_endpos(&t);
+		isbmodel = usemodel && (tv_rnd() % 3) != 0;
+		printf("COMB\t%d\t%d\n", isbmodel, k + 1);
+		Collision_CombineTraces(&clip, &t, (void *)(intptr_t)(k + 1), isbmodel);
+		tv_clipstate(&clip);
+	}
+}
+
 int main(void)
 {
 	int i, m, bihmode, v;
@@ -1163,6 +1350,14 @@ int main(void)
 		case 6: TV_SETCV(mod_q3bsp_tracelineofsight_brushes, 0); break;
 		}
 	}
+	// Collision_ClipTo*, Collision_CombineTraces (both world paths)
+	for (bihmode = 1; bihmode >= 0; bihmode--)
+	{
+		TV_SETCV(mod_collision_bih, bihmode);
+		for (i = 0; i < 90; i++)
+			tv_clipscene();
+	}
+	TV_SETCV(mod_collision_bih, 1);
 	printf("END\n");
 	return 0;
 }

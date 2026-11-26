@@ -2159,6 +2159,100 @@ local function trace_begin(
 	trace.skipmaterialflagsmask = skipmaterialflagsmask
 end
 
+-- port: model_brush.c Collision_ClipTrace_Box L1066-1172 @xonotic-v0.8.6 (the #if 1 branch)
+local function Collision_ClipTrace_Box(
+	trace: collision.trace_t,
+	cmins: { number },
+	cmaxs: { number },
+	start: { number },
+	mins: { number },
+	maxs: { number },
+	end_: { number },
+	hitsupercontentsmask: number,
+	skipsupercontentsmask: number,
+	skipmaterialflagsmask: number,
+	boxsupercontents: number,
+	boxq3surfaceflags: number,
+	boxtexture: any
+)
+	local function plane(nx: number, ny: number, nz: number, dist: number): collision.colplanef_t
+		return { normal = { nx, ny, nz }, dist = dist, q3surfaceflags = boxq3surfaceflags, texture = boxtexture }
+	end
+	local cbox: collision.colbrushf_t = {
+		isaabb = true,
+		hasaabbplanes = true,
+		supercontents = boxsupercontents,
+		numplanes = 6,
+		numpoints = 0,
+		numtriangles = 0,
+		planes = {
+			plane(1, 0, 0, R(cmaxs[1] - mins[1])),
+			plane(-1, 0, 0, R(maxs[1] - cmins[1])),
+			plane(0, 1, 0, R(cmaxs[2] - mins[2])),
+			plane(0, -1, 0, R(maxs[2] - cmins[2])),
+			plane(0, 0, 1, R(cmaxs[3] - mins[3])),
+			plane(0, 0, -1, R(maxs[3] - cmins[3])),
+		},
+		points = buffer.create(0),
+		elements = buffer.create(0),
+		markframe = 0,
+		mins = { 0, 0, 0 },
+		maxs = { 0, 0, 0 },
+		-- not set by the C code (stack garbage that the line trace never reads)
+		numedgedirs = 0,
+		edgedirs = buffer.create(0),
+		texture = nil,
+		q3surfaceflags = 0,
+	}
+	collision.cleartrace(trace)
+	trace.hitsupercontentsmask = hitsupercontentsmask
+	trace.skipsupercontentsmask = skipsupercontentsmask
+	trace.skipmaterialflagsmask = skipmaterialflagsmask
+	trace.fraction = 1
+	collision.Collision_TraceLineBrushFloat(trace, start, end_, cbox, cbox)
+end
+collision.Collision_ClipTrace_Box = Collision_ClipTrace_Box
+model_brush.Collision_ClipTrace_Box = Collision_ClipTrace_Box
+
+-- port: model_brush.c Collision_ClipTrace_Point L1174-1190 @xonotic-v0.8.6
+local function Collision_ClipTrace_Point(
+	trace: collision.trace_t,
+	cmins: { number },
+	cmaxs: { number },
+	start: { number },
+	hitsupercontentsmask: number,
+	skipsupercontentsmask: number,
+	skipmaterialflagsmask: number,
+	boxsupercontents: number,
+	_boxq3surfaceflags: number,
+	_boxtexture: any
+)
+	collision.cleartrace(trace)
+	trace.fraction = 1
+	trace.hitsupercontentsmask = hitsupercontentsmask
+	trace.skipsupercontentsmask = skipsupercontentsmask
+	trace.skipmaterialflagsmask = skipmaterialflagsmask
+	if
+		start[1] <= cmaxs[1]
+		and start[1] >= cmins[1]
+		and start[2] <= cmaxs[2]
+		and start[2] >= cmins[2]
+		and start[3] <= cmaxs[3]
+		and start[3] >= cmins[3]
+	then
+		trace.startsupercontents = bit32.bor(trace.startsupercontents, boxsupercontents)
+		if
+			bit32.band(hitsupercontentsmask, boxsupercontents) ~= 0
+			and bit32.band(skipsupercontentsmask, boxsupercontents) == 0
+		then
+			trace.startsolid = true
+			trace.allsolid = true
+		end
+	end
+end
+collision.Collision_ClipTrace_Point = Collision_ClipTrace_Point
+model_brush.Collision_ClipTrace_Point = Collision_ClipTrace_Point
+
 -- port: model_brush.c Mod_CollisionBIH_TracePoint L6881-6945 @xonotic-v0.8.6
 local function Mod_CollisionBIH_TracePoint(
 	model: dp_model_t,
