@@ -1,0 +1,2 @@
+# the fixture shaders test CRLF and lone-CR line endings: keep every byte as written
+* -text

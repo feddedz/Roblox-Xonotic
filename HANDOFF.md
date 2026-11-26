@@ -36,7 +36,7 @@ Every section except §MAP and §DIFFS stays under ~60 lines; detail lives in `d
 - **M2-RUNNER done** (stormkeep entities load, first StartFrame spawns them; world builtins wait on M3).
   ~170 builtins ported; server state (engine/server.luau), SZ/MSG writes, mathlib bit-exact.
 - **M2-AOT-SHIP (claimed, Claude-Anvil):** lazy chunk loading + background preload; Q-014 (startup 17.7 s).
-- **Tests:** 21 Lune files, all pass; StyLua/Selene clean; check_port_lines 0 wrong.
+- **Tests:** 25 Lune files, all pass; StyLua/Selene clean; check_port_lines 0 wrong.
 - **Stale claims:** M3-BSPLOAD and REF-DP branches have only claim commits from 2026-11-20 — owner to reassign.
 - **Local + Studio (2026-11-25):** the owner cannot use cloud sessions; work happens on the owner's Windows PC.
   Toolchain there: `rokit install` (shims in %USERPROFILE%/.rokit/bin; stylua, selene, lune 14/14, rojo pass).
@@ -58,13 +58,17 @@ Every section except §MAP and §DIFFS stays under ~60 lines; detail lives in `d
   brush.TraceLineOfSight. Trace cvars are bound by collision.Collision_Init / model_brush.Mod_BrushInit
   (host.luau calls both). Q3 shader scripts: Mod_LoadQ3Shaders / Mod_LookupQ3Shader and
   Mod_LoadTextureFromQ3Shader ported (all 2,447 release shaders agree with tools/shaders/parse.py; map textures
-  get basematerialflags, shader passes, skybox name; load maps with the VFS provider set; not yet checked
-  against the C build). **Next in this task:** a C reference for the shader code (fixture shaders), lightmaps,
+  get basematerialflags, shader passes, skybox name; load maps with the VFS provider set; checked against the C
+  build with fixture shaders: tests/unit/q3shaders_ref.test.luau, 4,363 checks). **Next in this task:** lightmaps,
   the model registry; then M3-TRACE (world.c area grid, sv_phys.c SV_Trace*, the world builtins). C
   reference vectors: push tools/testgen/*_vectors.{c,sh} -> the Testgen workflow builds them on GitHub (no C
   compiler on the owner's PC, G-054) -> `gh run download`.
-- **M3-TRACE (claimed, Claude-Quartz):** engine/world.luau = world.c area grid, checked against the C build
-  (tests/unit/world.test.luau). Next: sv_phys.c SV_Trace* / SV_LinkEdict, sv.world, the world builtins.
+- **M3-TRACE (claimed, Claude-Quartz):** engine/world.luau = world.c area grid (checked against the C build).
+  engine/sv_phys.luau = SV_TracePoint / TraceLine / TraceBox, SV_LinkEdict(+TouchAreaGrid), SV_EntitiesInBox,
+  SV_PointSuperContents, SV_NudgeOutOfSolid; builtins setorigin, setsize, traceline, tracebox, findradius,
+  droptofloor, pointcontents ported (unit tests pass; **not yet checked against the C build**). Still stubs:
+  tracetoss, walkmove, checkbottom, setmodel, checkclient / checkpvs / aim. Next: a C reference for sv_phys,
+  then the movers (M4). Log: docs/log/2026-11-26-Claude-Quartz.md.
 - **Branches (2026-11-25):** PRs 1, 2, 3 merged into main: start every new branch from main (D-012). Owner
   decided NOT to archive the 68 old images (archive-now.tsv is only a list).
 - **Next:** owner: heavymetal.ogg appeal (optional); M1-TEX / M5-RENDER use texture_assets.luau;

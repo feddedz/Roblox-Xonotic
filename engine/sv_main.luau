@@ -3,7 +3,8 @@
 Copyright (C) 1996-1997 Id Software, Inc. (DarkPlaces sv_main.c; GPLv2 or later, see engine/prvm_exec.luau)
 ]]
 --[[
-	Port of sv_main.c @xonotic-v0.8.6. PARTIAL: SV_VM_Setup up to PRVM_Prog_Load.
+	Port of sv_main.c @xonotic-v0.8.6. PARTIAL: SV_VM_Setup up to PRVM_Prog_Load, the SVVM_* edict hooks,
+	SV_GetModelByIndex, SV_GetModelFromEdict.
 	NOT YET PORTED: the PROGHEADER_CRC branch that sets engine field offsets from entvars_t (applies to
 	Xonotic: progs crc 5927), the remaining PRVM_Prog_Load steps (autocvar_* globals from cvars, .po
 	translation, PRVM_Init_Exec, field/global offset lookup), the rest of SV_VM_Setup, and everything else.
@@ -58,6 +59,37 @@ local function seti(prog: any, e: number, field: string, v: number)
 	end
 end
 
+-- port: sv_main.c SVVM_begin_increase_edicts L3587-3591 @xonotic-v0.8.6
+function sv_main.SVVM_begin_increase_edicts(_prog: any)
+	-- links don't survive the transition, so unlink everything
+	require("./world").World_UnlinkAll(require("./server").sv.world)
+end
+
+-- port: sv_main.c SVVM_end_increase_edicts L3593-3602 @xonotic-v0.8.6
+function sv_main.SVVM_end_increase_edicts(prog: any)
+	-- sv_phys requires sv_main, so it is required here
+	local SV_LinkEdict = require("./sv_phys").SV_LinkEdict
+	-- link every entity except world
+	-- engine quirk kept: C starts ent at prog->edicts (edict 0) while i starts at 1, so ent is edict i - 1:
+	-- edicts 0 .. num_edicts - 2 are relinked (SV_LinkEdict skips the world), the last one is not
+	local amin, amax = prvm_edict.FieldOfs(prog, "absmin"), prvm_edict.FieldOfs(prog, "absmax")
+	local f = prog.edictsfields
+	for i = 1, prog.num_edicts - 1 do
+		local ent = i - 1
+		local base = ent * prog.entityfields
+		if
+			not prog.ed_free[ent]
+			and not (
+				buffer.readf32(f, (base + amin) * 4) == buffer.readf32(f, (base + amax) * 4)
+				and buffer.readf32(f, (base + amin + 1) * 4) == buffer.readf32(f, (base + amax + 1) * 4)
+				and buffer.readf32(f, (base + amin + 2) * 4) == buffer.readf32(f, (base + amax + 2) * 4)
+			)
+		then
+			SV_LinkEdict(ent)
+		end
+	end
+end
+
 -- port: sv_main.c SVVM_init_edict L3604-3655 @xonotic-v0.8.6 (priv.server->move: not ported yet, sv_phys)
 function sv_main.SVVM_init_edict(prog: any, e: number)
 	local num = e - 1
@@ -86,7 +118,7 @@ end
 
 -- port: sv_main.c SVVM_free_edict L3657-3684 @xonotic-v0.8.6
 function sv_main.SVVM_free_edict(prog: any, e: number)
-	notPorted("World_UnlinkEdict (world.c) in SVVM_free_edict")
+	require("./world").World_UnlinkEdict(prog, e) -- unlink from world bsp
 	seti(prog, e, "model", 0)
 	setf(prog, e, "takedamage", 0)
 	setf(prog, e, "modelindex", 0)
@@ -134,6 +166,23 @@ function sv_main.SVVM_load_edict(prog: any, ent: number): boolean
 	return true
 end
 
+-- port: sv_main.c SV_GetModelByIndex L3089-3092 @xonotic-v0.8.6 (nil = NULL)
+function sv_main.SV_GetModelByIndex(modelindex: number): any
+	return if modelindex > 0 and modelindex < server.MAX_MODELS then server.sv.models[modelindex] else nil
+end
+
+-- port: sv_main.c SV_GetModelFromEdict L3094-3102 @xonotic-v0.8.6 (ed: edict number, nil = NULL; 0 is the world)
+function sv_main.SV_GetModelFromEdict(ed: number?): any
+	local prog = cvar.prvm_prog_list[0] -- SVVM_prog
+	if ed == nil or prog.ed_free[ed] then
+		return nil
+	end
+	local modelindex = libc.toint(
+		buffer.readf32(prog.edictsfields, (ed * prog.entityfields + prvm_edict.FieldOfs(prog, "modelindex")) * 4)
+	)
+	return if modelindex > 0 and modelindex < server.MAX_MODELS then server.sv.models[modelindex] else nil
+end
+
 local MAX_EDICTS = 32768 -- quakedef.h (non-DP_SMALLMEMORY)
 
 -- port: sv_main.c SV_VM_Setup L3736-3924 @xonotic-v0.8.6 (PARTIAL, see header)
@@ -147,12 +196,8 @@ function sv_main.SV_VM_Setup(progsdata: buffer, opts: { onStub: ((number, string
 	prog.init_edict = sv_main.SVVM_init_edict
 	prog.free_edict = sv_main.SVVM_free_edict
 	prog.load_edict = sv_main.SVVM_load_edict
-	prog.begin_increase_edicts = function(_p: any)
-		notPorted("SVVM_begin_increase_edicts: World_UnlinkEdict of all edicts (world.c)")
-	end
-	prog.end_increase_edicts = function(_p: any)
-		notPorted("SVVM_end_increase_edicts: SV_LinkEdict of all edicts (sv_phys.c)")
-	end
+	prog.begin_increase_edicts = sv_main.SVVM_begin_increase_edicts
+	prog.end_increase_edicts = sv_main.SVVM_end_increase_edicts
 	prog.loadintoworld = true
 	prvm_edict.PRVM_Prog_Load(prog, "progs.dat", progsdata, prvm_offsets.server_fields, prvm_offsets.server_globals)
 	return prog

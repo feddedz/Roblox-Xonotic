@@ -71,7 +71,11 @@ function libc.strtod(s: string, init: number?): (number, number)
 				k += 1
 			end
 		end
-		return sign * (0 / 0), j
+		-- glibc returns a quiet NaN with the sign the text has (0x7ff8... for "nan"). `0 / 0` has the sign bit set
+		-- on x86, so the bits are written out instead.
+		local nanbits = buffer.create(8)
+		buffer.writeu32(nanbits, 4, if sign < 0 then 0xFFF80000 else 0x7FF80000)
+		return buffer.readf64(nanbits, 0), j
 	end
 	-- hexadecimal
 	if string.byte(s, i) == 48 and (string.byte(s, i + 1) == 120 or string.byte(s, i + 1) == 88) then

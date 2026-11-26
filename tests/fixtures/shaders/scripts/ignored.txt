@@ -1,0 +1,5 @@
+not a .shader file: FS_Search("scripts/*.shader") must not return it
+textures/tv/ignored
+{
+	surfaceparm nodraw
+}

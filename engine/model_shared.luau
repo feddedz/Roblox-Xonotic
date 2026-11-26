@@ -735,7 +735,9 @@ local function Q3Shader_AddToHash(shader: q3shaderinfo_t)
 	entry.shader = shader -- memcpy (&entry->shader, shader, sizeof (q3shaderinfo_t));
 end
 
--- strtol(s, NULL, 0)
+-- The low 32 bits (unsigned) of the 64-bit long strtol(s, NULL, 0) returns (glibc: clamped to LONG_MAX /
+-- LONG_MIN on overflow): all the caller keeps of it (custsurfaceflags[] is ORed into an int). The value is
+-- tracked as two exact 32-bit halves, so digits past 2^53 are not rounded away.
 local function strtol0(s: string): number
 	local i = 1
 	while string.find(string.sub(s, i, i), "^%s") do
@@ -757,16 +759,24 @@ local function strtol0(s: string): number
 			base = 8
 		end
 	end
-	local v = 0
+	local lo, hi = 0, 0 -- magnitude = hi * 2^32 + lo; hi stops growing past 2^31 (overflow either way)
 	while true do
 		local d = tonumber(string.sub(s, i, i), 36)
 		if not d or d >= base then
 			break
 		end
-		v = math.min(v * base + d, 9223372036854775807)
+		local t = lo * base + d
+		lo = t % 4294967296
+		hi = math.min(hi * base + (t - lo) / 4294967296, 4294967296)
 		i += 1
 	end
-	return if neg then -v else v
+	if not neg then
+		return if hi >= 2147483648 then 4294967295 else lo -- LONG_MAX
+	end
+	if hi > 2147483648 or (hi == 2147483648 and lo > 0) then
+		return 0 -- LONG_MIN
+	end
+	return (4294967296 - lo) % 4294967296
 end
 
 -- the value of a static cvar_t of model_brush.c / host.c (registered by host.luau), or its default
@@ -1469,15 +1479,19 @@ function model_shared.Mod_LookupQ3Shader(name: string): q3shaderinfo_t?
 	return nil
 end
 
--- Port support (tests, tools): every shader in the hash, in bucket then chain order.
+-- Port support (tests, tools): every shader in the hash, in bucket then chain order. A head entry with an empty
+-- name is unused (Q3Shader_AddToHash never stores "" there); a chained entry is always a shader, also one named
+-- "" (it is chained when its bucket head is taken).
 function model_shared.q3shaders(): { q3shaderinfo_t }
 	local out = {}
 	for i = 0, Q3SHADER_HASH_SIZE - 1 do
 		local entry = q3shader_data.hash[i]
+		if entry and entry.shader.name ~= "" then
+			table.insert(out, entry.shader)
+		end
+		entry = if entry then entry.chain else nil
 		while entry do
-			if entry.shader.name ~= "" then
-				table.insert(out, entry.shader)
-			end
+			table.insert(out, entry.shader)
 			entry = entry.chain
 		end
 	end
@@ -1884,31 +1898,53 @@ function model_shared.Mod_LoadTextureFromQ3Shader(
 					texture.name
 				)
 			end
+			-- texture->shaderpasses[shaderpassindex++] = p. C does not check the index against the
+			-- Q3SHADER_MAXLAYERS entries of shaderpasses[] (pre and post layers can overlap: a shader with
+			-- rgbgen lightingdiffuse after alphagen lightingspecular converts some layers twice), and indexes 8
+			-- and 9 land on the next fields of texture_t, materialshaderpass and backgroundshaderpass
+			-- (model_shared.h L595-597; checked against the C build, tests/unit/q3shaders_ref.test.luau). Index 10
+			-- and up would overwrite the pass range bytes and colormapping with a pointer value: not reproducible.
+			local function storepass(p: any)
+				if shaderpassindex < Q3SHADER_MAXLAYERS then
+					texture.shaderpasses[shaderpassindex + 1] = p
+				elseif shaderpassindex == Q3SHADER_MAXLAYERS then
+					texture.materialshaderpass = p
+				elseif shaderpassindex == Q3SHADER_MAXLAYERS + 1 then
+					texture.backgroundshaderpass = p
+				else
+					print(
+						"NOT YET PORTED: shader pass "
+							.. shaderpassindex
+							.. " of "
+							.. texture.name
+							.. " (C writes it past texture_t.backgroundshaderpass)"
+					)
+				end
+				shaderpassindex += 1
+			end
 			-- convert the main material layer
 			-- FIXME: if alphagenspecularlayer is used, we should pass a specular texture name to R_SkinFrame_LoadExternal and have it load that texture instead of the assumed name for _gloss texture
 			if materiallayer >= 0 then
-				shaderpassindex += 1
-				texture.shaderpasses[shaderpassindex] = pass(materiallayer)
-				texture.materialshaderpass = texture.shaderpasses[shaderpassindex]
+				local p = pass(materiallayer)
+				texture.materialshaderpass = p
+				storepass(p)
 			end
 			-- convert the terrain background blend layer (if any)
 			if terrainbackgroundlayer >= 0 then
-				shaderpassindex += 1
-				texture.shaderpasses[shaderpassindex] = pass(terrainbackgroundlayer)
-				texture.backgroundshaderpass = texture.shaderpasses[shaderpassindex]
+				local p = pass(terrainbackgroundlayer)
+				texture.backgroundshaderpass = p
+				storepass(p)
 			end
 			-- convert the prepass layers (if any)
 			texture.startpreshaderpass = shaderpassindex
 			for i = 0, endofprelayers - 1 do
-				shaderpassindex += 1
-				texture.shaderpasses[shaderpassindex] = pass(i)
+				storepass(pass(i))
 			end
 			texture.endpreshaderpass = shaderpassindex
 			texture.startpostshaderpass = shaderpassindex
 			-- convert the postpass layers (if any)
 			for i = firstpostlayer, shader.numlayers - 1 do
-				shaderpassindex += 1
-				texture.shaderpasses[shaderpassindex] = pass(i)
+				storepass(pass(i))
 			end
 			-- (as in C: startpostshaderpass is assigned again here, endpostshaderpass never)
 			texture.startpostshaderpass = shaderpassindex
