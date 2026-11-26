@@ -2030,13 +2030,13 @@ static void mv_edgecases(void)
 		mv_call(MV_WM, n);
 	}
 	MV_SETCV(sv_gameplayfix_stepmultipletimes, 1);
-	for (i = 0; i < 8; i++)
+	for (i = 0; i < 24; i++)
 	{
 		n = MV_DYN0 + 46;
 		ed = mv_ed + n;
 		mv_fresh(n, MOVETYPE_STEP, 2, 0);
 		VectorSet(PRVM_serveredictvector(ed, velocity), tv_frand(600, 1500), tv_frand(600, 1500), -tv_frand(300, 900));
-		PRVM_serveredictvector(ed, origin)[2] += tv_frand(0, 4);
+		PRVM_serveredictvector(ed, origin)[2] = -PRVM_serveredictvector(ed, mins)[2] + 0.03125f * mv_rn(3); // touching the floor
 		PRVM_serveredictfloat(ed, solid) = SOLID_SLIDEBOX;
 		PRVM_serveredictfloat(ed, flags) = 0;
 		PRVM_serveredictfloat(ed, dphitcontentsmask) = 0;
@@ -2125,13 +2125,13 @@ int main(void)
 		mv_call(MV_CLIP, 0);
 
 	// single calls on random entities: Xonotic's configuration, then the engine's own
-	mv_unitcases(700);
+	mv_unitcases(1000);
 	mv_pushcases(70);
 	mv_edgecases();
 	mv_config_engine();
 	mv_setframetime((double)0.0138889f); // the engine's sys_ticrate default
 	MV_SETCV(developer_extra, 1);
-	mv_unitcases(500);
+	mv_unitcases(800);
 	MV_SETCV(developer_extra, 0);
 	mv_pushcases(40);
 
