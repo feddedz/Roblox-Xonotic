@@ -565,13 +565,20 @@ static void tv_makemodels(void)
 		s->collision_bih.numnodes, s->render_bih.numnodes);
 }
 
-// a line that mostly aims at something of model m
-static void tv_aim(int m, float *start, float *end)
+// a line that mostly aims at something of model m (what: 0 anything, 1 a surface)
+static int tv_lastaim = -1; // the brush the last line was aimed at, or -1
+static void tv_aim(int m, float *start, float *end, int what)
 {
 	float c[3], dir[3], d2[3], a, b;
 	int j, r = (int)(tv_rnd() % 20), mode;
+	tv_lastaim = -1;
+	if (what == 1)
+		r = 12 + (int)(tv_rnd() % 5);
 	if (r < 12)
-		VectorCopy(tv_bcenter[tv_pickbrush(m)], c);
+	{
+		tv_lastaim = tv_pickbrush(m);
+		VectorCopy(tv_bcenter[tv_lastaim], c);
+	}
 	else if (r < 17)
 		VectorCopy(tv_scenter[m ? TV_NWORLDS : (int)(tv_rnd() % TV_NWORLDS)], c);
 	else
@@ -651,7 +658,7 @@ static void tv_boxt(int kind) // 0: box, 1: the same boxes with isaabb cleared (
 	float start[3], end[3], mins[3], maxs[3], smins[3], smaxs[3], emins[3], emaxs[3];
 	int list[8], i, hit, skip, mat, bsc, bq3;
 	const texture_t *btex;
-	tv_aim(0, start, end);
+	tv_aim(0, start, end, 0);
 	tv_boxsize(mins, maxs);
 	VectorAdd(start, mins, smins);
 	VectorAdd(start, maxs, smaxs);
@@ -667,6 +674,8 @@ static void tv_boxt(int kind) // 0: box, 1: the same boxes with isaabb cleared (
 		bs.brush.isaabb = be.brush.isaabb = false;
 	for (i = 0; i < 8; i++)
 		list[i] = tv_pickbrush(tv_rnd() % 6 == 0);
+	if (tv_lastaim >= 0)
+		list[tv_rnd() % 8] = tv_lastaim;
 	printf("BOXT\t%d\t%d\t%d\t%d\t%d\t%d\t%d", kind, hit, skip, mat, bsc, bq3, tv_texidx(btex));
 	tv_pv(smins);
 	tv_pv(smaxs);
@@ -691,7 +700,7 @@ static void tv_movet(void) // a box against a box that moves too (other_start !=
 	trace_t t;
 	float start[3], end[3], mins[3], maxs[3], smins[3], smaxs[3], emins[3], emaxs[3], osmins[3], osmaxs[3], oemins[3], oemaxs[3], d[3];
 	int j, hit, skip, mat, tex = (int)(tv_rnd() % TV_NTEX);
-	tv_aim(0, start, end);
+	tv_aim(0, start, end, 0);
 	tv_boxsize(mins, maxs);
 	VectorAdd(start, mins, smins);
 	VectorAdd(start, maxs, smaxs);
@@ -731,10 +740,12 @@ static void tv_linet(void)
 	trace_t t, prev;
 	float start[3], end[3];
 	int list[8], i, hit, skip, mat;
-	tv_aim(0, start, end);
+	tv_aim(0, start, end, 0);
 	tv_masks(&hit, &skip, &mat);
 	for (i = 0; i < 8; i++)
 		list[i] = tv_pickbrush(tv_rnd() % 6 == 0);
+	if (tv_lastaim >= 0)
+		list[tv_rnd() % 8] = tv_lastaim;
 	printf("LINET\t%d\t%d\t%d", hit, skip, mat);
 	tv_pv(start);
 	tv_pv(end);
@@ -759,7 +770,7 @@ static void tv_pntt(void)
 	tv_masks(&hit, &skip, &mat);
 	list[0] = tv_pickbrush(0);
 	for (j = 0; j < 3; j++)
-		p[j] = tv_bcenter[list[0]][j] + tv_frand(-70, 70);
+		p[j] = tv_bcenter[list[0]][j] + tv_frand(-45, 45);
 	for (i = 1; i < 8; i++)
 		list[i] = tv_pickbrush(tv_rnd() % 6 == 0);
 	printf("PNTT\t%d\t%d\t%d", hit, skip, mat);
@@ -853,7 +864,7 @@ static void tv_seg(void)
 {
 	colboxbrushf_t bs, be;
 	float start[3], end[3], mins[3], maxs[3], smins[3], smaxs[3], emins[3], emaxs[3], omins[3], omaxs[3], sf, ef;
-	tv_aim(0, start, end);
+	tv_aim(0, start, end, 0);
 	tv_boxsize(mins, maxs);
 	VectorAdd(start, mins, smins);
 	VectorAdd(start, maxs, smaxs);
@@ -885,10 +896,19 @@ static void tv_mesht(int line)
 	const msurface_t *surf = tv_surf + s;
 	float dir[3], a, b;
 	// 0 and -1 work for every surface; a positive stride needs the surface's own bboxes
-	stride = (int)(tv_rnd() % 3) - 1;
-	if (stride > 0)
-		stride = tv_stride[s] > 0 ? tv_stride[s] : 0;
-	tv_randnormal(dir);
+	if (tv_stride[s] > 0 && tv_rnd() % 2)
+		stride = tv_stride[s];
+	else
+		stride = (int)(tv_rnd() % 2) - 1;
+	if (line || tv_rnd() % 2)
+	{
+		// mostly across the surface, from either side
+		dir[0] = tv_frand(-0.3f, 0.3f);
+		dir[1] = tv_frand(-0.3f, 0.3f);
+		dir[2] = tv_rnd() % 2 ? 1.0f : -1.0f;
+	}
+	else
+		tv_randnormal(dir);
 	a = tv_frand(20, 200);
 	b = tv_frand(0, 120);
 	for (j = 0; j < 3; j++)
@@ -943,7 +963,7 @@ static void tv_xbox(int m)
 	trace_t t;
 	float start[3], end[3], mins[3], maxs[3];
 	int hit, skip, mat;
-	tv_aim(m, start, end);
+	tv_aim(m, start, end, 0);
 	tv_boxsize(mins, maxs);
 	tv_masks(&hit, &skip, &mat);
 	printf("XBOX\t%d\t%d\t%d\t%d", m, hit, skip, mat);
@@ -961,7 +981,7 @@ static void tv_xnbox(int m) // Mod_Q3BSP_TraceBrush with boxes that are not mark
 	trace_t t;
 	float start[3], end[3], mins[3], maxs[3], smins[3], smaxs[3], emins[3], emaxs[3];
 	int hit, skip, mat;
-	tv_aim(m, start, end);
+	tv_aim(m, start, end, 0);
 	tv_boxsize(mins, maxs);
 	VectorAdd(start, mins, smins);
 	VectorAdd(start, maxs, smaxs);
@@ -985,7 +1005,7 @@ static void tv_xline(int m, int surfaces)
 	trace_t t;
 	float start[3], end[3];
 	int hit, skip, mat;
-	tv_aim(m, start, end);
+	tv_aim(m, start, end, surfaces);
 	tv_masks(&hit, &skip, &mat);
 	printf("%s\t%d\t%d\t%d\t%d", surfaces ? "XSURF" : "XLINE", m, hit, skip, mat);
 	tv_pv(start);
@@ -1018,7 +1038,7 @@ static void tv_xlos(int m)
 {
 	float start[3], end[3], amins[3], amaxs[3];
 	int j, r = (int)(tv_rnd() % 4);
-	tv_aim(m, start, end);
+	tv_aim(m, start, end, 0);
 	for (j = 0; j < 3; j++)
 	{
 		float c = r == 0 ? 0.0f : end[j];
