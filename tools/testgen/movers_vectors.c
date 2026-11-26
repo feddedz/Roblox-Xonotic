@@ -1927,6 +1927,55 @@ static void mv_frames(int nframes, int nents)
 	for (f = 0; f < nframes; f++)
 		mv_call(MV_PHYS, 0);
 }
+// paths the random cases may miss: every movetype on a client entity through the client paths, a pusher of
+// an unrecognized solid type, an item whose touch function removes it while SV_Physics_Toss moves it
+static void mv_edgecases(void)
+{
+	static const int cmt[16] =
+	{
+		MOVETYPE_NONE, MOVETYPE_WALK, MOVETYPE_STEP, MOVETYPE_FLY, MOVETYPE_TOSS, MOVETYPE_PUSH, MOVETYPE_NOCLIP,
+		MOVETYPE_FLYMISSILE, MOVETYPE_BOUNCE, MOVETYPE_BOUNCEMISSILE, MOVETYPE_FOLLOW, MOVETYPE_FAKEPUSH,
+		MOVETYPE_FLY_WORLDONLY, MOVETYPE_PHYSICS, 150, 50,
+	};
+	prvm_prog_t *prog = SVVM_prog;
+	prvm_edict_t *ed;
+	int i, k, n;
+	for (i = 0; i < 16; i++)
+	{
+		for (k = 0; k < 2; k++)
+		{
+			mv_makeclient(0);
+			PRVM_serveredictfloat(mv_ed + 1, movetype) = cmt[i];
+			mv_clients[0].begun = 1;
+			mv_clients[0].clmovement_inputtimeout = k ? 0.05f : 0;
+			mv_commit(1);
+			mv_printcl("CLS", 0);
+			mv_call(MV_CNT, 1);
+			mv_call(MV_CENT, 1);
+			mv_call(MV_CMOVE, 1);
+		}
+	}
+	n = MV_DYN0 + 44;
+	ed = mv_ed + n;
+	mv_makeent(n, MOVETYPE_PUSH);
+	PRVM_serveredictfloat(ed, solid) = 7;
+	VectorSet(PRVM_serveredictvector(ed, velocity), 10, 20, 30);
+	mv_commit(n);
+	mv_call(MV_PM, n);
+	for (i = 0; i < 4; i++)
+	{
+		n = MV_DYN0 + 45;
+		ed = mv_ed + n;
+		mv_fresh(n, i < 2 ? MOVETYPE_TOSS : MOVETYPE_BOUNCE, 0, 1);
+		PRVM_serveredictfloat(ed, solid) = SOLID_BBOX;
+		PRVM_serveredictfloat(ed, flags) = 0;
+		PRVM_serveredictfloat(ed, dphitcontentsmask) = 0;
+		PRVM_serveredictfunction(ed, touch) = 74;
+		PRVM_serveredictvector(ed, velocity)[2] = -1200;
+		mv_commit(n);
+		mv_call(MV_TOSS, n);
+	}
+}
 // single calls of the movers a cvar variant changes, on entities set up for them
 static void mv_variantcalls(void)
 {
@@ -1977,6 +2026,7 @@ int main(void)
 	// single calls on random entities: Xonotic's configuration, then the engine's own
 	mv_unitcases(700);
 	mv_pushcases(70);
+	mv_edgecases();
 	mv_config_engine();
 	mv_setframetime((double)0.0138889f); // the engine's sys_ticrate default
 	MV_SETCV(developer_extra, 1);
