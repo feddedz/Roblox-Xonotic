@@ -26,14 +26,23 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 	float arrays are f32 buffers and int arrays i32 buffers, passed as (buffer, byte offset) where the C code
 	passes a pointer into the middle of an array; every float operation is rounded like C (D-004).
 	model_shared.loadmodel is the C global `loadmodel` (set by the loader that is running).
-	NOT YET PORTED: everything else (model registry and loading, Q3 shaders and Mod_LoadTextureFromQ3Shader,
+	Q3 shader scripts: Mod_LoadQ3Shaders, Mod_LookupQ3Shader and their helpers; Mod_CreateShaderPass,
+	Mod_CreateShaderPassFromQ3ShaderLayer, Mod_LoadTextureFromQ3Shader (end of this file; the renderer calls
+	they make on a client are hooks, see R_SkinFrame_LoadMissing below).
+	NOT YET PORTED: everything else (model registry and loading,
 	skins, shadow meshes, sorted surfaces, lightmap allocation, ...).
 ]]
+local common = require("./common")
+local console = require("./console")
+local cvar = require("./cvar")
 local f32 = require("./_port/f32")
+local fs = require("./fs")
+local libc = require("./_port/libc")
 
 local model_shared = {}
 
 local R = f32.round
+local Con_Printf, Con_DPrint, Con_DPrintf = console.Con_Printf, console.Con_DPrint, console.Con_DPrintf
 local readf32, writef32, readi32, writei32 = buffer.readf32, buffer.writef32, buffer.readi32, buffer.writei32
 
 -- model_shared.c L47: dp_model_t *loadmodel;
@@ -285,6 +294,1844 @@ function model_shared.Mod_MakeSortedSurfaces(mod: any)
 		sorted[firstsurfacefortexture[t + 1] + 1] = k + mod.firstmodelsurface
 		firstsurfacefortexture[t + 1] += 1
 	end
+end
+
+-- ---------------------------------------------------------------------------------------------------------
+-- Q3 shader scripts (model_shared.c L48-61, L1552-2413; model_shared.h L257-509)
+
+-- model_shared.h L259-278
+model_shared.Q3TEXTUREFLAG_TWOSIDED = 1
+model_shared.Q3TEXTUREFLAG_NOPICMIP = 16
+model_shared.Q3TEXTUREFLAG_POLYGONOFFSET = 32
+model_shared.Q3TEXTUREFLAG_REFRACTION = 256
+model_shared.Q3TEXTUREFLAG_REFLECTION = 512
+model_shared.Q3TEXTUREFLAG_WATERSHADER = 1024
+model_shared.Q3TEXTUREFLAG_CAMERA = 2048
+model_shared.Q3TEXTUREFLAG_TRANSPARENTSORT = 4096
+local Q3TEXTUREFLAG_TWOSIDED = 1
+local Q3TEXTUREFLAG_NOPICMIP = 16
+local Q3TEXTUREFLAG_POLYGONOFFSET = 32
+local Q3TEXTUREFLAG_REFRACTION = 256
+local Q3TEXTUREFLAG_REFLECTION = 512
+local Q3TEXTUREFLAG_WATERSHADER = 1024
+local Q3TEXTUREFLAG_CAMERA = 2048
+local Q3TEXTUREFLAG_TRANSPARENTSORT = 4096
+local Q3PATHLENGTH = 64
+local TEXTURE_MAXFRAMES = 64
+local Q3WAVEPARMS = 4
+local Q3DEFORM_MAXPARMS = 3
+local Q3SHADER_MAXLAYERS = 8
+local Q3RGBGEN_MAXPARMS = 3
+local Q3ALPHAGEN_MAXPARMS = 1
+local Q3TCGEN_MAXPARMS = 6
+local Q3TCMOD_MAXPARMS = 6
+local Q3MAXTCMODS = 8
+local Q3MAXDEFORMS = 4
+model_shared.Q3SHADER_MAXLAYERS = Q3SHADER_MAXLAYERS
+model_shared.Q3MAXTCMODS = Q3MAXTCMODS
+model_shared.Q3MAXDEFORMS = Q3MAXDEFORMS
+model_shared.TEXTURE_MAXFRAMES = TEXTURE_MAXFRAMES
+
+-- q3wavefunc_e L280-294
+model_shared.Q3WAVEFUNC_NONE = 0
+model_shared.Q3WAVEFUNC_INVERSESAWTOOTH = 1
+model_shared.Q3WAVEFUNC_NOISE = 2
+model_shared.Q3WAVEFUNC_SAWTOOTH = 3
+model_shared.Q3WAVEFUNC_SIN = 4
+model_shared.Q3WAVEFUNC_SQUARE = 5
+model_shared.Q3WAVEFUNC_TRIANGLE = 6
+model_shared.Q3WAVEFUNC_COUNT = 7
+model_shared.Q3WAVEFUNC_USER_COUNT = 4
+model_shared.Q3WAVEFUNC_USER_SHIFT = 8 -- use 8 bits for wave func type
+local Q3WAVEFUNC_USER_SHIFT = 8
+-- q3deform_e L296-316
+model_shared.Q3DEFORM = {
+	NONE = 0,
+	PROJECTIONSHADOW = 1,
+	AUTOSPRITE = 2,
+	AUTOSPRITE2 = 3,
+	TEXT0 = 4,
+	TEXT1 = 5,
+	TEXT2 = 6,
+	TEXT3 = 7,
+	TEXT4 = 8,
+	TEXT5 = 9,
+	TEXT6 = 10,
+	TEXT7 = 11,
+	BULGE = 12,
+	WAVE = 13,
+	NORMAL = 14,
+	MOVE = 15,
+	COUNT = 16,
+}
+-- q3rgbgen_e L318-332
+model_shared.Q3RGBGEN = {
+	IDENTITY = 0,
+	CONST = 1,
+	ENTITY = 2,
+	EXACTVERTEX = 3,
+	IDENTITYLIGHTING = 4,
+	LIGHTINGDIFFUSE = 5,
+	ONEMINUSENTITY = 6,
+	ONEMINUSVERTEX = 7,
+	VERTEX = 8,
+	WAVE = 9,
+	COUNT = 10,
+}
+local Q3RGBGEN_IDENTITY, Q3RGBGEN_LIGHTINGDIFFUSE, Q3RGBGEN_VERTEX, Q3RGBGEN_WAVE = 0, 5, 8, 9
+-- q3alphagen_e L334-347
+model_shared.Q3ALPHAGEN = {
+	IDENTITY = 0,
+	CONST = 1,
+	ENTITY = 2,
+	LIGHTINGSPECULAR = 3,
+	ONEMINUSENTITY = 4,
+	ONEMINUSVERTEX = 5,
+	PORTAL = 6,
+	VERTEX = 7,
+	WAVE = 8,
+	COUNT = 9,
+}
+local Q3ALPHAGEN_IDENTITY, Q3ALPHAGEN_VERTEX, Q3ALPHAGEN_WAVE = 0, 7, 8
+-- q3tcgen_e L349-358
+model_shared.Q3TCGEN = { NONE = 0, TEXTURE = 1, ENVIRONMENT = 2, LIGHTMAP = 3, VECTOR = 4, COUNT = 5 }
+local Q3TCGEN_TEXTURE = 1
+-- q3tcmod_e L360-373
+model_shared.Q3TCMOD = {
+	NONE = 0,
+	ENTITYTRANSLATE = 1,
+	ROTATE = 2,
+	SCALE = 3,
+	SCROLL = 4,
+	STRETCH = 5,
+	TRANSFORM = 6,
+	TURBULENT = 7,
+	PAGE = 8,
+	COUNT = 9,
+}
+local Q3TCMOD_STRETCH = 5
+-- dpoffsetmapping_technique_t L434-440, dptransparentsortcategory_t L442-447
+model_shared.OFFSETMAPPING_OFF = 0
+model_shared.OFFSETMAPPING_DEFAULT = 1
+model_shared.OFFSETMAPPING_LINEAR = 2
+model_shared.OFFSETMAPPING_RELIEF = 3
+model_shared.TRANSPARENTSORT_SKY = 0
+model_shared.TRANSPARENTSORT_DISTANCE = 1
+model_shared.TRANSPARENTSORT_HUD = 2
+local OFFSETMAPPING_OFF, OFFSETMAPPING_DEFAULT, OFFSETMAPPING_LINEAR, OFFSETMAPPING_RELIEF = 0, 1, 2, 3
+local TRANSPARENTSORT_SKY, TRANSPARENTSORT_DISTANCE, TRANSPARENTSORT_HUD = 0, 1, 2
+
+-- bspfile.h Q3SURFACEPARM_* (by the name used after `surfaceparm`)
+local SURFACEPARMS: { [string]: number } = {
+	alphashadow = 1,
+	areaportal = 2,
+	clusterportal = 4,
+	detail = 8,
+	donotenter = 16,
+	fog = 32,
+	lava = 64,
+	lightfilter = 128,
+	metalsteps = 256,
+	nodamage = 512,
+	nodlight = 1024,
+	nodraw = 2048,
+	nodrop = 4096,
+	noimpact = 8192,
+	nolightmap = 16384,
+	nomarks = 32768,
+	nomipmaps = 65536,
+	nonsolid = 131072,
+	origin = 262144,
+	playerclip = 524288,
+	sky = 1048576,
+	slick = 2097152,
+	slime = 4194304,
+	structural = 8388608,
+	trans = 16777216,
+	water = 33554432,
+	pointlight = 67108864,
+	hint = 134217728,
+	dust = 268435456,
+	botclip = 536870912,
+	lightgrid = 1073741824,
+	antiportal = 2147483648,
+}
+model_shared.Q3SURFACEPARM = SURFACEPARMS
+local Q3SURFACEPARM_NOMIPMAPS = 65536
+local Q3SURFACEPARM_SKY = 1048576
+
+-- glquake.h blend factors
+local GL_ZERO, GL_ONE = 0x0, 0x1
+local GL_SRC_COLOR, GL_ONE_MINUS_SRC_COLOR = 0x0300, 0x0301
+local GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA = 0x0302, 0x0303
+local GL_DST_ALPHA, GL_ONE_MINUS_DST_ALPHA = 0x0304, 0x0305
+local GL_DST_COLOR, GL_ONE_MINUS_DST_COLOR = 0x0306, 0x0307
+local BLENDFACTORS: { [string]: number } = {
+	gl_one = GL_ONE,
+	gl_zero = GL_ZERO,
+	gl_src_color = GL_SRC_COLOR,
+	gl_src_alpha = GL_SRC_ALPHA,
+	gl_dst_color = GL_DST_COLOR,
+	gl_dst_alpha = GL_DST_ALPHA,
+	gl_one_minus_src_color = GL_ONE_MINUS_SRC_COLOR,
+	gl_one_minus_src_alpha = GL_ONE_MINUS_SRC_ALPHA,
+	gl_one_minus_dst_color = GL_ONE_MINUS_DST_COLOR,
+	gl_one_minus_dst_alpha = GL_ONE_MINUS_DST_ALPHA,
+}
+-- r_textures.h TEXF_*
+local TEXF_ALPHA = 0x00000001
+local TEXF_MIPMAP = 0x00000002
+local TEXF_CLAMP = 0x00000020
+local TEXF_PICMIP = 0x00000100
+local TEXF_COMPRESS = 0x00000200
+
+local RGBGENS: { [string]: number } = {
+	identity = 0,
+	const = 1,
+	entity = 2,
+	exactvertex = 3,
+	identitylighting = 4,
+	lightingdiffuse = 5,
+	oneminusentity = 6,
+	oneminusvertex = 7,
+	vertex = 8,
+}
+local ALPHAGENS: { [string]: number } = {
+	identity = 0,
+	const = 1,
+	entity = 2,
+	lightingspecular = 3,
+	oneminusentity = 4,
+	oneminusvertex = 5,
+	portal = 6,
+	vertex = 7,
+}
+local TCGENS: { [string]: number } = { base = 1, texture = 1, environment = 2, lightmap = 3, vector = 4 }
+local TCMODS: { [string]: number } = {
+	entitytranslate = 1,
+	rotate = 2,
+	scale = 3,
+	scroll = 4,
+	page = 8,
+	transform = 6,
+	turb = 7,
+}
+local DEFORMS: { [string]: number } = {
+	projectionshadow = 1,
+	autosprite = 2,
+	autosprite2 = 3,
+	text0 = 4,
+	text1 = 5,
+	text2 = 6,
+	text3 = 7,
+	text4 = 8,
+	text5 = 9,
+	text6 = 10,
+	text7 = 11,
+	bulge = 12,
+	normal = 14,
+}
+
+--[[
+	q3shaderinfo_t (model_shared.h L449-509) as a table with the C field names. Arrays that C zero-fills hold only
+	the used entries here; a missing entry is a zeroed one:
+	  * layers[1 .. numlayers] (C layers[0 .. numlayers - 1]); a killed shader (numlayers = 0) keeps its parsed
+	    layers in the table, as the C struct does.
+	  * layer.tcmods[i], shader.deforms[i]: nil means tcmod / deform 0 (Q3TCMOD_NONE / Q3DEFORM_NONE).
+	  * layer.texturename: nil (NULL) or a list of numframes names.
+	surfaceparms is kept as an unsigned 32-bit value (Q3SURFACEPARM_ANTIPORTAL is bit 31).
+]]
+export type q3shaderinfo_t = { [string]: any }
+export type q3shaderinfo_layer_t = { [string]: any }
+
+-- a zeroed q3shaderinfo_layer_t
+local function newlayer(): q3shaderinfo_layer_t
+	return {
+		alphatest = false,
+		clampmap = false,
+		framerate = 0,
+		numframes = 0,
+		dptexflags = 0,
+		texturename = nil,
+		blendfunc = { 0, 0 },
+		rgbgen = { rgbgen = 0, parms = { 0, 0, 0 }, wavefunc = 0, waveparms = { 0, 0, 0, 0 } },
+		alphagen = { alphagen = 0, parms = { 0 }, wavefunc = 0, waveparms = { 0, 0, 0, 0 } },
+		tcgen = { tcgen = 0, parms = { 0, 0, 0, 0, 0, 0 } },
+		tcmods = {},
+	}
+end
+
+-- a zeroed q3shaderinfo_t (memset(&shader, 0, sizeof(shader)))
+local function newshader(): q3shaderinfo_t
+	return {
+		name = "",
+		surfaceparms = 0,
+		surfaceflags = 0,
+		textureflags = 0,
+		numlayers = 0,
+		lighting = false,
+		vertexalpha = false,
+		textureblendalpha = false,
+		layers = {},
+		skyboxname = "",
+		deforms = {},
+		dpnortlight = false,
+		dpshadow = false,
+		dpnoshadow = false,
+		dpmeshcollisions = false,
+		dpshaderkill = false,
+		dpreflectcube = "",
+		reflectmin = 0,
+		reflectmax = 0,
+		refractfactor = 0,
+		refractcolor4f = { 0, 0, 0, 0 },
+		reflectfactor = 0,
+		reflectcolor4f = { 0, 0, 0, 0 },
+		r_water_wateralpha = 0,
+		r_water_waterscroll = { 0, 0 },
+		offsetmapping = 0,
+		offsetscale = 0,
+		offsetbias = 0,
+		biaspolygonoffset = 0,
+		biaspolygonfactor = 0,
+		transparentsort = 0,
+		specularscalemod = 0,
+		specularpowermod = 0,
+		rtlightambient = 0,
+	}
+end
+
+-- model_shared.c L48-61: static mempool_t* q3shaders_mem; static q3shader_data_t* q3shader_data;
+-- hash[i] is the head entry of bucket i ({ shader, chain }); C has all 1021 heads zeroed, here a head is made
+-- (zeroed) when it is first looked at. `loaded` stands for q3shaders_mem != NULL.
+local Q3SHADER_HASH_SIZE = 1021
+local q3shaders_loaded = false
+local q3shader_data: { hash: { [number]: any } } = { hash = {} }
+
+local function hashhead(index: number): any
+	local entry = q3shader_data.hash[index]
+	if not entry then
+		entry = { shader = newshader(), chain = nil }
+		q3shader_data.hash[index] = entry
+	end
+	return entry
+end
+
+local function lower(s: string): string
+	return string.lower(s)
+end
+
+-- port: model_shared.c Mod_LoadQ3Shaders_EnumerateWaveFunc L1552-1572 @xonotic-v0.8.6
+local function Mod_LoadQ3Shaders_EnumerateWaveFunc(s: string): number
+	local offset = 0
+	if lower(string.sub(s, 1, 4)) == "user" then -- parse stuff like "user1sin", always user<n>func
+		offset = math.clamp((string.byte(s, 5) or 0) - 48, 0, 9)
+		offset = bit32.lshift(offset + 1, Q3WAVEFUNC_USER_SHIFT)
+		s = string.sub(s, 5)
+		if s ~= "" then
+			s = string.sub(s, 2)
+		end
+	end
+	local l = lower(s)
+	if l == "sin" then
+		return bit32.bor(offset, 4)
+	elseif l == "square" then
+		return bit32.bor(offset, 5)
+	elseif l == "triangle" then
+		return bit32.bor(offset, 6)
+	elseif l == "sawtooth" then
+		return bit32.bor(offset, 3)
+	elseif l == "inversesawtooth" then
+		return bit32.bor(offset, 1)
+	elseif l == "noise" then
+		return bit32.bor(offset, 2)
+	elseif l == "none" then
+		return bit32.bor(offset, 0)
+	end
+	Con_DPrintf("Mod_LoadQ3Shaders: unknown wavefunc %s\n", s)
+	return bit32.bor(offset, 0)
+end
+
+-- port: model_shared.c Mod_FreeQ3Shaders L1574-1577 @xonotic-v0.8.6
+function model_shared.Mod_FreeQ3Shaders()
+	q3shaders_loaded = false
+	q3shader_data = { hash = {} }
+end
+
+-- memcmp of the Q3SHADERINFO_COMPARE_START .. COMPARE_END range of two shaders: true when it differs. A layer's
+-- texturename is a pointer in C, so two layers with texture names never compare equal.
+local function shaderdiffers(a: any, b: any): boolean
+	local function differ(x: any, y: any): boolean
+		if type(x) ~= type(y) then
+			return true
+		end
+		if type(x) ~= "table" then
+			return x ~= y
+		end
+		for k, v in x do
+			if k == "texturename" then
+				return true
+			end
+			if differ(v, y[k]) then
+				return true
+			end
+		end
+		for k in y do
+			if x[k] == nil then
+				return true
+			end
+		end
+		return false
+	end
+	for k, v in a do
+		if k ~= "name" and differ(v, b[k]) then
+			return true
+		end
+	end
+	return false
+end
+
+-- port: model_shared.c Q3Shader_AddToHash L1579-1635 @xonotic-v0.8.6
+local function Q3Shader_AddToHash(shader: q3shaderinfo_t)
+	local hash = common.CRC_Block_CaseInsensitive(shader.name)
+	local entry: any = hashhead(hash % Q3SHADER_HASH_SIZE)
+	local lastEntry: any = nil
+	repeat
+		if lower(entry.shader.name) == lower(shader.name) then
+			-- redeclaration
+			if shader.dpshaderkill then
+				-- killed shader is a redeclarion? we can safely ignore it
+				return
+			elseif entry.shader.dpshaderkill then
+				-- replace the old shader!
+				-- this will skip the entry allocating part
+				-- below and just replace the shader
+				break
+			else
+				if shaderdiffers(shader, entry.shader) then
+					Con_DPrintf("Shader '%s' already defined, ignoring mismatching redeclaration\n", shader.name)
+				else
+					Con_DPrintf("Shader '%s' already defined\n", shader.name)
+				end
+				return
+			end
+		end
+		lastEntry = entry
+		entry = entry.chain
+	until entry == nil
+	if entry == nil then
+		if lastEntry.shader.name ~= "" then
+			-- Add to chain
+			local newEntry = { shader = nil, chain = nil }
+			while lastEntry.chain ~= nil do
+				lastEntry = lastEntry.chain
+			end
+			lastEntry.chain = newEntry
+			lastEntry = newEntry
+		end
+		-- else: head of chain, in hash entry array
+		entry = lastEntry
+	end
+	entry.shader = shader -- memcpy (&entry->shader, shader, sizeof (q3shaderinfo_t));
+end
+
+-- strtol(s, NULL, 0)
+local function strtol0(s: string): number
+	local i = 1
+	while string.find(string.sub(s, i, i), "^%s") do
+		i += 1
+	end
+	local neg = false
+	local c = string.sub(s, i, i)
+	if c == "+" or c == "-" then
+		neg = c == "-"
+		i += 1
+	end
+	local base = 10
+	if string.sub(s, i, i) == "0" then
+		local x = string.sub(s, i + 1, i + 1)
+		if (x == "x" or x == "X") and string.find(string.sub(s, i + 2, i + 2), "^%x") then
+			base = 16
+			i += 2
+		else
+			base = 8
+		end
+	end
+	local v = 0
+	while true do
+		local d = tonumber(string.sub(s, i, i), 36)
+		if not d or d >= base then
+			break
+		end
+		v = math.min(v * base + d, 9223372036854775807)
+		i += 1
+	end
+	return if neg then -v else v
+end
+
+-- the value of a static cvar_t of model_brush.c / host.c (registered by host.luau), or its default
+local function cvarvalue(name: string, default: number): number
+	local v = cvar.Cvar_FindVar(name)
+	return if v then v.value else default
+end
+
+-- port: model_shared.c Mod_LoadQ3Shaders L1645-2396 @xonotic-v0.8.6
+function model_shared.Mod_LoadQ3Shaders()
+	local numparameters = 0
+	-- char parameter[TEXTURE_MAXFRAMES + 4][Q3PATHLENGTH]: C never clears it, so a keyword that reads more
+	-- parameters than its line has sees what an earlier line left there. Kept (C index k is parameter[k + 1]).
+	local parameter: { string } = table.create(TEXTURE_MAXFRAMES + 4, "")
+	local custsurfaceparmnames: { string } = {}
+	local custsurfaceflags: { number } = {}
+	local numcustsurfaceflags = 0
+	local dpshaderkill = false
+	local text = ""
+	local pos: number? = nil
+	local QC = common.COM_ParseToken_QuakeC
+
+	model_shared.Mod_FreeQ3Shaders()
+
+	q3shaders_loaded = true
+	q3shader_data = { hash = {} }
+
+	-- parse custinfoparms.txt
+	numcustsurfaceflags = 0
+	local f = fs.FS_LoadFile("scripts/custinfoparms.txt", false)
+	if f then
+		text, pos = f, 1
+		local ok: boolean
+		ok, pos = QC(text, pos, false)
+		if not ok or common.com_token ~= "{" then
+			Con_DPrintf(
+				'scripts/custinfoparms.txt: contentflags section parsing error - expected "{", found "%s"\n',
+				common.com_token
+			)
+		else
+			while true do
+				ok, pos = QC(text, pos, false)
+				if not ok or common.com_token == "}" then
+					break
+				end
+			end
+			-- custom surfaceflags section
+			ok, pos = QC(text, pos, false)
+			if not ok or common.com_token ~= "{" then
+				Con_DPrintf(
+					'scripts/custinfoparms.txt: surfaceflags section parsing error - expected "{", found "%s"\n',
+					common.com_token
+				)
+			else
+				while true do
+					ok, pos = QC(text, pos, false)
+					if not ok then
+						break
+					end
+					if common.com_token == "}" then
+						break
+					end
+					-- register surfaceflag
+					if numcustsurfaceflags >= 256 then
+						Con_Printf(
+							"scripts/custinfoparms.txt: surfaceflags section parsing error - max 256 surfaceflags exceeded\n"
+						)
+						break
+					end
+					-- name
+					custsurfaceparmnames[numcustsurfaceflags + 1] = common.com_token
+					-- value
+					ok, pos = QC(text, pos, false)
+					if ok then
+						custsurfaceflags[numcustsurfaceflags + 1] = strtol0(common.com_token)
+					else
+						custsurfaceflags[numcustsurfaceflags + 1] = 0
+					end
+					numcustsurfaceflags += 1
+				end
+			end
+		end
+	end
+
+	-- the "for (j = 0; strcasecmp(com_token, "\n") && strcasecmp(com_token, "}"); j++)" loop of both parameter
+	-- readers: com_token holds the first token on entry and the token that ended the line on exit ("" at the end
+	-- of the file)
+	local function readparameters()
+		numparameters = 0
+		local j = 0
+		local tok = common.com_token
+		while tok ~= "\n" and tok ~= "}" do
+			if j < TEXTURE_MAXFRAMES + 4 then
+				-- remap dp_water to dpwater, dp_reflect to dpreflect, etc.
+				if j == 0 and lower(string.sub(tok, 1, 3)) == "dp_" then
+					parameter[j + 1] = string.sub("dp" .. string.sub(tok, 4), 1, Q3PATHLENGTH - 1)
+				else
+					parameter[j + 1] = string.sub(tok, 1, Q3PATHLENGTH - 1)
+				end
+				numparameters = j + 1
+			end
+			local ok: boolean
+			ok, pos = QC(text, pos, true)
+			if not ok then
+				break
+			end
+			tok = common.com_token
+			j += 1
+		end
+	end
+	local function P(k: number): string
+		return parameter[k + 1]
+	end
+	local function PL(k: number): string
+		return lower(parameter[k + 1])
+	end
+	local function atof(k: number): number
+		return libc.atof(parameter[k + 1])
+	end
+
+	-- the cvar_t fields the parser reads (model_brush.c L55-61, host.c developer_insane)
+	local default_offsetmapping = cvarvalue("mod_q3shader_default_offsetmapping", 1)
+	local default_offsetmapping_scale = cvarvalue("mod_q3shader_default_offsetmapping_scale", 1)
+	local default_offsetmapping_bias = cvarvalue("mod_q3shader_default_offsetmapping_bias", 0)
+	local default_polygonoffset = cvarvalue("mod_q3shader_default_polygonoffset", -2)
+	local default_polygonfactor = cvarvalue("mod_q3shader_default_polygonfactor", 0)
+	local force_addalpha = cvarvalue("mod_q3shader_force_addalpha", 0) ~= 0
+	local force_terrain_alphaflag = cvarvalue("mod_q3shader_force_terrain_alphaflag", 0) ~= 0
+	local developer_insane = cvarvalue("developer_insane", 0) ~= 0
+
+	-- parse shaders
+	local search = fs.FS_Search("scripts/*.shader", true, false)
+	if not search then
+		return
+	end
+	for fileindex = 0, #search - 1 do
+		local filename = search[fileindex + 1]
+		local filetext = fs.FS_LoadFile(filename, false)
+		if not filetext then
+			continue
+		end
+		text, pos = filetext, 1
+		while true do
+			local ok: boolean
+			ok, pos = QC(text, pos, false)
+			if not ok then
+				break
+			end
+			local shader = newshader()
+			shader.reflectmin = 0
+			shader.reflectmax = 1
+			shader.refractfactor = 1
+			shader.refractcolor4f = { 1, 1, 1, 1 }
+			shader.reflectfactor = 1
+			shader.reflectcolor4f = { 1, 1, 1, 1 }
+			shader.r_water_wateralpha = 1
+			shader.r_water_waterscroll[1] = 0
+			shader.r_water_waterscroll[2] = 0
+			shader.offsetmapping = if default_offsetmapping ~= 0 then OFFSETMAPPING_DEFAULT else OFFSETMAPPING_OFF
+			shader.offsetscale = default_offsetmapping_scale
+			shader.offsetbias = default_offsetmapping_bias
+			shader.biaspolygonoffset = default_polygonoffset
+			shader.biaspolygonfactor = default_polygonfactor
+			shader.transparentsort = TRANSPARENTSORT_DISTANCE
+			shader.specularscalemod = 1
+			shader.specularpowermod = 1
+			shader.rtlightambient = 0
+			-- WHEN ADDING DEFAULTS HERE, REMEMBER TO PUT DEFAULTS IN ALL LOADERS
+			-- JUST GREP FOR "specularscalemod = 1".
+
+			shader.name = string.sub(common.com_token, 1, Q3PATHLENGTH - 1)
+			ok, pos = QC(text, pos, false)
+			if not ok or common.com_token ~= "{" then
+				Con_DPrintf('%s parsing error - expected "{", found "%s"\n', filename, common.com_token)
+				break
+			end
+			while true do
+				ok, pos = QC(text, pos, false)
+				if not ok then
+					break
+				end
+				if common.com_token == "}" then
+					break
+				end
+				if common.com_token == "{" then
+					local layer: q3shaderinfo_layer_t
+					if shader.numlayers < Q3SHADER_MAXLAYERS then
+						layer = newlayer()
+						shader.numlayers += 1
+						shader.layers[shader.numlayers] = layer
+					else
+						-- parse and process it anyway, just don't store it (so a map $lightmap or such stuff still is found)
+						layer = newlayer()
+					end
+					layer.rgbgen.rgbgen = Q3RGBGEN_IDENTITY
+					layer.alphagen.alphagen = Q3ALPHAGEN_IDENTITY
+					layer.tcgen.tcgen = Q3TCGEN_TEXTURE
+					layer.blendfunc[1] = GL_ONE
+					layer.blendfunc[2] = GL_ZERO
+					while true do
+						ok, pos = QC(text, pos, false)
+						if not ok then
+							break
+						end
+						if common.com_token == "}" then
+							break
+						end
+						if common.com_token == "\n" then
+							continue
+						end
+						readparameters()
+						if developer_insane then
+							Con_DPrintf("%s %i: ", shader.name, shader.numlayers - 1)
+							for j = 0, numparameters - 1 do
+								Con_DPrintf(" %s", P(j))
+							end
+							Con_DPrint("\n")
+						end
+						local p0 = PL(0)
+						if numparameters >= 2 and p0 == "blendfunc" then
+							if numparameters == 2 then
+								local p1 = PL(1)
+								if p1 == "add" then
+									layer.blendfunc[1] = GL_ONE
+									layer.blendfunc[2] = GL_ONE
+								elseif p1 == "addalpha" then
+									layer.blendfunc[1] = GL_SRC_ALPHA
+									layer.blendfunc[2] = GL_ONE
+								elseif p1 == "filter" then
+									layer.blendfunc[1] = GL_DST_COLOR
+									layer.blendfunc[2] = GL_ZERO
+								elseif p1 == "blend" then
+									layer.blendfunc[1] = GL_SRC_ALPHA
+									layer.blendfunc[2] = GL_ONE_MINUS_SRC_ALPHA
+								end
+							elseif numparameters == 3 then
+								for k = 0, 1 do
+									-- GL_ONE: default in case of parsing error
+									layer.blendfunc[k + 1] = BLENDFACTORS[PL(k + 1)] or GL_ONE
+								end
+							end
+						end
+						if numparameters >= 2 and p0 == "alphafunc" then
+							layer.alphatest = true
+						end
+						if numparameters >= 2 and (p0 == "map" or p0 == "clampmap") then
+							if p0 == "clampmap" then
+								layer.clampmap = true
+							end
+							layer.numframes = 1
+							layer.framerate = 1
+							layer.texturename = { P(1) }
+							if PL(1) == "$lightmap" then
+								shader.lighting = true
+							end
+						elseif numparameters >= 3 and (p0 == "animmap" or p0 == "animclampmap") then
+							layer.numframes = math.min(numparameters - 2, TEXTURE_MAXFRAMES)
+							layer.framerate = R(atof(1))
+							local names = table.create(layer.numframes)
+							for i = 0, layer.numframes - 1 do
+								names[i + 1] = P(i + 2)
+							end
+							layer.texturename = names
+						elseif numparameters >= 2 and p0 == "rgbgen" then
+							local i = 0
+							while i < numparameters - 2 and i < Q3RGBGEN_MAXPARMS do
+								layer.rgbgen.parms[i + 1] = R(atof(i + 2))
+								i += 1
+							end
+							local p1 = PL(1)
+							local gen = RGBGENS[p1]
+							if gen then
+								layer.rgbgen.rgbgen = gen
+							elseif p1 == "wave" then
+								layer.rgbgen.rgbgen = Q3RGBGEN_WAVE
+								layer.rgbgen.wavefunc = Mod_LoadQ3Shaders_EnumerateWaveFunc(P(2))
+								i = 0
+								while i < numparameters - 3 and i < Q3WAVEPARMS do
+									layer.rgbgen.waveparms[i + 1] = R(atof(i + 3))
+									i += 1
+								end
+							else
+								Con_DPrintf("%s parsing warning: unknown rgbgen %s\n", filename, P(1))
+							end
+						elseif numparameters >= 2 and p0 == "alphagen" then
+							local i = 0
+							while i < numparameters - 2 and i < Q3ALPHAGEN_MAXPARMS do
+								layer.alphagen.parms[i + 1] = R(atof(i + 2))
+								i += 1
+							end
+							local p1 = PL(1)
+							local gen = ALPHAGENS[p1]
+							if gen then
+								layer.alphagen.alphagen = gen
+							elseif p1 == "wave" then
+								layer.alphagen.alphagen = Q3ALPHAGEN_WAVE
+								layer.alphagen.wavefunc = Mod_LoadQ3Shaders_EnumerateWaveFunc(P(2))
+								i = 0
+								while i < numparameters - 3 and i < Q3WAVEPARMS do
+									layer.alphagen.waveparms[i + 1] = R(atof(i + 3))
+									i += 1
+								end
+							else
+								Con_DPrintf("%s parsing warning: unknown alphagen %s\n", filename, P(1))
+							end
+						elseif numparameters >= 2 and (p0 == "texgen" or p0 == "tcgen") then
+							-- observed values: tcgen environment
+							-- no other values have been observed in real shaders
+							local i = 0
+							while i < numparameters - 2 and i < Q3TCGEN_MAXPARMS do
+								layer.tcgen.parms[i + 1] = R(atof(i + 2))
+								i += 1
+							end
+							local gen = TCGENS[PL(1)]
+							if gen then
+								layer.tcgen.tcgen = gen
+							else
+								Con_DPrintf("%s parsing warning: unknown tcgen mode %s\n", filename, P(1))
+							end
+						elseif numparameters >= 2 and p0 == "tcmod" then
+							-- observed values:
+							-- tcmod rotate #
+							-- tcmod scale # #
+							-- tcmod scroll # #
+							-- tcmod stretch sin # # # #
+							-- tcmod stretch triangle # # # #
+							-- tcmod transform # # # # # #
+							-- tcmod turb # # # #
+							-- tcmod turb sin # # # #  (this is bogus)
+							-- no other values have been observed in real shaders
+							local tcmodindex = 0
+							while tcmodindex < Q3MAXTCMODS do
+								local m = layer.tcmods[tcmodindex + 1]
+								if not m or m.tcmod == 0 then
+									break
+								end
+								tcmodindex += 1
+							end
+							if tcmodindex < Q3MAXTCMODS then
+								local m = layer.tcmods[tcmodindex + 1]
+								if not m then
+									-- (a zeroed entry; the entries before it exist, they were found non-zero)
+									m = {
+										tcmod = 0,
+										parms = { 0, 0, 0, 0, 0, 0 },
+										wavefunc = 0,
+										waveparms = { 0, 0, 0, 0 },
+									}
+									layer.tcmods[tcmodindex + 1] = m
+								end
+								local i = 0
+								while i < numparameters - 2 and i < Q3TCMOD_MAXPARMS do
+									m.parms[i + 1] = R(atof(i + 2))
+									i += 1
+								end
+								local p1 = PL(1)
+								local mode = TCMODS[p1]
+								if mode then
+									m.tcmod = mode
+								elseif p1 == "stretch" then
+									m.tcmod = Q3TCMOD_STRETCH
+									m.wavefunc = Mod_LoadQ3Shaders_EnumerateWaveFunc(P(2))
+									i = 0
+									while i < numparameters - 3 and i < Q3WAVEPARMS do
+										m.waveparms[i + 1] = R(atof(i + 3))
+										i += 1
+									end
+								else
+									Con_DPrintf("%s parsing warning: unknown tcmod mode %s\n", filename, P(1))
+								end
+							else
+								Con_DPrintf("%s parsing warning: too many tcmods on one layer\n", filename)
+							end
+						end
+						-- break out a level if it was a closing brace (not using the character here to not confuse vim)
+						if common.com_token == "}" then
+							break
+						end
+					end
+					if layer.rgbgen.rgbgen == Q3RGBGEN_LIGHTINGDIFFUSE or layer.rgbgen.rgbgen == Q3RGBGEN_VERTEX then
+						shader.lighting = true
+					end
+					if layer.alphagen.alphagen == Q3ALPHAGEN_VERTEX then
+						if layer == shader.layers[1] then
+							-- vertex controlled transparency
+							shader.vertexalpha = true
+						else
+							-- multilayer terrain shader or similar
+							shader.textureblendalpha = true
+							if force_terrain_alphaflag then
+								shader.layers[1].dptexflags = bit32.bor(shader.layers[1].dptexflags, TEXF_ALPHA)
+							end
+						end
+					end
+
+					if force_addalpha then
+						-- for a long while, DP treated GL_ONE GL_ONE as GL_SRC_ALPHA GL_ONE
+						-- this cvar brings back this behaviour
+						if layer.blendfunc[1] == GL_ONE and layer.blendfunc[2] == GL_ONE then
+							layer.blendfunc[1] = GL_SRC_ALPHA
+						end
+					end
+
+					layer.dptexflags = 0
+					if layer.alphatest then
+						layer.dptexflags = bit32.bor(layer.dptexflags, TEXF_ALPHA)
+					end
+					if layer.blendfunc[1] == GL_SRC_ALPHA or layer.blendfunc[1] == GL_ONE_MINUS_SRC_ALPHA then
+						layer.dptexflags = bit32.bor(layer.dptexflags, TEXF_ALPHA)
+					end
+					if layer.blendfunc[2] == GL_SRC_ALPHA or layer.blendfunc[2] == GL_ONE_MINUS_SRC_ALPHA then
+						layer.dptexflags = bit32.bor(layer.dptexflags, TEXF_ALPHA)
+					end
+					if bit32.band(shader.surfaceparms, Q3SURFACEPARM_NOMIPMAPS) == 0 then
+						layer.dptexflags = bit32.bor(layer.dptexflags, TEXF_MIPMAP)
+					end
+					if bit32.band(shader.textureflags, Q3TEXTUREFLAG_NOPICMIP) == 0 then
+						layer.dptexflags = bit32.bor(layer.dptexflags, TEXF_PICMIP + TEXF_COMPRESS)
+					end
+					if layer.clampmap then
+						layer.dptexflags = bit32.bor(layer.dptexflags, TEXF_CLAMP)
+					end
+					continue
+				end
+				readparameters()
+				if fileindex == 0 and common.com_token == "}" then
+					break
+				end
+				if developer_insane then
+					Con_DPrintf("%s: ", shader.name)
+					for j = 0, numparameters - 1 do
+						Con_DPrintf(" %s", P(j))
+					end
+					Con_DPrint("\n")
+				end
+				if numparameters < 1 then
+					continue
+				end
+				local p0 = PL(0)
+				-- (the two dpshaderkill conditions assign the local even when their branch is not taken, as in C)
+				local iskillzero = p0 == "dpshaderkillifcvarzero"
+				local iskill = p0 == "dpshaderkillifcvar"
+				if p0 == "surfaceparm" and numparameters >= 2 then
+					local p1 = PL(1)
+					local parm = SURFACEPARMS[p1]
+					if parm then
+						shader.surfaceparms = bit32.bor(shader.surfaceparms, parm)
+					elseif p1 ~= "skip" then
+						-- ("skip": shader.surfaceparms |= Q3SURFACEPARM_SKIP; FIXME we don't have enough #defines for
+						-- this any more, and the engine doesn't need this one anyway)
+						-- try custom surfaceparms
+						local found = false
+						for j = 1, numcustsurfaceflags do
+							if lower(custsurfaceparmnames[j]) == p1 then
+								shader.surfaceflags = bit32.bor(shader.surfaceflags, custsurfaceflags[j] % 4294967296)
+								found = true
+								break
+							end
+						end
+						-- failed all
+						if not found then
+							Con_DPrintf('%s parsing warning: unknown surfaceparm "%s"\n', filename, P(1))
+						end
+					end
+				elseif p0 == "dpshadow" then
+					shader.dpshadow = true
+				elseif p0 == "dpnoshadow" then
+					shader.dpnoshadow = true
+				elseif p0 == "dpnortlight" then
+					shader.dpnortlight = true
+				elseif p0 == "dpreflectcube" then
+					shader.dpreflectcube = P(1)
+				elseif p0 == "dpmeshcollisions" then
+					shader.dpmeshcollisions = true
+				-- this sets dpshaderkill to true if dpshaderkillifcvarzero was used, and to false if dpnoshaderkillifcvarzero was used
+				elseif (iskillzero or p0 == "dpnoshaderkillifcvarzero") and numparameters >= 2 then
+					dpshaderkill = iskillzero
+					if cvar.Cvar_VariableValue(P(1)) == 0 then
+						shader.dpshaderkill = dpshaderkill
+					end
+				-- this sets dpshaderkill to true if dpshaderkillifcvar was used, and to false if dpnoshaderkillifcvar was used
+				elseif (iskill or p0 == "dpnoshaderkillifcvar") and numparameters >= 2 then
+					dpshaderkill = iskill
+					local op: string? = nil
+					if numparameters >= 3 then
+						op = P(2)
+					end
+					local value = cvar.Cvar_VariableValue(P(1))
+					if not op then
+						if value ~= 0 then
+							shader.dpshaderkill = dpshaderkill
+						end
+					elseif numparameters >= 4 and op == "==" then
+						if value == atof(3) then
+							shader.dpshaderkill = dpshaderkill
+						end
+					elseif numparameters >= 4 and op == "!=" then
+						if value ~= atof(3) then
+							shader.dpshaderkill = dpshaderkill
+						end
+					elseif numparameters >= 4 and op == ">" then
+						if value > atof(3) then
+							shader.dpshaderkill = dpshaderkill
+						end
+					elseif numparameters >= 4 and op == "<" then
+						if value < atof(3) then
+							shader.dpshaderkill = dpshaderkill
+						end
+					elseif numparameters >= 4 and op == ">=" then
+						if value >= atof(3) then
+							shader.dpshaderkill = dpshaderkill
+						end
+					elseif numparameters >= 4 and op == "<=" then
+						if value <= atof(3) then
+							shader.dpshaderkill = dpshaderkill
+						end
+					else
+						Con_DPrintf(
+							'%s parsing warning: unknown dpshaderkillifcvar op "%s", or not enough arguments\n',
+							filename,
+							op
+						)
+					end
+				elseif p0 == "sky" and numparameters >= 2 then
+					-- some q3 skies don't have the sky parm set
+					shader.surfaceparms = bit32.bor(shader.surfaceparms, Q3SURFACEPARM_SKY)
+					shader.skyboxname = P(1)
+				elseif p0 == "skyparms" and numparameters >= 2 then
+					-- some q3 skies don't have the sky parm set
+					shader.surfaceparms = bit32.bor(shader.surfaceparms, Q3SURFACEPARM_SKY)
+					if libc.atoi(P(1)) == 0 and PL(1) ~= "-" then
+						shader.skyboxname = P(1)
+					end
+				elseif p0 == "cull" and numparameters >= 2 then
+					local p1 = PL(1)
+					if p1 == "disable" or p1 == "none" or p1 == "twosided" then
+						shader.textureflags = bit32.bor(shader.textureflags, Q3TEXTUREFLAG_TWOSIDED)
+					end
+				elseif p0 == "nomipmaps" then
+					shader.surfaceparms = bit32.bor(shader.surfaceparms, Q3SURFACEPARM_NOMIPMAPS)
+				elseif p0 == "nopicmip" then
+					shader.textureflags = bit32.bor(shader.textureflags, Q3TEXTUREFLAG_NOPICMIP)
+				elseif p0 == "polygonoffset" then
+					shader.textureflags = bit32.bor(shader.textureflags, Q3TEXTUREFLAG_POLYGONOFFSET)
+				elseif p0 == "dppolygonoffset" then
+					shader.textureflags = bit32.bor(shader.textureflags, Q3TEXTUREFLAG_POLYGONOFFSET)
+					if numparameters >= 2 then
+						shader.biaspolygonfactor = R(atof(1))
+						if numparameters >= 3 then
+							shader.biaspolygonoffset = R(atof(2))
+						else
+							shader.biaspolygonoffset = 0
+						end
+					end
+				elseif p0 == "dptransparentsort" and numparameters >= 2 then
+					shader.textureflags = bit32.bor(shader.textureflags, Q3TEXTUREFLAG_TRANSPARENTSORT)
+					local p1 = PL(1)
+					if p1 == "sky" then
+						shader.transparentsort = TRANSPARENTSORT_SKY
+					elseif p1 == "distance" then
+						shader.transparentsort = TRANSPARENTSORT_DISTANCE
+					elseif p1 == "hud" then
+						shader.transparentsort = TRANSPARENTSORT_HUD
+					else
+						Con_DPrintf(
+							'%s parsing warning: unknown dptransparentsort category "%s", or not enough arguments\n',
+							filename,
+							P(1)
+						)
+					end
+				elseif p0 == "dprefract" and numparameters >= 5 then
+					shader.textureflags = bit32.bor(shader.textureflags, Q3TEXTUREFLAG_REFRACTION)
+					shader.refractfactor = R(atof(1))
+					shader.refractcolor4f = { R(atof(2)), R(atof(3)), R(atof(4)), 1 }
+				elseif p0 == "dpreflect" and numparameters >= 6 then
+					shader.textureflags = bit32.bor(shader.textureflags, Q3TEXTUREFLAG_REFLECTION)
+					shader.reflectfactor = R(atof(1))
+					shader.reflectcolor4f = { R(atof(2)), R(atof(3)), R(atof(4)), R(atof(5)) }
+				elseif p0 == "dpcamera" then
+					shader.textureflags = bit32.bor(shader.textureflags, Q3TEXTUREFLAG_CAMERA)
+				elseif p0 == "dpwater" and numparameters >= 12 then
+					shader.textureflags = bit32.bor(shader.textureflags, Q3TEXTUREFLAG_WATERSHADER)
+					shader.reflectmin = R(atof(1))
+					shader.reflectmax = R(atof(2))
+					shader.refractfactor = R(atof(3))
+					shader.reflectfactor = R(atof(4))
+					shader.refractcolor4f = { R(atof(5)), R(atof(6)), R(atof(7)), 1 }
+					shader.reflectcolor4f = { R(atof(8)), R(atof(9)), R(atof(10)), 1 }
+					shader.r_water_wateralpha = R(atof(11))
+				elseif p0 == "dpwaterscroll" and numparameters >= 3 then
+					shader.r_water_waterscroll[1] = R(1 / atof(1))
+					shader.r_water_waterscroll[2] = R(1 / atof(2))
+				elseif p0 == "dpglossintensitymod" and numparameters >= 2 then
+					shader.specularscalemod = R(atof(1))
+				elseif p0 == "dpglossexponentmod" and numparameters >= 2 then
+					shader.specularpowermod = R(atof(1))
+				elseif p0 == "dprtlightambient" and numparameters >= 2 then
+					shader.rtlightambient = R(atof(1))
+				elseif p0 == "dpoffsetmapping" and numparameters >= 2 then
+					local p1 = PL(1)
+					if p1 == "disable" or p1 == "none" or p1 == "off" then
+						shader.offsetmapping = OFFSETMAPPING_OFF
+					elseif p1 == "default" or p1 == "normal" then
+						shader.offsetmapping = OFFSETMAPPING_DEFAULT
+					elseif p1 == "linear" then
+						shader.offsetmapping = OFFSETMAPPING_LINEAR
+					elseif p1 == "relief" then
+						shader.offsetmapping = OFFSETMAPPING_RELIEF
+					end
+					if numparameters >= 3 then
+						shader.offsetscale = R(atof(2))
+					end
+					if numparameters >= 5 then
+						local p3 = PL(3)
+						if p3 == "bias" then
+							shader.offsetbias = R(atof(4))
+						elseif p3 == "match" then
+							shader.offsetbias = R(1.0 - atof(4))
+						elseif p3 == "match8" then
+							shader.offsetbias = R(1.0 - atof(4) / 255.0)
+						elseif p3 == "match16" then
+							shader.offsetbias = R(1.0 - atof(4) / 65535.0)
+						end
+					end
+				elseif p0 == "deformvertexes" and numparameters >= 2 then
+					local deformindex = 0
+					while deformindex < Q3MAXDEFORMS do
+						local d = shader.deforms[deformindex + 1]
+						if not d or d.deform == 0 then
+							break
+						end
+						deformindex += 1
+					end
+					if deformindex < Q3MAXDEFORMS then
+						local d = shader.deforms[deformindex + 1]
+						if not d then
+							d = { deform = 0, parms = { 0, 0, 0 }, wavefunc = 0, waveparms = { 0, 0, 0, 0 } }
+							shader.deforms[deformindex + 1] = d
+						end
+						local i = 0
+						while i < numparameters - 2 and i < Q3DEFORM_MAXPARMS do
+							d.parms[i + 1] = R(atof(i + 2))
+							i += 1
+						end
+						local p1 = PL(1)
+						local mode = DEFORMS[p1]
+						if mode then
+							d.deform = mode
+						elseif p1 == "wave" then
+							d.deform = 13 -- Q3DEFORM_WAVE
+							d.wavefunc = Mod_LoadQ3Shaders_EnumerateWaveFunc(P(3))
+							i = 0
+							while i < numparameters - 4 and i < Q3WAVEPARMS do
+								d.waveparms[i + 1] = R(atof(i + 4))
+								i += 1
+							end
+						elseif p1 == "move" then
+							d.deform = 15 -- Q3DEFORM_MOVE
+							d.wavefunc = Mod_LoadQ3Shaders_EnumerateWaveFunc(P(5))
+							i = 0
+							while i < numparameters - 6 and i < Q3WAVEPARMS do
+								d.waveparms[i + 1] = R(atof(i + 6))
+								i += 1
+							end
+						end
+					end
+				end
+			end
+			-- hide this shader if a cvar said it should be killed
+			if shader.dpshaderkill then
+				shader.numlayers = 0
+			end
+			-- fix up multiple reflection types
+			if bit32.band(shader.textureflags, Q3TEXTUREFLAG_WATERSHADER) ~= 0 then
+				shader.textureflags = bit32.band(
+					shader.textureflags,
+					bit32.bnot(Q3TEXTUREFLAG_REFRACTION + Q3TEXTUREFLAG_REFLECTION + Q3TEXTUREFLAG_CAMERA)
+				)
+			end
+
+			Q3Shader_AddToHash(shader)
+		end
+	end
+end
+
+-- port: model_shared.c Mod_LookupQ3Shader L2398-2413 @xonotic-v0.8.6
+function model_shared.Mod_LookupQ3Shader(name: string): q3shaderinfo_t?
+	if not q3shaders_loaded then
+		model_shared.Mod_LoadQ3Shaders()
+	end
+	local hash = common.CRC_Block_CaseInsensitive(name)
+	local entry: any = hashhead(hash % Q3SHADER_HASH_SIZE)
+	local lname = lower(name)
+	while entry ~= nil do
+		if lower(entry.shader.name) == lname then
+			return entry.shader
+		end
+		entry = entry.chain
+	end
+	return nil
+end
+
+-- Port support (tests, tools): every shader in the hash, in bucket then chain order.
+function model_shared.q3shaders(): { q3shaderinfo_t }
+	local out = {}
+	for i = 0, Q3SHADER_HASH_SIZE - 1 do
+		local entry = q3shader_data.hash[i]
+		while entry do
+			if entry.shader.name ~= "" then
+				table.insert(out, entry.shader)
+			end
+			entry = entry.chain
+		end
+	end
+	return out
+end
+
+-- ---------------------------------------------------------------------------------------------------------
+-- Textures from Q3 shaders (model_shared.c L2415-2838)
+
+-- model_brush.h MATERIALFLAG_* L73-131
+model_shared.MATERIALFLAG_MESHCOLLISIONS = 0x00000001
+model_shared.MATERIALFLAG_ALPHA = 0x00000002
+model_shared.MATERIALFLAG_ADD = 0x00000004
+model_shared.MATERIALFLAG_NODEPTHTEST = 0x00000008
+model_shared.MATERIALFLAG_WATERALPHA = 0x00000010
+model_shared.MATERIALFLAG_FULLBRIGHT = 0x00000020
+model_shared.MATERIALFLAG_WALL = 0x00000040
+model_shared.MATERIALFLAG_SKY = 0x00000080
+model_shared.MATERIALFLAG_WATERSCROLL = 0x00000100
+model_shared.MATERIALFLAG_NODRAW = 0x00000200
+model_shared.MATERIALFLAG_LIGHTBOTHSIDES = 0x00000400
+model_shared.MATERIALFLAG_ALPHATEST = 0x00000800
+model_shared.MATERIALFLAG_BLENDED = 0x00001000
+model_shared.MATERIALFLAG_CUSTOMBLEND = 0x00002000
+model_shared.MATERIALFLAG_NOSHADOW = 0x00004000
+model_shared.MATERIALFLAG_VERTEXTEXTUREBLEND = 0x00008000
+model_shared.MATERIALFLAG_NOCULLFACE = 0x00010000
+model_shared.MATERIALFLAG_SHORTDEPTHRANGE = 0x00020000
+model_shared.MATERIALFLAG_WATERSHADER = 0x00040000
+model_shared.MATERIALFLAG_REFRACTION = 0x00080000
+model_shared.MATERIALFLAG_REFLECTION = 0x00100000
+model_shared.MATERIALFLAG_MODELLIGHT = 0x00200000
+model_shared.MATERIALFLAG_CUSTOMSURFACE = 0x00800000
+model_shared.MATERIALFLAG_TRANSDEPTH = 0x01000000
+model_shared.MATERIALFLAG_CAMERA = 0x02000000
+model_shared.MATERIALFLAG_NORTLIGHT = 0x04000000
+model_shared.MATERIALFLAG_ALPHAGEN_VERTEX = 0x08000000
+model_shared.MATERIALFLAG_OCCLUDE = 0x10000000
+local MATERIALFLAG_MESHCOLLISIONS = 0x00000001
+local MATERIALFLAG_ALPHA = 0x00000002
+local MATERIALFLAG_ADD = 0x00000004
+local MATERIALFLAG_FULLBRIGHT = 0x00000020
+local MATERIALFLAG_WALL = 0x00000040
+local MATERIALFLAG_SKY = 0x00000080
+local MATERIALFLAG_NODRAW = 0x00000200
+local MATERIALFLAG_ALPHATEST = 0x00000800
+local MATERIALFLAG_BLENDED = 0x00001000
+local MATERIALFLAG_CUSTOMBLEND = 0x00002000
+local MATERIALFLAG_NOSHADOW = 0x00004000
+local MATERIALFLAG_NOCULLFACE = 0x00010000
+local MATERIALFLAG_WATERSHADER = 0x00040000
+local MATERIALFLAG_REFRACTION = 0x00080000
+local MATERIALFLAG_REFLECTION = 0x00100000
+local MATERIALFLAG_CAMERA = 0x02000000
+local MATERIALFLAG_NORTLIGHT = 0x04000000
+local MATERIALFLAG_ALPHAGEN_VERTEX = 0x08000000
+
+-- bspfile.h Q3SURFACEFLAG_* L298-318 and SUPERCONTENTS_* L232-247 (the ones used here)
+local Q3SURFACEFLAG_NODAMAGE = 1
+local Q3SURFACEFLAG_SLICK = 2
+local Q3SURFACEFLAG_SKY = 4
+local Q3SURFACEFLAG_NOIMPACT = 16
+local Q3SURFACEFLAG_NOMARKS = 32
+local Q3SURFACEFLAG_NODRAW = 128
+local Q3SURFACEFLAG_HINT = 256
+local Q3SURFACEFLAG_NOLIGHTMAP = 1024
+local Q3SURFACEFLAG_POINTLIGHT = 2048
+local Q3SURFACEFLAG_METALSTEPS = 4096
+local Q3SURFACEFLAG_NONSOLID = 16384
+local Q3SURFACEFLAG_LIGHTFILTER = 32768
+local Q3SURFACEFLAG_ALPHASHADOW = 65536
+local Q3SURFACEFLAG_NODLIGHT = 131072
+local Q3SURFACEFLAG_DUST = 262144
+local SUPERCONTENTS_SOLID = 0x00000001
+local SUPERCONTENTS_WATER = 0x00000002
+local SUPERCONTENTS_SLIME = 0x00000004
+local SUPERCONTENTS_LAVA = 0x00000008
+local SUPERCONTENTS_SKY = 0x00000010
+local SUPERCONTENTS_NODROP = 0x00000080
+local SUPERCONTENTS_PLAYERCLIP = 0x00000100
+local SUPERCONTENTS_MONSTERCLIP = 0x00000200
+local SUPERCONTENTS_DONOTENTER = 0x00000400
+local SUPERCONTENTS_BOTCLIP = 0x00000800
+local SUPERCONTENTS_OPAQUE = 0x00001000
+local TEXF_ISWORLD = 0x00004000
+local TEXF_ISSPRITE = 0x00008000
+
+-- Renderer functions this file calls (gl_rmain.c; the renderer is not ported yet). On a dedicated server
+-- R_SkinFrame_LoadMissing returns NULL and R_SkinFrame_LoadExternal is not called; a client backend replaces
+-- these.
+local renderer_notported: { [string]: boolean } = {}
+local function renderer_missing(what: string)
+	if not renderer_notported[what] then
+		renderer_notported[what] = true
+		print("NOT YET PORTED: " .. what .. " (gl_rmain.c)")
+	end
+end
+model_shared.R_SkinFrame_LoadMissing = function(): any
+	if cvar.cls_state_dedicated then
+		return nil
+	end
+	renderer_missing("R_SkinFrame_LoadMissing")
+	return nil
+end
+model_shared.R_SkinFrame_LoadExternal = function(_name: string, _textureflags: number, _complain: boolean): any
+	renderer_missing("R_SkinFrame_LoadExternal")
+	return nil
+end
+model_shared.R_GetCubemap = function(_basename: string): any
+	renderer_missing("R_GetCubemap")
+	return nil
+end
+-- model_brush.c Mod_Q2BSP_SuperContentsFromNativeContents, set by model_brush when the Q2 loader is ported
+model_shared.Mod_Q2BSP_SuperContentsFromNativeContents = nil :: ((number) -> number)?
+
+-- a copy of a wave / gen struct ({ kind, parms, wavefunc?, waveparms? }), as a C struct assignment copies it
+local function copygen(g: any): any
+	local c = table.clone(g)
+	c.parms = table.clone(g.parms)
+	if g.waveparms then
+		c.waveparms = table.clone(g.waveparms)
+	end
+	return c
+end
+
+-- texture_shaderpass_t (model_shared.h L511-544) as a table: skinframes[1 .. numframes] (nil = NULL), tcmods as in
+-- q3shaderinfo_layer_t (only the used entries)
+-- port: model_shared.c Mod_CreateShaderPass L2415-2428 @xonotic-v0.8.6
+function model_shared.Mod_CreateShaderPass(skinframe: any): any
+	return {
+		alphatest = false,
+		framerate = 0.0,
+		numframes = 1,
+		skinframes = { skinframe },
+		blendfunc = { GL_ONE, GL_ZERO },
+		rgbgen = { rgbgen = Q3RGBGEN_IDENTITY, parms = { 0, 0, 0 }, wavefunc = 0, waveparms = { 0, 0, 0, 0 } },
+		alphagen = { alphagen = Q3ALPHAGEN_IDENTITY, parms = { 0 }, wavefunc = 0, waveparms = { 0, 0, 0, 0 } },
+		tcgen = { tcgen = Q3TCGEN_TEXTURE, parms = { 0, 0, 0, 0, 0, 0 } },
+		tcmods = {},
+	}
+end
+
+-- port: model_shared.c Mod_CreateShaderPassFromQ3ShaderLayer L2430-2457 @xonotic-v0.8.6
+function model_shared.Mod_CreateShaderPassFromQ3ShaderLayer(
+	layer: q3shaderinfo_layer_t,
+	layerindex: number,
+	texflags: number,
+	texturename: string
+): any
+	local shaderpass = {
+		alphatest = layer.alphatest,
+		framerate = layer.framerate,
+		numframes = layer.numframes,
+		skinframes = {} :: { any },
+		blendfunc = { layer.blendfunc[1], layer.blendfunc[2] },
+		rgbgen = copygen(layer.rgbgen),
+		alphagen = copygen(layer.alphagen),
+		tcgen = copygen(layer.tcgen),
+		tcmods = {} :: { any },
+	}
+	for j = 1, Q3MAXTCMODS do
+		local m = layer.tcmods[j]
+		if not m or m.tcmod == 0 then
+			break
+		end
+		shaderpass.tcmods[j] = copygen(m)
+	end
+	for j = 0, layer.numframes - 1 do
+		if cvar.cls_state_dedicated then
+			shaderpass.skinframes[j + 1] = nil
+		else
+			local frame = model_shared.R_SkinFrame_LoadExternal(layer.texturename[j + 1], texflags, false)
+			if not frame then
+				Con_Printf(
+					'^1%s:^7 could not load texture ^3"%s"^7 (frame %i) for layer %i of shader ^2"%s"\n',
+					model_shared.loadmodel.name,
+					layer.texturename[j + 1],
+					j,
+					layerindex,
+					texturename
+				)
+				frame = model_shared.R_SkinFrame_LoadMissing()
+			end
+			shaderpass.skinframes[j + 1] = frame
+		end
+	end
+	return shaderpass
+end
+
+-- port: model_shared.c Mod_LoadTextureFromQ3Shader L2459-2838 @xonotic-v0.8.6
+-- texture: a texture_t table; fields the C code reads before writing them are taken as 0 / NULL when missing
+-- (C: the caller's zeroed struct). shaderpasses[1 ..] hold C shaderpasses[0 ..]; the start/end pass indexes keep
+-- their C (0-based) values.
+function model_shared.Mod_LoadTextureFromQ3Shader(
+	texture: any,
+	name: string?,
+	warnmissing: boolean,
+	fallback: boolean,
+	defaulttexflags: number
+): boolean
+	local loadmodel = model_shared.loadmodel
+	local success = true
+	local shadername = name or ""
+	texture.name = string.sub(shadername, 1, 63)
+	texture.basealpha = 1.0
+	texture.basematerialflags = texture.basematerialflags or 0
+	texture.surfaceflags = texture.surfaceflags or 0
+	texture.supercontents = texture.supercontents or 0
+	texture.biaspolygonoffset = texture.biaspolygonoffset or 0
+	texture.biaspolygonfactor = texture.biaspolygonfactor or 0
+	texture.shaderpasses = texture.shaderpasses or {}
+	texture.startpreshaderpass = texture.startpreshaderpass or 0
+	texture.endpreshaderpass = texture.endpreshaderpass or 0
+	texture.startpostshaderpass = texture.startpostshaderpass or 0
+	texture.endpostshaderpass = texture.endpostshaderpass or 0
+	local shader: q3shaderinfo_t? = if shadername ~= "" then model_shared.Mod_LookupQ3Shader(shadername) else nil
+
+	-- allow disabling of picmip or compression by defaulttexflags
+	local texflagsmask = 0xFFFFFFFF
+	if bit32.band(defaulttexflags, TEXF_PICMIP) == 0 then
+		texflagsmask = bit32.band(texflagsmask, bit32.bnot(TEXF_PICMIP))
+	end
+	if bit32.band(defaulttexflags, TEXF_COMPRESS) == 0 then
+		texflagsmask = bit32.band(texflagsmask, bit32.bnot(TEXF_COMPRESS))
+	end
+	local texflagsor = 0
+	if bit32.band(defaulttexflags, TEXF_ISWORLD) ~= 0 then
+		texflagsor = bit32.bor(texflagsor, TEXF_ISWORLD)
+	end
+	if bit32.band(defaulttexflags, TEXF_ISSPRITE) ~= 0 then
+		texflagsor = bit32.bor(texflagsor, TEXF_ISSPRITE)
+	end
+	-- unless later loaded from the shader
+	texture.offsetmapping = if cvarvalue("mod_noshader_default_offsetmapping", 1) ~= 0
+		then OFFSETMAPPING_DEFAULT
+		else OFFSETMAPPING_OFF
+	texture.offsetscale = 1
+	texture.offsetbias = 0
+	texture.specularscalemod = 1
+	texture.specularpowermod = 1
+	texture.rtlightambient = 0
+	texture.transparentsort = TRANSPARENTSORT_DISTANCE
+	-- WHEN ADDING DEFAULTS HERE, REMEMBER TO PUT DEFAULTS IN ALL LOADERS
+	-- JUST GREP FOR "specularscalemod = 1".
+
+	local developer_extra = cvarvalue("developer_extra", 0) ~= 0
+	if shader then
+		if cvarvalue("developer_loading", 0) ~= 0 then
+			Con_Printf("%s: loaded shader for %s\n", loadmodel.name, shadername)
+		end
+
+		if bit32.band(shader.surfaceparms, Q3SURFACEPARM_SKY) ~= 0 then
+			texture.basematerialflags = MATERIALFLAG_SKY
+			if shader.skyboxname ~= "" then
+				-- quake3 seems to append a _ to the skybox name, so this must do so as well
+				loadmodel.brush.skybox = string.sub(shader.skyboxname .. "_", 1, 127)
+			end
+		elseif bit32.band(texture.surfaceflags, Q3SURFACEFLAG_NODRAW) ~= 0 or shader.numlayers == 0 then
+			texture.basematerialflags = MATERIALFLAG_NODRAW + MATERIALFLAG_NOSHADOW
+		else
+			texture.basematerialflags = MATERIALFLAG_WALL
+		end
+
+		-- (C reads layers[0] whatever numlayers is: a killed shader keeps its parsed layers)
+		local layer0 = shader.layers[1]
+		if layer0 and layer0.alphatest then
+			texture.basematerialflags =
+				bit32.bor(texture.basematerialflags, MATERIALFLAG_ALPHATEST + MATERIALFLAG_NOSHADOW)
+		end
+		if bit32.band(shader.textureflags, Q3TEXTUREFLAG_TWOSIDED) ~= 0 then
+			texture.basematerialflags =
+				bit32.bor(texture.basematerialflags, MATERIALFLAG_NOSHADOW + MATERIALFLAG_NOCULLFACE)
+		end
+		if bit32.band(shader.textureflags, Q3TEXTUREFLAG_POLYGONOFFSET) ~= 0 then
+			texture.biaspolygonoffset = R(texture.biaspolygonoffset + shader.biaspolygonoffset)
+			texture.biaspolygonfactor = R(texture.biaspolygonfactor + shader.biaspolygonfactor)
+		end
+		if bit32.band(shader.textureflags, Q3TEXTUREFLAG_REFRACTION) ~= 0 then
+			texture.basematerialflags = bit32.bor(texture.basematerialflags, MATERIALFLAG_REFRACTION)
+		end
+		if bit32.band(shader.textureflags, Q3TEXTUREFLAG_REFLECTION) ~= 0 then
+			texture.basematerialflags = bit32.bor(texture.basematerialflags, MATERIALFLAG_REFLECTION)
+		end
+		if bit32.band(shader.textureflags, Q3TEXTUREFLAG_WATERSHADER) ~= 0 then
+			texture.basematerialflags = bit32.bor(texture.basematerialflags, MATERIALFLAG_WATERSHADER)
+		end
+		if bit32.band(shader.textureflags, Q3TEXTUREFLAG_CAMERA) ~= 0 then
+			texture.basematerialflags = bit32.bor(texture.basematerialflags, MATERIALFLAG_CAMERA)
+		end
+		texture.customblendfunc = { GL_ONE, GL_ZERO }
+		texture.transparentsort = shader.transparentsort
+		if shader.numlayers > 0 then
+			local b0, b1 = shader.layers[1].blendfunc[1], shader.layers[1].blendfunc[2]
+			texture.customblendfunc[1] = b0
+			texture.customblendfunc[2] = b1
+			-- (the table of Q3 shader blendfuncs used in the game is in the C source, L2535-2554)
+			-- if not opaque, figure out what blendfunc to use
+			if b0 ~= GL_ONE or b1 ~= GL_ZERO then
+				-- (GL_ONE GL_ONE and GL_SRC_ALPHA GL_ONE: two branches with the same body in C)
+				if (b0 == GL_ONE and b1 == GL_ONE) or (b0 == GL_SRC_ALPHA and b1 == GL_ONE) then
+					texture.basematerialflags = bit32.bor(
+						texture.basematerialflags,
+						MATERIALFLAG_ADD + MATERIALFLAG_BLENDED + MATERIALFLAG_NOSHADOW
+					)
+				elseif b0 == GL_SRC_ALPHA and b1 == GL_ONE_MINUS_SRC_ALPHA then
+					texture.basematerialflags = bit32.bor(
+						texture.basematerialflags,
+						MATERIALFLAG_ALPHA + MATERIALFLAG_BLENDED + MATERIALFLAG_NOSHADOW
+					)
+				else
+					texture.basematerialflags = bit32.bor(
+						texture.basematerialflags,
+						MATERIALFLAG_CUSTOMBLEND
+							+ MATERIALFLAG_FULLBRIGHT
+							+ MATERIALFLAG_BLENDED
+							+ MATERIALFLAG_NOSHADOW
+					)
+				end
+			end
+		end
+		if not shader.lighting then
+			texture.basematerialflags = bit32.bor(texture.basematerialflags, MATERIALFLAG_FULLBRIGHT)
+		end
+
+		-- here be dragons: convert quake3 shaders to material
+		if shader.numlayers > 0 then
+			local layers = shader.layers -- C layers[i] is layers[i + 1]
+			local terrainbackgroundlayer = -1
+			local lightmaplayer = -1
+			local alphagenspecularlayer = -1
+			local rgbgenvertexlayer = -1
+			local rgbgendiffuselayer = -1
+			local materiallayer = -1
+			local endofprelayers = 0
+			local firstpostlayer = 0
+			local shaderpassindex = 0
+			for i = 0, shader.numlayers - 1 do
+				local l = layers[i + 1]
+				if l.texturename ~= nil and lower(l.texturename[1]) == "$lightmap" then
+					lightmaplayer = i
+				end
+				if l.rgbgen.rgbgen == Q3RGBGEN_VERTEX then
+					rgbgenvertexlayer = i
+				end
+				if l.rgbgen.rgbgen == Q3RGBGEN_LIGHTINGDIFFUSE then
+					rgbgendiffuselayer = i
+				end
+				if l.alphagen.alphagen == 3 then -- Q3ALPHAGEN_LIGHTINGSPECULAR
+					alphagenspecularlayer = i
+				end
+			end
+			local l0, l1 = layers[1], layers[2]
+			if
+				shader.numlayers >= 2
+				and l1.alphagen.alphagen == Q3ALPHAGEN_VERTEX
+				and (l0.blendfunc[1] == GL_ONE and l0.blendfunc[2] == GL_ZERO and not l0.alphatest)
+				and (
+					(l1.blendfunc[1] == GL_SRC_ALPHA and l1.blendfunc[2] == GL_ONE_MINUS_SRC_ALPHA)
+					or (l1.blendfunc[1] == GL_ONE and l1.blendfunc[2] == GL_ZERO and l1.alphatest)
+				)
+			then
+				-- terrain blend or certain other effects involving alphatest over a regular layer
+				terrainbackgroundlayer = 0
+				materiallayer = 1
+				-- terrain may be vertex lit (in which case both layers are rgbGen vertex) or lightmapped (in which ase the third layer is lightmap)
+				firstpostlayer = if lightmaplayer >= 0 then lightmaplayer + 1 else materiallayer + 1
+			elseif lightmaplayer == 0 then
+				-- ordinary texture but with $lightmap before diffuse
+				materiallayer = 1
+				firstpostlayer = lightmaplayer + 2
+			elseif lightmaplayer >= 1 then
+				-- ordinary texture - we don't properly apply lighting to the prelayers, but oh well...
+				endofprelayers = lightmaplayer - 1
+				materiallayer = lightmaplayer - 1
+				firstpostlayer = lightmaplayer + 1
+			elseif rgbgenvertexlayer >= 0 then
+				-- map models with baked lighting
+				materiallayer = rgbgenvertexlayer
+				endofprelayers = rgbgenvertexlayer
+				firstpostlayer = rgbgenvertexlayer + 1
+			elseif rgbgendiffuselayer >= 0 then
+				-- entity models with dynamic lighting
+				materiallayer = rgbgendiffuselayer
+				endofprelayers = rgbgendiffuselayer
+				firstpostlayer = rgbgendiffuselayer + 1
+				-- player models often have specular as a pass after diffuse - we don't currently make use of that specular texture (would need to meld it into the skinframe)...
+				if alphagenspecularlayer >= 0 then
+					firstpostlayer = alphagenspecularlayer + 1
+				end
+			else
+				-- special effects shaders - treat first as primary layer and do everything else as post
+				endofprelayers = 0
+				materiallayer = 0
+				firstpostlayer = 1
+			end
+			-- (C indexes shader->layers[] with these numbers without checking them against numlayers: a layer
+			-- past the parsed ones is a zeroed layer of the struct)
+			local function pass(i: number): any
+				local l = layers[i + 1] or newlayer()
+				return model_shared.Mod_CreateShaderPassFromQ3ShaderLayer(
+					l,
+					i,
+					bit32.bor(bit32.band(l.dptexflags, texflagsmask), texflagsor),
+					texture.name
+				)
+			end
+			-- convert the main material layer
+			-- FIXME: if alphagenspecularlayer is used, we should pass a specular texture name to R_SkinFrame_LoadExternal and have it load that texture instead of the assumed name for _gloss texture
+			if materiallayer >= 0 then
+				shaderpassindex += 1
+				texture.shaderpasses[shaderpassindex] = pass(materiallayer)
+				texture.materialshaderpass = texture.shaderpasses[shaderpassindex]
+			end
+			-- convert the terrain background blend layer (if any)
+			if terrainbackgroundlayer >= 0 then
+				shaderpassindex += 1
+				texture.shaderpasses[shaderpassindex] = pass(terrainbackgroundlayer)
+				texture.backgroundshaderpass = texture.shaderpasses[shaderpassindex]
+			end
+			-- convert the prepass layers (if any)
+			texture.startpreshaderpass = shaderpassindex
+			for i = 0, endofprelayers - 1 do
+				shaderpassindex += 1
+				texture.shaderpasses[shaderpassindex] = pass(i)
+			end
+			texture.endpreshaderpass = shaderpassindex
+			texture.startpostshaderpass = shaderpassindex
+			-- convert the postpass layers (if any)
+			for i = firstpostlayer, shader.numlayers - 1 do
+				shaderpassindex += 1
+				texture.shaderpasses[shaderpassindex] = pass(i)
+			end
+			-- (as in C: startpostshaderpass is assigned again here, endpostshaderpass never)
+			texture.startpostshaderpass = shaderpassindex
+		end
+
+		if shader.dpshadow then
+			texture.basematerialflags = bit32.band(texture.basematerialflags, bit32.bnot(MATERIALFLAG_NOSHADOW))
+		end
+		if shader.dpnoshadow then
+			texture.basematerialflags = bit32.bor(texture.basematerialflags, MATERIALFLAG_NOSHADOW)
+		end
+		if shader.dpnortlight then
+			texture.basematerialflags = bit32.bor(texture.basematerialflags, MATERIALFLAG_NORTLIGHT)
+		end
+		if shader.vertexalpha then
+			texture.basematerialflags = bit32.bor(texture.basematerialflags, MATERIALFLAG_ALPHAGEN_VERTEX)
+		end
+		-- memcpy(texture->deforms, shader->deforms, sizeof(texture->deforms));
+		texture.deforms = {}
+		for i, d in shader.deforms do
+			texture.deforms[i] = copygen(d)
+		end
+		texture.reflectmin = shader.reflectmin
+		texture.reflectmax = shader.reflectmax
+		texture.refractfactor = shader.refractfactor
+		texture.refractcolor4f = table.clone(shader.refractcolor4f)
+		texture.reflectfactor = shader.reflectfactor
+		texture.reflectcolor4f = table.clone(shader.reflectcolor4f)
+		texture.r_water_wateralpha = shader.r_water_wateralpha
+		texture.r_water_waterscroll = table.clone(shader.r_water_waterscroll)
+		texture.offsetmapping = shader.offsetmapping
+		texture.offsetscale = shader.offsetscale
+		texture.offsetbias = shader.offsetbias
+		texture.specularscalemod = shader.specularscalemod
+		texture.specularpowermod = shader.specularpowermod
+		texture.rtlightambient = shader.rtlightambient
+		if shader.dpreflectcube ~= "" then
+			texture.reflectcubetexture = model_shared.R_GetCubemap(shader.dpreflectcube)
+		end
+
+		-- set up default supercontents (on q3bsp this is overridden by the q3bsp loader)
+		local sp = shader.surfaceparms
+		local function has(parm: number): boolean
+			return bit32.band(sp, parm) ~= 0
+		end
+		local sc = SUPERCONTENTS_SOLID + SUPERCONTENTS_OPAQUE
+		if has(SURFACEPARMS.lava) then
+			sc = SUPERCONTENTS_LAVA
+		end
+		if has(SURFACEPARMS.slime) then
+			sc = SUPERCONTENTS_SLIME
+		end
+		if has(SURFACEPARMS.water) then
+			sc = SUPERCONTENTS_WATER
+		end
+		if has(SURFACEPARMS.nonsolid) then
+			sc = 0
+		end
+		if has(SURFACEPARMS.playerclip) then
+			sc = SUPERCONTENTS_PLAYERCLIP
+		end
+		if has(SURFACEPARMS.botclip) then
+			sc = SUPERCONTENTS_MONSTERCLIP
+		end
+		if has(SURFACEPARMS.sky) then
+			sc = SUPERCONTENTS_SKY
+		end
+
+		if has(SURFACEPARMS.donotenter) then
+			sc = bit32.bor(sc, SUPERCONTENTS_DONOTENTER)
+		end
+		if has(SURFACEPARMS.lava) then
+			sc = bit32.bor(sc, SUPERCONTENTS_LAVA)
+		end
+		if has(SURFACEPARMS.nodrop) then
+			sc = bit32.bor(sc, SUPERCONTENTS_NODROP)
+		end
+		if has(SURFACEPARMS.nonsolid) then
+			sc = bit32.band(sc, bit32.bnot(SUPERCONTENTS_SOLID))
+		end
+		if has(SURFACEPARMS.playerclip) then
+			sc = bit32.bor(sc, SUPERCONTENTS_PLAYERCLIP)
+		end
+		if has(SURFACEPARMS.sky) then
+			sc = bit32.bor(sc, SUPERCONTENTS_SKY)
+		end
+		if has(SURFACEPARMS.slime) then
+			sc = bit32.bor(sc, SUPERCONTENTS_SLIME)
+		end
+		if has(SURFACEPARMS.water) then
+			sc = bit32.bor(sc, SUPERCONTENTS_WATER)
+		end
+		if has(SURFACEPARMS.botclip) then
+			sc = bit32.bor(sc, SUPERCONTENTS_BOTCLIP + SUPERCONTENTS_MONSTERCLIP)
+		end
+		texture.supercontents = sc
+
+		local sf = shader.surfaceflags
+		if has(SURFACEPARMS.alphashadow) then
+			sf = bit32.bor(sf, Q3SURFACEFLAG_ALPHASHADOW)
+		end
+		if has(SURFACEPARMS.lightfilter) then
+			sf = bit32.bor(sf, Q3SURFACEFLAG_LIGHTFILTER)
+		end
+		if has(SURFACEPARMS.metalsteps) then
+			sf = bit32.bor(sf, Q3SURFACEFLAG_METALSTEPS)
+		end
+		if has(SURFACEPARMS.nodamage) then
+			sf = bit32.bor(sf, Q3SURFACEFLAG_NODAMAGE)
+		end
+		if has(SURFACEPARMS.nodlight) then
+			sf = bit32.bor(sf, Q3SURFACEFLAG_NODLIGHT)
+		end
+		if has(SURFACEPARMS.nodraw) then
+			sf = bit32.bor(sf, Q3SURFACEFLAG_NODRAW)
+		end
+		if has(SURFACEPARMS.noimpact) then
+			sf = bit32.bor(sf, Q3SURFACEFLAG_NOIMPACT)
+		end
+		if has(SURFACEPARMS.nolightmap) then
+			sf = bit32.bor(sf, Q3SURFACEFLAG_NOLIGHTMAP)
+		end
+		if has(SURFACEPARMS.nomarks) then
+			sf = bit32.bor(sf, Q3SURFACEFLAG_NOMARKS)
+		end
+		if has(SURFACEPARMS.nonsolid) then
+			sf = bit32.bor(sf, Q3SURFACEFLAG_NONSOLID)
+		end
+		if has(SURFACEPARMS.sky) then
+			sf = bit32.bor(sf, Q3SURFACEFLAG_SKY)
+		end
+		if has(SURFACEPARMS.slick) then
+			sf = bit32.bor(sf, Q3SURFACEFLAG_SLICK)
+		end
+		if has(SURFACEPARMS.pointlight) then
+			sf = bit32.bor(sf, Q3SURFACEFLAG_POINTLIGHT)
+		end
+		if has(SURFACEPARMS.hint) then
+			sf = bit32.bor(sf, Q3SURFACEFLAG_HINT)
+		end
+		if has(SURFACEPARMS.dust) then
+			sf = bit32.bor(sf, Q3SURFACEFLAG_DUST)
+		end
+		texture.surfaceflags = sf
+
+		if shader.dpmeshcollisions then
+			texture.basematerialflags = bit32.bor(texture.basematerialflags, MATERIALFLAG_MESHCOLLISIONS)
+		end
+		if shader.dpshaderkill and developer_extra then
+			Con_DPrintf('^1%s:^7 killing shader ^3"%s" because of cvar\n', loadmodel.name, shadername)
+		end
+	elseif texture.name == "noshader" or texture.name == "" then
+		if developer_extra then
+			Con_DPrintf('^1%s:^7 using fallback noshader material for ^3"%s"\n', loadmodel.name, shadername)
+		end
+		texture.supercontents = SUPERCONTENTS_SOLID + SUPERCONTENTS_OPAQUE
+	elseif texture.name == "common/nodraw" or texture.name == "textures/common/nodraw" then
+		if developer_extra then
+			Con_DPrintf('^1%s:^7 using fallback nodraw material for ^3"%s"\n', loadmodel.name, shadername)
+		end
+		texture.basematerialflags = MATERIALFLAG_NODRAW + MATERIALFLAG_NOSHADOW
+		texture.supercontents = SUPERCONTENTS_SOLID
+	else
+		if developer_extra then
+			Con_DPrintf('^1%s:^7 No shader found for texture ^3"%s"\n', loadmodel.name, texture.name)
+		end
+		if bit32.band(texture.surfaceflags, Q3SURFACEFLAG_NODRAW) ~= 0 then
+			texture.basematerialflags =
+				bit32.bor(texture.basematerialflags, MATERIALFLAG_NODRAW + MATERIALFLAG_NOSHADOW)
+			texture.supercontents = SUPERCONTENTS_SOLID
+		elseif bit32.band(texture.surfaceflags, Q3SURFACEFLAG_SKY) ~= 0 then
+			texture.basematerialflags = bit32.bor(texture.basematerialflags, MATERIALFLAG_SKY)
+			texture.supercontents = SUPERCONTENTS_SKY
+		else
+			texture.basematerialflags = bit32.bor(texture.basematerialflags, MATERIALFLAG_WALL)
+			texture.supercontents = SUPERCONTENTS_SOLID + SUPERCONTENTS_OPAQUE
+		end
+		if cvar.cls_state_dedicated then
+			texture.materialshaderpass = nil
+			success = false
+		else
+			if fallback then
+				texture.shaderpasses[1] = model_shared.Mod_CreateShaderPass(
+					model_shared.R_SkinFrame_LoadExternal(texture.name, defaulttexflags, false)
+				)
+				texture.materialshaderpass = texture.shaderpasses[1]
+				local frame = texture.materialshaderpass.skinframes[1]
+				if frame then
+					if frame.hasalpha then
+						texture.basematerialflags = bit32.bor(
+							texture.basematerialflags,
+							MATERIALFLAG_ALPHA + MATERIALFLAG_BLENDED + MATERIALFLAG_NOSHADOW
+						)
+					end
+					if (texture.q2contents or 0) ~= 0 and model_shared.Mod_Q2BSP_SuperContentsFromNativeContents then
+						texture.supercontents =
+							model_shared.Mod_Q2BSP_SuperContentsFromNativeContents(texture.q2contents)
+					end
+				else
+					success = false
+				end
+			else
+				success = false
+			end
+			if not success and warnmissing then
+				Con_Printf('^1%s:^7 could not load texture ^3"%s"\n', loadmodel.name, texture.name)
+			end
+		end
+	end
+	-- init the animation variables
+	texture.currentframe = texture
+	if not texture.materialshaderpass then
+		texture.shaderpasses[1] = model_shared.Mod_CreateShaderPass(model_shared.R_SkinFrame_LoadMissing())
+		texture.materialshaderpass = texture.shaderpasses[1]
+	end
+	if not texture.materialshaderpass.skinframes[1] then
+		texture.materialshaderpass.skinframes[1] = model_shared.R_SkinFrame_LoadMissing()
+	end
+	texture.currentskinframe = if texture.materialshaderpass then texture.materialshaderpass.skinframes[1] else nil
+	texture.backgroundcurrentskinframe = if texture.backgroundshaderpass
+		then texture.backgroundshaderpass.skinframes[1]
+		else nil
+	return success
 end
 
 return model_shared

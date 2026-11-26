@@ -83,9 +83,44 @@ None new.
 - Tests: 20 Lune files, 0 failed (trace 4,905, q3bsp_trace 662, q3bsp_load 84,795); StyLua / Selene clean;
   check_port_lines 0 wrong; Python 26 run (same 3 Windows-only errors).
 
+## Part 5 (same day): Q3 shader scripts
+- PR 7 (traces) merged into main. Branch M3-BSPLOAD-shaders.
+- common.c COM_ParseToken_QuakeC (its C body is identical to COM_ParseToken_VM_Tokenize). model_shared.c:
+  Mod_LoadQ3Shaders_EnumerateWaveFunc, Mod_FreeQ3Shaders, Q3Shader_AddToHash, Mod_LoadQ3Shaders (custinfoparms,
+  layers, every general keyword), Mod_LookupQ3Shader; q3shaderinfo_t as tables (see the comment above newlayer).
+  Kept quirks: the parameter array is never cleared (keywords that read past their line see older values);
+  in the first shader file only, a `}` that ends a parameter line also ends the shader; names are cut to 63
+  characters; an empty hash bucket head matches the name "".
+- tests/integration/q3shaders.test.luau: all 2,447 shaders of the release agree with the independent parser
+  (assets/data/shaders.json): names, layer counts, surfaceparm bits, layer texture names. 3.7 s to parse 706 KB
+  (the tokenizer is slow: one table.insert per character; a pure speed rewrite is possible later).
+- Mod_CreateShaderPass, Mod_CreateShaderPassFromQ3ShaderLayer, Mod_LoadTextureFromQ3Shader ported;
+  Mod_Q3BSP_LoadTextures calls it (then restores the lump's surfaceflags / supercontents, as C does, so
+  collision contents do not change). Textures now have basematerialflags (sky / nodraw / wall / blend /
+  MESHCOLLISIONS ...), shader passes, deforms, water / offset / gloss values; loadmodel.brush.skybox is set.
+  Renderer calls (R_SkinFrame_LoadExternal / LoadMissing, R_GetCubemap) are hooks on model_shared: dedicated
+  behaviour (NULL skin frames) is exact, a client backend replaces them. No release shader uses
+  dpmeshcollisions, so the collision BIH of the stock maps is unchanged.
+  q3shaders test: stormkeep 58 textures, 52 with a shader, sky / nodraw / wall flags follow the shader,
+  skybox env/extragalactic/asteroids_. **A map must be loaded with the VFS provider set** (shader scripts
+  come through engine/fs.luau), otherwise every texture takes the no-shader path.
+- NOT yet checked against the C build (parser and texture setup): needs a generator with fixture shader
+  files and stubbed FS_Search / FS_LoadFile, because the runner has no game data.
+
 ## Next step
-1. Mod_LoadTextureFromQ3Shader (model_shared.c; basematerialflags / currentmaterialflags decide what collides
-   and what the skip masks see), then Mod_Q3BSP_LoadLightmaps, the model registry (Mod_FindName).
-2. M3-TRACE: world.c, Collision_ClipToWorld / ClipToGenericEntity / CombineTraces, SV_TraceBox and the world
+1. C reference for Mod_LoadQ3Shaders + Mod_LoadTextureFromQ3Shader: tools/testgen/shader_vectors.c with fixture
+   .shader files (tests/fixtures) and stubbed FS_Search / FS_LoadFile; print every q3shaderinfo_t field and
+   the texture fields. Plan: the generator `#include "model_shared.c"` (q3shader_data is static), links
+   common.c + com_crc16.c, stubs FS_Search / FS_LoadFile / FS_FreeSearch (read tests/fixtures/shaders/ in a
+   fixed sorted order), Mem_* incl. Mem_ExpandableArray_*, Cvar_VariableValue (a small table the test also
+   registers), R_SkinFrame_LoadMissing / R_GetCubemap (NULL), and defines cls (ca_dedicated), developer_* and
+   the mod_q3shader_* cvars. Fixtures to write: a_first.shader (the fileindex 0 `}` quirk), b_layers.shader
+   (every layer keyword, > 8 layers, > 8 tcmods, stale parameters after short lines, user wave funcs, quotes,
+   comments, CRLF / lone CR), c_general.shader (every general keyword and surfaceparm, dp_ remap, all
+   dpshaderkill forms, 63-character names, empty name), d_redeclare.shader (redeclarations, killed / replaced,
+   missing `{`, end of file inside a body), custinfoparms.txt. Luau side: a fixture provider for fs.SetProvider
+   ({ files, load, pack }, see tests/_lib/vfs_provider.luau).
+2. Mod_Q3BSP_LoadLightmaps, the model registry (Mod_FindName / Mod_ForName).
+3. M3-TRACE: world.c, Collision_ClipToWorld / ClipToGenericEntity / CombineTraces, SV_TraceBox and the world
    builtins (traceline, tracebox, pointcontents, droptofloor) that M2-RUNNER waits for.
-3. Memory layout of BIH leafs for Roblox if needed (see part 3).
+4. Speed: the tokenizer (3.7 s for the 706 KB of shader scripts); memory layout of BIH leafs for Roblox.
