@@ -1152,13 +1152,226 @@ static int mv_pushscene(int first)
 	return n0 + count + 1;
 }
 
-// ---- the calls
+// the calls of the cases
 enum
 {
 	MV_TEP, MV_CCT, MV_CV, MV_RT, MV_IMP, MV_FLY, MV_GRAV, MV_NPK, MV_PE, MV_UNO, MV_UN, MV_CS, MV_CW, MV_WF, MV_WM,
 	MV_FOL, MV_CWT, MV_TOSS, MV_STEP, MV_PENT, MV_CNT, MV_CMOVE, MV_CPRE, MV_CPOST, MV_CENT, MV_PM, MV_PP, MV_PHYS,
 	MV_CLIP, MV_AVF, MV_NOPS
 };
+
+// an entity of the cases set up next to something to run into: 0 dropping onto the arena floor, 1 next to a scene
+// box (steps, walls, stairs, ledge, bump) moving into it, 2 into the corner of the walls, 3 at the stairs, 4 walking
+// off the ledge, 5 just above a world brush (some have sloped tops), 6 / 7 next to a brush of the static / rotated
+// bmodel moving into it, 8 at some depth in a water brush, 9 sunk into the top of a world brush (stuck),
+// 10 under the low ceiling
+static void mv_fresh(int n, int movetype, int kind, int sizekind)
+{
+	prvm_prog_t *prog = SVVM_prog;
+	prvm_edict_t *ed = mv_ed + n;
+	float *o, *v, *mins, *maxs, c[3], d[3], k, depth;
+	const mv_box_t *bx;
+	const colbrushf_t *cb;
+	matrix4x4_t m;
+	int b, j, side;
+	mv_makeent(n, movetype);
+	mins = PRVM_serveredictvector(ed, mins);
+	maxs = PRVM_serveredictvector(ed, maxs);
+	if (PRVM_serveredictfloat(ed, solid) == SOLID_BSP)
+	{
+		PRVM_serveredictfloat(ed, solid) = SOLID_SLIDEBOX;
+		PRVM_serveredictfloat(ed, modelindex) = 0;
+		VectorClear(PRVM_serveredictvector(ed, angles));
+		mv_size(mins, maxs, mv_randsizekind());
+	}
+	if (sizekind >= 0)
+		mv_size(mins, maxs, sizekind);
+	o = PRVM_serveredictvector(ed, origin);
+	v = PRVM_serveredictvector(ed, velocity);
+	k = tv_frand(1.1f, 4) / (float)sv.frametime; // a velocity that gets there in 1 / 4 .. 1 / 1.1 frames
+	switch (kind)
+	{
+	case 0:
+		VectorSet(o, 1300 + tv_frand(-400, 400), tv_frand(-400, 380), -mins[2] + tv_frand(0, 30));
+		VectorSet(v, tv_frand(-300, 300), tv_frand(-300, 300), -tv_frand(20, 900));
+		break;
+	case 1:
+		bx = mv_boxes + 3 + mv_rn(MV_NBOX - 3);
+		if (bx == mv_boxes + 13)
+			bx = mv_boxes + 4;
+		side = mv_rn(4);
+		o[0] = bx->o[0] + tv_frand(bx->mins[0], bx->maxs[0]);
+		o[1] = bx->o[1] + tv_frand(bx->mins[1], bx->maxs[1]);
+		o[2] = -mins[2] + tv_frand(0, 1);
+		if (side == 0)
+			o[0] = bx->o[0] + bx->mins[0] - maxs[0] - tv_frand(0, 24);
+		else if (side == 1)
+			o[0] = bx->o[0] + bx->maxs[0] - mins[0] + tv_frand(0, 24);
+		else if (side == 2)
+			o[1] = bx->o[1] + bx->mins[1] - maxs[1] - tv_frand(0, 24);
+		else
+			o[1] = bx->o[1] + bx->maxs[1] - mins[1] + tv_frand(0, 24);
+		for (j = 0; j < 2; j++)
+			c[j] = bx->o[j] + 0.5f * (bx->mins[j] + bx->maxs[j]);
+		v[0] = (c[0] - o[0]) * k;
+		v[1] = (c[1] - o[1]) * k;
+		v[2] = mv_rn(3) ? 0 : tv_frand(-100, 300);
+		break;
+	case 2:
+		VectorSet(o, 1700 - maxs[0] - tv_frand(0, 30), 420 - maxs[1] - tv_frand(0, 30), -mins[2] + tv_frand(0, 1));
+		VectorSet(v, tv_frand(100, 600), mv_rn(2) ? tv_frand(100, 600) : tv_frand(-300, 300), mv_rn(2) ? 0 : -tv_frand(0, 200));
+		break;
+	case 3:
+		VectorSet(o, 1100 - maxs[0] - tv_frand(0, 40), -400 + tv_frand(-50, 50), -mins[2] + tv_frand(0, 1));
+		VectorSet(v, tv_frand(150, 500), tv_frand(-50, 50), 0);
+		break;
+	case 4:
+		VectorSet(o, 1000 + tv_frand(-64, 64), 250 + tv_frand(-64, 64), 48 - mins[2] + tv_frand(0, 0.5f));
+		VectorSet(d, o[0] - 1000, o[1] - 250, 0);
+		VectorNormalize(d);
+		VectorScale(d, tv_frand(100, 450), v);
+		PRVM_serveredictfloat(ed, flags) = (int)PRVM_serveredictfloat(ed, flags) | FL_ONGROUND;
+		PRVM_serveredictedict(ed, groundentity) = MV_SCENE0 + 14;
+		break;
+	case 5:
+		b = tv_pickbrush(0);
+		cb = tv_brush[b].colbrushf;
+		VectorSet(o, tv_frand(cb->mins[0], cb->maxs[0]), tv_frand(cb->mins[1], cb->maxs[1]), cb->maxs[2] - mins[2] + tv_frand(0, 6));
+		VectorSet(v, tv_frand(-300, 300), tv_frand(-300, 300), -tv_frand(0, 400));
+		break;
+	case 6:
+	case 7:
+		b = TV_NWORLDB + mv_rn(TV_NB - TV_NWORLDB);
+		mv_bspmatrix(kind == 6 ? MV_BSP : MV_RBSP, &m);
+		Matrix4x4_Transform(&m, tv_bcenter[b], c);
+		tv_randnormal(d);
+		VectorMA(c, tv_frand(30, 120), d, o);
+		VectorSubtract(c, o, v);
+		VectorScale(v, k, v);
+		break;
+	case 8:
+		if (!mv_nwater)
+			break;
+		b = mv_water[mv_rn(mv_nwater)];
+		cb = tv_brush[b].colbrushf;
+		depth = tv_frand(-10, maxs[2] - mins[2] + 10);
+		VectorSet(o, tv_frand(cb->mins[0] + 4, cb->maxs[0] - 4), tv_frand(cb->mins[1] + 4, cb->maxs[1] - 4), cb->maxs[2] - mins[2] - depth);
+		VectorSet(v, tv_frand(-200, 200), tv_frand(-200, 200), tv_frand(-200, 200));
+		if (mv_rn(4) == 0)
+			PRVM_serveredictfloat(ed, flags) = (int)PRVM_serveredictfloat(ed, flags) | FL_WATERJUMP;
+		break;
+	case 9:
+		b = tv_pickbrush(0);
+		cb = tv_brush[b].colbrushf;
+		VectorSet(o, tv_frand(cb->mins[0], cb->maxs[0]), tv_frand(cb->mins[1], cb->maxs[1]), cb->maxs[2] - mins[2] - tv_frand(0.25f, 17));
+		VectorSet(v, tv_frand(-200, 200), tv_frand(-200, 200), tv_frand(-100, 100));
+		break;
+	default:
+		VectorSet(o, 950 + tv_frand(-50, 50), tv_frand(-50, 50), -mins[2] + tv_frand(0, 1));
+		VectorSet(v, tv_frand(-300, 300), tv_frand(-300, 300), mv_rn(2) ? tv_frand(100, 300) : 0);
+		break;
+	}
+	for (j = 0; j < 3; j++)
+		v[j] = bound(-3000, v[j], 3000);
+	VectorCopy(o, PRVM_serveredictvector(ed, oldorigin));
+	if (mv_rn(3) == 0)
+		VectorCopy(o, mv_priv[n].waterposition_origin);
+}
+// a fresh entity in the scratch edicts (MV_DYN0 + 44 ..) set up for op, or -1 (op runs on an existing entity)
+static int mv_freshfor(int op)
+{
+	static const int wmk[12] = {0, 1, 1, 2, 3, 3, 4, 4, 5, 8, 10, 9};
+	static const int tossk[9] = {0, 0, 5, 5, 6, 7, 1, 2, 4};
+	static const int tossmt[8] = {MOVETYPE_TOSS, MOVETYPE_BOUNCE, MOVETYPE_BOUNCE, MOVETYPE_BOUNCEMISSILE, MOVETYPE_FLYMISSILE, MOVETYPE_FLY, MOVETYPE_FLY_WORLDONLY, MOVETYPE_TOSS};
+	static const int stepk[6] = {0, 0, 5, 4, 8, 1};
+	static const int stuckk[7] = {9, 9, 9, 6, 7, 8, 5};
+	static const int tepk[5] = {9, 9, 0, 5, 6};
+	static const int waterk[5] = {8, 8, 8, 0, 5};
+	static const int npkk[4] = {9, 6, 7, 5};
+	prvm_prog_t *prog = SVVM_prog;
+	int n = MV_DYN0 + 44 + mv_rn(20), mt, kind, sizekind = -1, r, fl;
+	prvm_edict_t *ed = mv_ed + n;
+	switch (op)
+	{
+	case MV_FLY:
+	case MV_PE:
+	case MV_PENT:
+		mt = mv_randmovetype();
+		kind = mv_rn(11);
+		break;
+	case MV_WM:
+		mt = mv_rn(100) < 85 ? MOVETYPE_WALK : (mv_rn(2) ? MOVETYPE_FLY : MOVETYPE_STEP);
+		kind = wmk[mv_rn(12)];
+		sizekind = mv_rn(5) ? 0 : 5;
+		break;
+	case MV_TOSS:
+		mt = tossmt[mv_rn(8)];
+		kind = tossk[mv_rn(9)];
+		break;
+	case MV_STEP:
+		mt = MOVETYPE_STEP;
+		kind = stepk[mv_rn(6)];
+		break;
+	case MV_UNO:
+	case MV_UN:
+	case MV_CS:
+		mt = mv_rn(2) ? MOVETYPE_WALK : mv_randmovetype();
+		kind = stuckk[mv_rn(7)];
+		sizekind = mv_rn(2) ? 0 : -1;
+		break;
+	case MV_TEP:
+		mt = mv_randmovetype();
+		kind = tepk[mv_rn(5)];
+		break;
+	case MV_CW:
+	case MV_CWT:
+		mt = mv_randmovetype();
+		kind = waterk[mv_rn(5)];
+		sizekind = mv_rn(2) ? 0 : -1;
+		break;
+	case MV_NPK:
+		mt = mv_randmovetype();
+		kind = npkk[mv_rn(4)];
+		break;
+	default:
+		return -1;
+	}
+	mv_fresh(n, mt, kind, sizekind);
+	fl = (int)PRVM_serveredictfloat(ed, flags);
+	r = mv_rn(4);
+	if (op == MV_WM)
+	{
+		PRVM_serveredictfloat(ed, solid) = SOLID_SLIDEBOX;
+		if (kind != 4)
+		{
+			PRVM_serveredictfloat(ed, flags) = r < 3 ? (fl | FL_ONGROUND) : (fl & ~FL_ONGROUND);
+			PRVM_serveredictedict(ed, groundentity) = MV_SCENE0;
+		}
+	}
+	else if (op == MV_TOSS && r == 0) // a slow landing (bouncestop)
+		PRVM_serveredictvector(ed, velocity)[2] = -tv_frand(0, 40);
+	else if (op == MV_STEP)
+	{
+		if (r < 2)
+		{
+			PRVM_serveredictfloat(ed, flags) = fl & ~(FL_ONGROUND | FL_FLY | FL_SWIM);
+			PRVM_serveredictvector(ed, velocity)[2] = -tv_frand(0, 600);
+		}
+		else if (r == 2)
+		{
+			PRVM_serveredictfloat(ed, flags) = (fl | FL_ONGROUND) & ~(FL_FLY | FL_SWIM);
+			PRVM_serveredictvector(ed, velocity)[2] = tv_frand(0.0625f, 200);
+		}
+		if (mv_rn(2))
+			PRVM_serveredictfunction(ed, movetypesteplandevent) = 120 + mv_rn(10);
+	}
+	else if (op == MV_PE && r == 0)
+		PRVM_serveredictfunction(ed, touch) = 75;
+	mv_commit(n);
+	return n;
+}
+
+// ---- the calls
 static const char *mv_opname[MV_NOPS] =
 {
 	"TEP", "CCT", "CV", "RT", "IMP", "FLY", "GRAV", "NPK", "PE", "UNO", "UN", "CS", "CW", "WF", "WM",
@@ -1444,7 +1657,7 @@ static void mv_call(int op, int n)
 		SV_Physics_Toss(ed);
 		if ((int)PRVM_serveredictfloat(ed, flags) & FL_ONGROUND)
 			mv_tosslanded++;
-		else if (DotProduct(PRVM_serveredictvector(ed, velocity), (prvm_vec_t *)(mv_sfields + n * MV_NF + prog->fieldoffsets.velocity)) < 0)
+		else if (PRVM_serveredictvector(ed, velocity)[2] > 0 && ((prvm_vec_t *)(mv_sfields + n * MV_NF + prog->fieldoffsets.velocity))[2] < 0)
 			mv_tossbounced++;
 		mv_end("-");
 		break;
@@ -1645,7 +1858,10 @@ static void mv_unitcases(int calls)
 		for (k = 0; r >= w[k][1]; k++)
 			r -= w[k][1];
 		op = w[k][0];
-		mv_call(op, mv_pickent());
+		if (mv_rn(10) < 7 && (n = mv_freshfor(op)) >= 0)
+			mv_call(op, n);
+		else
+			mv_call(op, mv_pickent());
 	}
 }
 static void mv_pushcases(int scenes)
@@ -1729,11 +1945,11 @@ int main(void)
 
 	// single calls on random entities: Xonotic's configuration, then the engine's own
 	mv_unitcases(700);
-	mv_pushcases(50);
+	mv_pushcases(70);
 	mv_config_engine();
 	mv_setframetime((double)0.0138889f); // the engine's sys_ticrate default
 	mv_unitcases(500);
-	mv_pushcases(30);
+	mv_pushcases(40);
 
 	// whole server frames
 	mv_config_xonotic();

@@ -17,10 +17,13 @@ gcc "${flags[@]}" --coverage -o "$out/movers_vectors" "$out/movers_vectors.o" "$
 "$out/movers_vectors" > tests/vectors/movers.tsv || { tail -n 3 tests/vectors/movers.tsv | cut -c1-300; exit 1; }
 root=$PWD
 (
-	cd "$out" && gcov -o "$out" "$root/tools/testgen/movers_vectors.c" > /dev/null 2>&1 &&
-	awk -F: 'BEGIN { n = 0; u = 0 }
-		{ c = $1; gsub(/ /, "", c); l = $2 + 0 }
-		l >= 893 && l <= 3232 && c != "-" { n++; if (c == "#####") { u++; miss = miss " " l } }
-		END { printf "sv_phys.c L893-3232: %d executable lines, %d never run\n", n, u; print "never run:" miss }' sv_phys.c.gcov
-) > tests/vectors/movers_coverage.txt 2>&1 || echo "no coverage (gcov failed)" > tests/vectors/movers_coverage.txt
+	cd "$out"
+	gcov -f -o "$out" "$root/tools/testgen/movers_vectors.c" > gcov.log 2>&1 || true
+	awk '/^Function/ { f = $2 } /^Lines executed/ && f ~ /SV_|ClipVelocity|AngleVectorsFLU/ { print f, $0; f = "" }' gcov.log
+	g=$(ls ./*sv_phys.c.gcov 2>/dev/null | head -n 1)
+	echo "gcov files: $(ls ./*.gcov 2>/dev/null | tr '\n' ' ')"
+	awk -F: '{ c = $1; gsub(/ /, "", c); l = $2 + 0 }
+		l >= 893 && l <= 3232 && c != "-" { n++; if (c ~ /#####/) { u++; miss = miss " " l } }
+		END { printf "sv_phys.c L893-3232: %d executable lines, %d never run\nnever run:%s\n", n, u, miss }' "$g"
+) > tests/vectors/movers_coverage.txt 2>&1 || true
 rm -rf "$out"
