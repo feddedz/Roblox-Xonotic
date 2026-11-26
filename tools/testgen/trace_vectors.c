@@ -1181,7 +1181,7 @@ static void tv_clipscene(void)
 				VectorSet(bodymaxs, 16, 16, 45);
 			}
 			tv_randnormal(dir);
-			a = tv_frand(30, 220);
+			a = kind == 2 ? tv_frand(0, 40) : tv_frand(30, 220); // point traces: often inside the box
 			b = tv_frand(-40, 120);
 			for (j = 0; j < 3; j++)
 			{

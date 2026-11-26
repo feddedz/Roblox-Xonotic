@@ -9,12 +9,18 @@ local collision = require("../../engine/collision")
 local console = require("../../engine/console")
 local cvar = require("../../engine/cvar")
 local f32 = require("../../engine/_port/f32")
+local matrixlib = require("../../engine/matrixlib")
 local model_brush = require("../../engine/model_brush")
 
 return function(ctx: t.Ctx)
 	local scratch = buffer.create(8)
 	local function fb(hex: string): number
 		return f32.frombits(tonumber(hex, 16) :: number)
+	end
+	local function db(hex: string): number
+		buffer.writeu32(scratch, 4, tonumber(string.sub(hex, 1, 8), 16) :: number)
+		buffer.writeu32(scratch, 0, tonumber(string.sub(hex, 9, 16), 16) :: number)
+		return buffer.readf64(scratch, 0)
 	end
 	local function dh(v: number): string
 		buffer.writef64(scratch, 0, v)
@@ -166,7 +172,13 @@ return function(ctx: t.Ctx)
 		m.brush.data_collisionvertex3f = shared.gcvert
 		m.brush.data_collisionelement3i = shared.gcelem
 		m.surfmesh = { data_vertex3f = shared.grvert, data_element3i = shared.grelem }
+		-- the function pointers Mod_Q3BSP_Load sets
+		m.TraceBox = model_brush.Mod_Q3BSP_TraceBox
+		m.TraceBrush = model_brush.Mod_Q3BSP_TraceBrush
 		m.TraceLine = model_brush.Mod_Q3BSP_TraceLine
+		m.TracePoint = model_brush.Mod_Q3BSP_TracePoint
+		m.PointSuperContents = model_brush.Mod_Q3BSP_PointSuperContents
+		m.TraceLineAgainstSurfaces = model_brush.Mod_CollisionBIH_TraceLine
 		m.brush.submodel = num(c[2])
 		m.firstmodelbrush = num(c[3])
 		m.nummodelbrushes = num(c[4])
@@ -191,6 +203,20 @@ return function(ctx: t.Ctx)
 	local seen: { boolean } = {}
 	local label = ""
 	local lineno = 0
+	-- Collision_ClipTo* / Collision_CombineTraces: the entity matrix pair, the last trace and the combined one
+	local mat, imat = matrixlib.new(), matrixlib.new()
+	local last: collision.trace_t = collision.newtrace()
+	local clip: collision.trace_t = collision.newtrace()
+	local function copytrace(tr: collision.trace_t): collision.trace_t
+		local c2 = table.clone(tr)
+		c2.endpos = table.clone(tr.endpos)
+		c2.plane = { normal = table.clone(tr.plane.normal), dist = tr.plane.dist }
+		c2.startdepthnormal = table.clone(tr.startdepthnormal)
+		return c2
+	end
+	local function modelat(s: string): any
+		return if s == "-1" then nil else models[num(s) + 1]
+	end
 	local function begin(states: { string }, initial: string?)
 		after = states
 		changed, seen = {}, {}
@@ -499,6 +525,181 @@ return function(ctx: t.Ctx)
 			local r =
 				model_brush.Mod_Q3BSP_TraceLineOfSight(models[num(c[2]) + 1], v3(c, 3), v3(c, 6), v3(c, 9), v3(c, 12))
 			t.eq(ctx, if r then "1" else "0", c[15], `line {lineno}: Mod_Q3BSP_TraceLineOfSight`)
+		elseif kind == "MATIN" then
+			matrixlib.Matrix4x4_CreateFromQuakeEntity(
+				mat,
+				db(c[2]),
+				db(c[3]),
+				db(c[4]),
+				db(c[5]),
+				db(c[6]),
+				db(c[7]),
+				db(c[8])
+			)
+			matrixlib.Matrix4x4_Invert_Simple(imat, mat)
+		elseif kind == "MAT" then
+			local got, gotinv = {}, {}
+			for r = 1, 4 do
+				for col = 1, 4 do
+					table.insert(got, fh(mat.m[r][col]))
+					table.insert(gotinv, fh(imat.m[r][col]))
+				end
+			end
+			t.eq(
+				ctx,
+				table.concat(got, "\t"),
+				table.concat(c, "\t", 2, 17),
+				`line {lineno}: Matrix4x4_CreateFromQuakeEntity`
+			)
+			-- the traces use the C matrix either way; the inverse is checked from it
+			for r = 1, 4 do
+				for col = 1, 4 do
+					mat.m[r][col] = fb(c[1 + (r - 1) * 4 + col])
+				end
+			end
+			matrixlib.Matrix4x4_Invert_Simple(imat, mat)
+			gotinv = {}
+			for r = 1, 4 do
+				for col = 1, 4 do
+					table.insert(gotinv, fh(imat.m[r][col]))
+				end
+			end
+			t.eq(
+				ctx,
+				table.concat(gotinv, "\t"),
+				table.concat(c, "\t", 18, 33),
+				`line {lineno}: Matrix4x4_Invert_Simple`
+			)
+		elseif kind == "XCW" then
+			last = collision.newtrace()
+			collision.Collision_ClipToWorld(
+				last,
+				modelat(c[2]),
+				v3(c, 6),
+				v3(c, 9),
+				v3(c, 12),
+				v3(c, 15),
+				num(c[3]),
+				num(c[4]),
+				num(c[5]),
+				fb(c[18])
+			)
+			begin({ statestr(last) }, nil)
+		elseif kind == "XCLW" then
+			last = collision.newtrace()
+			collision.Collision_ClipLineToWorld(
+				last,
+				modelat(c[2]),
+				v3(c, 6),
+				v3(c, 9),
+				num(c[3]),
+				num(c[4]),
+				num(c[5]),
+				fb(c[12]),
+				c[13] ~= "0"
+			)
+			begin({ statestr(last) }, nil)
+		elseif kind == "XCPW" then
+			last = collision.newtrace()
+			collision.Collision_ClipPointToWorld(last, modelat(c[2]), v3(c, 6), num(c[3]), num(c[4]), num(c[5]))
+			begin({ statestr(last) }, nil)
+		elseif kind == "XCG" then
+			last = collision.newtrace()
+			collision.Collision_ClipToGenericEntity(
+				last,
+				modelat(c[2]),
+				nil,
+				nil,
+				v3(c, 7),
+				v3(c, 10),
+				num(c[6]),
+				mat,
+				imat,
+				v3(c, 13),
+				v3(c, 16),
+				v3(c, 19),
+				v3(c, 22),
+				num(c[3]),
+				num(c[4]),
+				num(c[5]),
+				fb(c[25])
+			)
+			begin({ statestr(last) }, nil)
+		elseif kind == "XCLG" then
+			last = collision.newtrace()
+			collision.Collision_ClipLineToGenericEntity(
+				last,
+				modelat(c[2]),
+				nil,
+				nil,
+				v3(c, 7),
+				v3(c, 10),
+				num(c[6]),
+				mat,
+				imat,
+				v3(c, 13),
+				v3(c, 16),
+				num(c[3]),
+				num(c[4]),
+				num(c[5]),
+				fb(c[19]),
+				c[20] ~= "0"
+			)
+			begin({ statestr(last) }, nil)
+		elseif kind == "XCPG" then
+			last = collision.newtrace()
+			collision.Collision_ClipPointToGenericEntity(
+				last,
+				modelat(c[2]),
+				nil,
+				nil,
+				v3(c, 7),
+				v3(c, 10),
+				num(c[6]),
+				mat,
+				imat,
+				v3(c, 13),
+				num(c[3]),
+				num(c[4]),
+				num(c[5])
+			)
+			begin({ statestr(last) }, nil)
+		elseif kind == "EP" then
+			t.eq(
+				ctx,
+				dh(last.endpos[1]) .. "\t" .. dh(last.endpos[2]) .. "\t" .. dh(last.endpos[3]),
+				table.concat(c, "\t", 2),
+				`{label}: endpos`
+			)
+		elseif kind == "SETCLIP" then
+			clip = copytrace(last)
+		elseif kind == "COMB" then
+			collision.Collision_CombineTraces(clip, last, num(c[3]), c[2] ~= "0")
+		elseif kind == "CS" then
+			local got = table.concat({
+				if clip.allsolid then "1" else "0",
+				if clip.startsolid then "1" else "0",
+				if clip.bmodelstartsolid then "1" else "0",
+				if clip.inwater then "1" else "0",
+				dh(clip.fraction),
+				dh(clip.endpos[1]),
+				dh(clip.endpos[2]),
+				dh(clip.endpos[3]),
+				fh(clip.plane.normal[1]),
+				fh(clip.plane.normal[2]),
+				fh(clip.plane.normal[3]),
+				fh(clip.plane.dist),
+				tostring(clip.ent or 0),
+				tostring(clip.hitsupercontents),
+				tostring(clip.hitq3surfaceflags),
+				texidx(clip.hittexture),
+				tostring(clip.startsupercontents),
+				dh(clip.startdepth),
+				dh(clip.startdepthnormal[1]),
+				dh(clip.startdepthnormal[2]),
+				dh(clip.startdepthnormal[3]),
+			}, "\t")
+			t.eq(ctx, got, table.concat(c, "\t", 2), `line {lineno}: Collision_CombineTraces`)
 		elseif kind == "S" then
 			local k = num(c[2]) + 1
 			seen[k] = true
