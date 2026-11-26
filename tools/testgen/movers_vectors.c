@@ -140,7 +140,7 @@ static int mv_calls[40];
 // the effect of a QC function, by its number (the Luau test applies the same ones)
 static void mv_effect(prvm_prog_t *prog, int fnum)
 {
-	int self = PRVM_serverglobaledict(self), other = PRVM_serverglobaledict(other);
+	int i, self = PRVM_serverglobaledict(self), other = PRVM_serverglobaledict(other);
 	prvm_edict_t *s = mv_ed + self, *o = mv_ed + other;
 	float time = PRVM_serverglobalfloat(time);
 	if (fnum == MV_FN_PRE)
@@ -157,6 +157,17 @@ static void mv_effect(prvm_prog_t *prog, int fnum)
 		return;
 	switch (fnum % 10)
 	{
+	case 0: // spawn(): the first free edict of the cases is in use again, not moved yet
+		for (i = MV_DYN0; i < MV_SENT; i++)
+		{
+			if (mv_priv[i].free)
+			{
+				mv_priv[i].free = false;
+				mv_priv[i].move = false;
+				break;
+			}
+		}
+		break;
 	case 1:
 		PRVM_serveredictfloat(s, nextthink) = time + 0.05f;
 		break;
@@ -1142,6 +1153,8 @@ static int mv_pushscene(int first)
 		}
 		if (mv_rn(12) == 0)
 			PRVM_serveredictedict(ed, owner) = n0;
+		if (mv_rn(6) == 0) // teleported (setorigin) when it is pushed into something
+			PRVM_serveredictfunction(ed, touch) = 75;
 		mv_commit(n);
 	}
 	if (mv_rn(8) == 0)
@@ -1371,8 +1384,10 @@ static int mv_freshfor(int op)
 		if (mv_rn(2))
 			PRVM_serveredictfunction(ed, movetypesteplandevent) = 120 + mv_rn(10);
 	}
-	else if (op == MV_PE && r == 0)
+	else if ((op == MV_PE || op == MV_FLY) && r == 0) // a touch function that teleports (setorigin)
 		PRVM_serveredictfunction(ed, touch) = 75;
+	if (op == MV_TOSS && mv_rn(5) == 0) // a touch function that removes the entity
+		PRVM_serveredictfunction(ed, touch) = 74;
 	mv_commit(n);
 	return n;
 }
@@ -1840,8 +1855,8 @@ static void mv_unitcases(int calls)
 	{
 		{MV_TEP, 6}, {MV_CCT, 3}, {MV_CV, 6}, {MV_RT, 6}, {MV_IMP, 4}, {MV_FLY, 22}, {MV_GRAV, 2}, {MV_NPK, 5},
 		{MV_PE, 10}, {MV_UNO, 4}, {MV_UN, 3}, {MV_CS, 4}, {MV_CW, 6}, {MV_WF, 4}, {MV_WM, 20}, {MV_FOL, 4},
-		{MV_CWT, 5}, {MV_TOSS, 14}, {MV_STEP, 9}, {MV_PENT, 14}, {MV_CNT, 3}, {MV_CMOVE, 2}, {MV_CPRE, 2},
-		{MV_CPOST, 2}, {MV_CENT, 4}, {MV_PM, 3}, {MV_PP, 3},
+		{MV_CWT, 5}, {MV_TOSS, 14}, {MV_STEP, 9}, {MV_PENT, 14}, {MV_CNT, 8}, {MV_CMOVE, 2}, {MV_CPRE, 2},
+		{MV_CPOST, 2}, {MV_CENT, 8}, {MV_PM, 3}, {MV_PP, 3},
 	};
 	int i, k, total = 0, r, op, n;
 	for (k = 0; k < (int)(sizeof(w) / sizeof(w[0])); k++)
@@ -1912,6 +1927,17 @@ static void mv_frames(int nframes, int nents)
 	for (f = 0; f < nframes; f++)
 		mv_call(MV_PHYS, 0);
 }
+// single calls of the movers a cvar variant changes, on entities set up for them
+static void mv_variantcalls(void)
+{
+	static const int ops[6] = {MV_WM, MV_WM, MV_TOSS, MV_FLY, MV_STEP, MV_PENT};
+	int i, op;
+	for (i = 0; i < 90; i++)
+	{
+		op = ops[mv_rn(6)];
+		mv_call(op, mv_freshfor(op));
+	}
+}
 
 int main(void)
 {
@@ -1953,7 +1979,9 @@ int main(void)
 	mv_pushcases(70);
 	mv_config_engine();
 	mv_setframetime((double)0.0138889f); // the engine's sys_ticrate default
+	MV_SETCV(developer_extra, 1);
 	mv_unitcases(500);
+	MV_SETCV(developer_extra, 0);
 	mv_pushcases(40);
 
 	// whole server frames
@@ -1974,6 +2002,7 @@ int main(void)
 	MV_SETCV(sv_gameplayfix_nudgeoutofsolid, 1);
 	MV_SETCV(sv_gameplayfix_stepdown, 1);
 	mv_frames(24, 30);
+	mv_variantcalls();
 	mv_config_xonotic();
 	MV_SETCV(sv_gameplayfix_gravityunaffectedbyticrate, 0);
 	MV_SETCV(sv_gameplayfix_nogravityonground, 0);
@@ -1986,6 +2015,7 @@ int main(void)
 	MV_SETCV(sv_gameplayfix_grenadebouncedownslopes, 0);
 	MV_SETCV(sv_gameplayfix_noairborncorpse, 0);
 	mv_frames(24, 30);
+	mv_variantcalls();
 	mv_config_xonotic();
 	MV_SETCV(sv_gameplayfix_upwardvelocityclearsongroundflag, 0);
 	MV_SETCV(sv_gameplayfix_easierwaterjump, 0);
@@ -1996,10 +2026,14 @@ int main(void)
 	MV_SETCV(sv_gameplayfix_nudgeoutofsolid, 1);
 	MV_SETCV(sv_gameplayfix_nudgeoutofsolid_separation, -1);
 	mv_frames(24, 30);
+	mv_variantcalls();
+	MV_SETCV(sv_gameplayfix_nudgeoutofsolid_separation, 0.03125f);
+	mv_variantcalls();
 	mv_config_xonotic();
 	MV_SETCV(sv_nostep, 1);
 	MV_SETCV(sv_freezenonclients, 1);
 	mv_frames(8, 20);
+	mv_variantcalls();
 	MV_SETCV(sv_freezenonclients, 0);
 	// force_retouch, no EndFrame, and the highest edicts freed (prog->num_edicts goes down)
 	mv_config_xonotic();
