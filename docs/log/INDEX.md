@@ -1,4 +1,5 @@
 # Session log index (newest first)
+2026-11-25 Claude-Quartz M3-TRACE(partial) — world.c area grid ported (engine/world.luau), entity lists identical to the C build → docs/log/2026-11-25-Claude-Quartz.md
 2026-11-25 Claude-Quartz M3-BSPLOAD(partial) — Collision_ClipTo* / CombineTraces / ClipTrace_Box+Point and entity matrices ported; trace vectors now 8,685 checks bit-identical to the C build → docs/log/2026-11-25-Claude-Quartz.md
 2026-11-25 Claude-Quartz M3-BSPLOAD(partial) — Q3 shader scripts (Mod_LoadQ3Shaders, Mod_LookupQ3Shader, Mod_LoadTextureFromQ3Shader): 2,447 release shaders agree with the independent parser, map textures get material flags → docs/log/2026-11-25-Claude-Quartz.md
 2026-11-25 Claude-Quartz M3-BSPLOAD(partial) — all Q3BSP trace functions ported (collision.c brush/line/point/triangle traces, model_brush.c BIH + BSP-tree traces), 4,905 checks bit-identical to the C build; stock maps: BIH = plain loop, 77/77 spawns land → docs/log/2026-11-25-Claude-Quartz.md

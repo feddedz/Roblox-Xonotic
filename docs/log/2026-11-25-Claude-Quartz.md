@@ -120,12 +120,22 @@ None new.
   the 540 entity matrices built with the platform's sin / cos (CreateFromQuakeEntity) and trace endpos.
 - This is everything SV_TraceBox / SV_TraceLine / SV_TracePoint call below the area grid.
 
+## Part 7 (same day): M3-TRACE claimed, area grid
+- PR 9 (clip) merged. M3-TRACE claimed (commit on main), branch M3-TRACE-world.
+- engine/world.luau: world.c area grid (World_ClearLink / RemoveLink / InsertLinkBefore, World_SetSize,
+  World_UnlinkAll, World_UnlinkEdict, World_EntitiesInBox, World_LinkEdict(_AreaGrid), World_PrintAreaStats,
+  World_Init). Edicts are numbers; the area fields of edict_engineprivate_t live in prog.ed_area[n].
+- tools/testgen/world_vectors.c (world.c compiled unchanged, a prog with plain edicts): three worlds (normal,
+  smaller than the minimum grid, huge), 240 links + frees + relinks + unlinks, 246 box queries each.
+  tests/unit/world.test.luau compares the grid values bit for bit and every query's entity list in order.
+
 ## Next step
-1. M3-TRACE: world.c area grid (World_SetSize, World_LinkEdict, World_EntitiesInBox, ...), sv_phys.c
-   SV_GenericHitSuperContentsMask / SV_TracePoint / SV_TraceLine / SV_TraceBox / SV_PointSuperContents /
-   SV_EntitiesInBox / SV_LinkEdict, then the world builtins (traceline, tracebox, pointcontents, droptofloor,
-   setorigin, setsize, findradius ...) that M2-RUNNER waits for. Needs the model registry for brush entities
-   (`*N` submodels: brush.submodels) -- port Mod_FindName / Mod_ForName or wire SV_GetModelByIndex first.
+1. M3-TRACE continues: sv_phys.c SV_GenericHitSuperContentsMask / SV_TracePoint / SV_TraceLine / SV_TraceBox /
+   SV_PointSuperContents / SV_EntitiesInBox / SV_LinkEdict (L73-720; they call World_EntitiesInBox and the
+   Collision_ClipTo* functions, both done), sv.world + sv.worldmodel in engine/server.luau, then the world
+   builtins (traceline, tracebox, pointcontents, droptofloor, setorigin, setsize, findradius ...) that
+   M2-RUNNER waits for. Needs the model registry for brush entities (`*N` submodels: brush.submodels) --
+   port Mod_FindName / Mod_ForName or wire SV_GetModelByIndex first.
 2. C reference for Mod_LoadQ3Shaders + Mod_LoadTextureFromQ3Shader: tools/testgen/shader_vectors.c with fixture
    .shader files (tests/fixtures) and stubbed FS_Search / FS_LoadFile; print every q3shaderinfo_t field and
    the texture fields. Plan: the generator `#include "model_shared.c"` (q3shader_data is static), links
