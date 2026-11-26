@@ -21,12 +21,16 @@
 	Part 2: Collision_Init (cvars), triangle brushes, Collision_BrushForBox, the brush / line / point traces
 	against brushes and triangles, Collision_BoundingBoxOfBrushTraceSegment. The triangle brush of the
 	Collision_TraceBrushTriangle* functions is one reused scratch brush (C: locals on the stack).
-	NOT YET PORTED: the trace cache (Collision_Cache_*), Collision_ClipTrace_Line_Sphere, Collision_ClipTo*,
-	Collision_CombineTraces, Collision_ClipTrace_Box / _Point.
+	Part 3: Collision_TranslateBrush, Collision_TransformBrush, Collision_ClipExtendPrepare / Finish,
+	Collision_ClipToGenericEntity / ClipToWorld / ClipLineToGenericEntity / ClipLineToWorld /
+	ClipPointToGenericEntity / ClipPointToWorld, Collision_CombineTraces (Collision_ClipTrace_Box / _Point are
+	in model_brush.c: model_brush.luau stores them in this module).
+	NOT YET PORTED: the trace cache (Collision_Cache_*), Collision_ClipTrace_Line_Sphere.
 ]]
 local console = require("./console")
 local cvar = require("./cvar")
 local f32 = require("./_port/f32")
+local matrixlib = require("./matrixlib")
 local polygon = require("./polygon")
 
 local collision = {}
@@ -1856,6 +1860,542 @@ function collision.Collision_BoundingBoxOfBrushTraceSegment(
 		mins[k] = R(mins[k] - 1)
 		maxs[k] = R(maxs[k] + 1)
 	end
+end
+
+-- ---------------------------------------------------------------------------------------------------------
+-- Clipping against models and entities (collision.c L1397-1446, L1721-1952)
+
+-- model_brush.c Collision_ClipTrace_Box / Collision_ClipTrace_Point (declared in collision.h): model_brush.luau
+-- stores its ports here when it loads, because this module cannot require model_brush.
+collision.Collision_ClipTrace_Box = nil :: any
+collision.Collision_ClipTrace_Point = nil :: any
+
+-- port: collision.c Collision_TranslateBrush L1397-1411 @xonotic-v0.8.6
+local function Collision_TranslateBrush(shift: { number }, brush: colbrushf_t)
+	local s1, s2, s3 = shift[1], shift[2], shift[3]
+	-- now we can transform the data
+	for i = 1, brush.numplanes do
+		local p = brush.planes[i]
+		local n = p.normal
+		p.dist = R(p.dist + R(R(R(s1 * n[1]) + R(s2 * n[2])) + R(s3 * n[3])))
+	end
+	local points = brush.points
+	for i = 0, brush.numpoints - 1 do
+		writef32(points, i * 12, readf32(points, i * 12) + s1)
+		writef32(points, i * 12 + 4, readf32(points, i * 12 + 4) + s2)
+		writef32(points, i * 12 + 8, readf32(points, i * 12 + 8) + s3)
+	end
+	brush.mins[1], brush.mins[2], brush.mins[3] = R(brush.mins[1] + s1), R(brush.mins[2] + s2), R(brush.mins[3] + s3)
+	brush.maxs[1], brush.maxs[2], brush.maxs[3] = R(brush.maxs[1] + s1), R(brush.maxs[2] + s2), R(brush.maxs[3] + s3)
+end
+
+-- port: collision.c Collision_TransformBrush L1413-1446 @xonotic-v0.8.6
+local function Collision_TransformBrush(matrix: matrixlib.matrix4x4_t, brush: colbrushf_t)
+	local v = { 0, 0, 0 }
+	local tmp = { 0, 0, 0 }
+	-- we're breaking any AABB properties here...
+	brush.isaabb = false
+	brush.hasaabbplanes = false
+	-- now we can transform the data
+	for i = 1, brush.numplanes do
+		local p = brush.planes[i]
+		local n = p.normal
+		n[1], n[2], n[3], p.dist = matrixlib.Matrix4x4_TransformPositivePlane(matrix, n[1], n[2], n[3], p.dist)
+	end
+	local edgedirs = brush.edgedirs
+	for i = 0, brush.numedgedirs - 1 do
+		tmp[1], tmp[2], tmp[3] = readf32(edgedirs, i * 12), readf32(edgedirs, i * 12 + 4), readf32(edgedirs, i * 12 + 8)
+		matrixlib.Matrix4x4_Transform(matrix, tmp, v)
+		writef32(edgedirs, i * 12, v[1])
+		writef32(edgedirs, i * 12 + 4, v[2])
+		writef32(edgedirs, i * 12 + 8, v[3])
+	end
+	local points = brush.points
+	for i = 0, brush.numpoints - 1 do
+		tmp[1], tmp[2], tmp[3] = readf32(points, i * 12), readf32(points, i * 12 + 4), readf32(points, i * 12 + 8)
+		matrixlib.Matrix4x4_Transform(matrix, tmp, v)
+		writef32(points, i * 12, v[1])
+		writef32(points, i * 12 + 4, v[2])
+		writef32(points, i * 12 + 8, v[3])
+	end
+	local mins, maxs = brush.mins, brush.maxs
+	mins[1], mins[2], mins[3] = readf32(points, 0), readf32(points, 4), readf32(points, 8)
+	maxs[1], maxs[2], maxs[3] = mins[1], mins[2], mins[3]
+	for i = 1, brush.numpoints - 1 do
+		for k = 1, 3 do
+			local x = readf32(points, i * 12 + (k - 1) * 4)
+			if x < mins[k] then
+				mins[k] = x
+			end
+			if x > maxs[k] then
+				maxs[k] = x
+			end
+		end
+	end
+end
+
+-- collision.c extendtraceinfo_t L1721-1735 (all float)
+type extendtraceinfo_t = {
+	trace: trace_t,
+	realstart: { number },
+	realend: { number },
+	realdelta: { number },
+	extendstart: { number },
+	extendend: { number },
+	extenddelta: { number },
+	reallength: number,
+	extendlength: number,
+	scaletoextend: number,
+	extend: number,
+}
+
+-- port: collision.c Collision_ClipExtendPrepare L1737-1762 @xonotic-v0.8.6 (returns the filled struct)
+local function Collision_ClipExtendPrepare(
+	trace: trace_t,
+	tstart: { number },
+	tend: { number },
+	textend: number
+): extendtraceinfo_t
+	collision.cleartrace(trace)
+	trace.fraction = 1
+
+	local realstart = { tstart[1], tstart[2], tstart[3] }
+	local realend = { tend[1], tend[2], tend[3] }
+	local realdelta = { R(realend[1] - realstart[1]), R(realend[2] - realstart[2]), R(realend[3] - realstart[3]) }
+	local reallength = R(
+		math.sqrt(
+			R(R(R(realdelta[1] * realdelta[1]) + R(realdelta[2] * realdelta[2])) + R(realdelta[3] * realdelta[3]))
+		)
+	)
+	local info: extendtraceinfo_t = {
+		trace = trace,
+		realstart = realstart,
+		realend = realend,
+		realdelta = realdelta,
+		extendstart = { realstart[1], realstart[2], realstart[3] },
+		extendend = { realend[1], realend[2], realend[3] },
+		extenddelta = { realdelta[1], realdelta[2], realdelta[3] },
+		reallength = reallength,
+		extendlength = reallength,
+		scaletoextend = 1.0,
+		extend = textend,
+	}
+
+	-- make the trace longer according to the extend parameter
+	if info.reallength ~= 0 and info.extend ~= 0 then
+		info.extendlength = R(info.reallength + info.extend)
+		info.scaletoextend = R(info.extendlength / info.reallength)
+		for k = 1, 3 do
+			info.extendend[k] = R(realstart[k] + R(info.scaletoextend * realdelta[k]))
+			info.extenddelta[k] = R(info.extendend[k] - info.extendstart[k])
+		end
+	end
+	return info
+end
+
+-- port: collision.c Collision_ClipExtendFinish L1764-1791 @xonotic-v0.8.6
+local function Collision_ClipExtendFinish(extendtraceinfo: extendtraceinfo_t)
+	local trace = extendtraceinfo.trace
+
+	if trace.fraction ~= 1.0 then
+		-- undo the extended trace length
+		trace.fraction *= extendtraceinfo.scaletoextend
+
+		-- if the extended trace hit something that the unextended trace did not hit (even considering the collision_impactnudge), then we have to clear the hit information
+		if trace.fraction > 1.0 then
+			-- note that ent may refer to either startsolid or fraction<1, we can't restore the startsolid ent unfortunately
+			trace.ent = nil
+			trace.hitq3surfaceflags = 0
+			trace.hitsupercontents = 0
+			trace.hittexture = nil
+			trace.plane.normal[1], trace.plane.normal[2], trace.plane.normal[3] = 0, 0, 0
+			trace.plane.dist = 0.0
+		end
+	end
+
+	-- clamp things
+	trace.fraction = if trace.fraction >= 0 then (if trace.fraction < 1 then trace.fraction else 1) else 0
+
+	-- calculate the end position (double: endpos = realstart + fraction * realdelta)
+	for k = 1, 3 do
+		trace.endpos[k] = extendtraceinfo.realstart[k] + trace.fraction * extendtraceinfo.realdelta[k]
+	end
+end
+
+-- "transform plane" of the ClipTo*GenericEntity functions:
+-- Matrix4x4_TransformPositivePlane(matrix, normal[0], normal[1], normal[2], dist, normal_and_dist)
+local function transformplane(matrix: matrixlib.matrix4x4_t, trace: trace_t)
+	local n = trace.plane.normal
+	n[1], n[2], n[3], trace.plane.dist =
+		matrixlib.Matrix4x4_TransformPositivePlane(matrix, n[1], n[2], n[3], trace.plane.dist)
+end
+
+-- port: collision.c Collision_ClipToGenericEntity L1793-1834 @xonotic-v0.8.6
+function collision.Collision_ClipToGenericEntity(
+	trace: trace_t,
+	model: any,
+	frameblend: any,
+	skeleton: any,
+	bodymins: { number },
+	bodymaxs: { number },
+	bodysupercontents: number,
+	matrix: matrixlib.matrix4x4_t,
+	inversematrix: matrixlib.matrix4x4_t,
+	tstart: { number },
+	mins: { number },
+	maxs: { number },
+	tend: { number },
+	hitsupercontentsmask: number,
+	skipsupercontentsmask: number,
+	skipmaterialflagsmask: number,
+	extend: number
+)
+	local starttransformed, endtransformed = { 0, 0, 0 }, { 0, 0, 0 }
+	local extendtraceinfo = Collision_ClipExtendPrepare(trace, tstart, tend, extend)
+
+	matrixlib.Matrix4x4_Transform(inversematrix, extendtraceinfo.extendstart, starttransformed)
+	matrixlib.Matrix4x4_Transform(inversematrix, extendtraceinfo.extendend, endtransformed)
+
+	if model and model.TraceBox then
+		local im = inversematrix.m
+		if
+			model.TraceBrush
+			and (im[1][2] ~= 0 or im[1][3] ~= 0 or im[2][1] ~= 0 or im[2][3] ~= 0 or im[3][1] ~= 0 or im[3][2] ~= 0)
+		then
+			-- we get here if TraceBrush exists, AND we have a rotation component (SOLID_BSP case)
+			-- using starttransformed, endtransformed is WRONG in this case!
+			-- should rather build a brush and trace using it
+			local thisbrush_start = collision.Collision_BrushForBox(mins, maxs, 0, 0, nil)
+			local thisbrush_end = collision.Collision_BrushForBox(mins, maxs, 0, 0, nil)
+			Collision_TranslateBrush(extendtraceinfo.extendstart, thisbrush_start)
+			Collision_TranslateBrush(extendtraceinfo.extendend, thisbrush_end)
+			Collision_TransformBrush(inversematrix, thisbrush_start)
+			Collision_TransformBrush(inversematrix, thisbrush_end)
+			--Collision_TranslateBrush(starttransformed, &thisbrush_start.brush);
+			--Collision_TranslateBrush(endtransformed, &thisbrush_end.brush);
+			model.TraceBrush(
+				model,
+				frameblend,
+				skeleton,
+				trace,
+				thisbrush_start,
+				thisbrush_end,
+				hitsupercontentsmask,
+				skipsupercontentsmask,
+				skipmaterialflagsmask
+			)
+		else -- this is only approximate if rotated, quite useless
+			model.TraceBox(
+				model,
+				frameblend,
+				skeleton,
+				trace,
+				starttransformed,
+				mins,
+				maxs,
+				endtransformed,
+				hitsupercontentsmask,
+				skipsupercontentsmask,
+				skipmaterialflagsmask
+			)
+		end
+	else -- and this requires that the transformation matrix doesn't have angles components, like SV_TraceBox ensures; FIXME may get called if a model is SOLID_BSP but has no TraceBox function
+		collision.Collision_ClipTrace_Box(
+			trace,
+			bodymins,
+			bodymaxs,
+			starttransformed,
+			mins,
+			maxs,
+			endtransformed,
+			hitsupercontentsmask,
+			skipsupercontentsmask,
+			skipmaterialflagsmask,
+			bodysupercontents,
+			0,
+			nil
+		)
+	end
+
+	Collision_ClipExtendFinish(extendtraceinfo)
+
+	-- transform plane
+	-- NOTE: this relies on plane.dist being directly after plane.normal
+	transformplane(matrix, trace)
+end
+
+-- port: collision.c Collision_ClipToWorld L1836-1844 @xonotic-v0.8.6
+function collision.Collision_ClipToWorld(
+	trace: trace_t,
+	model: any,
+	tstart: { number },
+	mins: { number },
+	maxs: { number },
+	tend: { number },
+	hitsupercontentsmask: number,
+	skipsupercontentsmask: number,
+	skipmaterialflagsmask: number,
+	extend: number
+)
+	local extendtraceinfo = Collision_ClipExtendPrepare(trace, tstart, tend, extend)
+	-- ->TraceBox: TraceBrush not needed here, as worldmodel is never rotated
+	if model and model.TraceBox then
+		model.TraceBox(
+			model,
+			nil,
+			nil,
+			trace,
+			extendtraceinfo.extendstart,
+			mins,
+			maxs,
+			extendtraceinfo.extendend,
+			hitsupercontentsmask,
+			skipsupercontentsmask,
+			skipmaterialflagsmask
+		)
+	end
+	Collision_ClipExtendFinish(extendtraceinfo)
+end
+
+-- port: collision.c Collision_ClipLineToGenericEntity L1846-1870 @xonotic-v0.8.6
+function collision.Collision_ClipLineToGenericEntity(
+	trace: trace_t,
+	model: any,
+	frameblend: any,
+	skeleton: any,
+	bodymins: { number },
+	bodymaxs: { number },
+	bodysupercontents: number,
+	matrix: matrixlib.matrix4x4_t,
+	inversematrix: matrixlib.matrix4x4_t,
+	tstart: { number },
+	tend: { number },
+	hitsupercontentsmask: number,
+	skipsupercontentsmask: number,
+	skipmaterialflagsmask: number,
+	extend: number,
+	hitsurfaces: boolean
+)
+	local starttransformed, endtransformed = { 0, 0, 0 }, { 0, 0, 0 }
+	local extendtraceinfo = Collision_ClipExtendPrepare(trace, tstart, tend, extend)
+
+	matrixlib.Matrix4x4_Transform(inversematrix, extendtraceinfo.extendstart, starttransformed)
+	matrixlib.Matrix4x4_Transform(inversematrix, extendtraceinfo.extendend, endtransformed)
+
+	if model and model.TraceLineAgainstSurfaces and hitsurfaces then
+		model.TraceLineAgainstSurfaces(
+			model,
+			frameblend,
+			skeleton,
+			trace,
+			starttransformed,
+			endtransformed,
+			hitsupercontentsmask,
+			skipsupercontentsmask,
+			skipmaterialflagsmask
+		)
+	elseif model and model.TraceLine then
+		model.TraceLine(
+			model,
+			frameblend,
+			skeleton,
+			trace,
+			starttransformed,
+			endtransformed,
+			hitsupercontentsmask,
+			skipsupercontentsmask,
+			skipmaterialflagsmask
+		)
+	else
+		collision.Collision_ClipTrace_Box(
+			trace,
+			bodymins,
+			bodymaxs,
+			starttransformed,
+			{ 0, 0, 0 },
+			{ 0, 0, 0 },
+			endtransformed,
+			hitsupercontentsmask,
+			skipsupercontentsmask,
+			skipmaterialflagsmask,
+			bodysupercontents,
+			0,
+			nil
+		)
+	end
+
+	Collision_ClipExtendFinish(extendtraceinfo)
+
+	-- transform plane
+	-- NOTE: this relies on plane.dist being directly after plane.normal
+	transformplane(matrix, trace)
+end
+
+-- port: collision.c Collision_ClipLineToWorld L1872-1883 @xonotic-v0.8.6
+function collision.Collision_ClipLineToWorld(
+	trace: trace_t,
+	model: any,
+	tstart: { number },
+	tend: { number },
+	hitsupercontentsmask: number,
+	skipsupercontentsmask: number,
+	skipmaterialflagsmask: number,
+	extend: number,
+	hitsurfaces: boolean
+)
+	local extendtraceinfo = Collision_ClipExtendPrepare(trace, tstart, tend, extend)
+
+	if model and model.TraceLineAgainstSurfaces and hitsurfaces then
+		model.TraceLineAgainstSurfaces(
+			model,
+			nil,
+			nil,
+			trace,
+			extendtraceinfo.extendstart,
+			extendtraceinfo.extendend,
+			hitsupercontentsmask,
+			skipsupercontentsmask,
+			skipmaterialflagsmask
+		)
+	elseif model and model.TraceLine then
+		model.TraceLine(
+			model,
+			nil,
+			nil,
+			trace,
+			extendtraceinfo.extendstart,
+			extendtraceinfo.extendend,
+			hitsupercontentsmask,
+			skipsupercontentsmask,
+			skipmaterialflagsmask
+		)
+	end
+
+	Collision_ClipExtendFinish(extendtraceinfo)
+end
+
+-- port: collision.c Collision_ClipPointToGenericEntity L1885-1905 @xonotic-v0.8.6
+function collision.Collision_ClipPointToGenericEntity(
+	trace: trace_t,
+	model: any,
+	_frameblend: any,
+	_skeleton: any,
+	bodymins: { number },
+	bodymaxs: { number },
+	bodysupercontents: number,
+	matrix: matrixlib.matrix4x4_t,
+	inversematrix: matrixlib.matrix4x4_t,
+	start: { number },
+	hitsupercontentsmask: number,
+	skipsupercontentsmask: number,
+	skipmaterialflagsmask: number
+)
+	local starttransformed = { 0, 0, 0 }
+	collision.cleartrace(trace)
+	trace.fraction = 1
+
+	matrixlib.Matrix4x4_Transform(inversematrix, start, starttransformed)
+
+	if model and model.TracePoint then
+		model.TracePoint(
+			model,
+			nil,
+			nil,
+			trace,
+			starttransformed,
+			hitsupercontentsmask,
+			skipsupercontentsmask,
+			skipmaterialflagsmask
+		)
+	else
+		collision.Collision_ClipTrace_Point(
+			trace,
+			bodymins,
+			bodymaxs,
+			starttransformed,
+			hitsupercontentsmask,
+			skipsupercontentsmask,
+			skipmaterialflagsmask,
+			bodysupercontents,
+			0,
+			nil
+		)
+	end
+
+	trace.endpos[1], trace.endpos[2], trace.endpos[3] = start[1], start[2], start[3]
+	-- transform plane
+	-- NOTE: this relies on plane.dist being directly after plane.normal
+	transformplane(matrix, trace)
+end
+
+-- port: collision.c Collision_ClipPointToWorld L1907-1914 @xonotic-v0.8.6
+function collision.Collision_ClipPointToWorld(
+	trace: trace_t,
+	model: any,
+	start: { number },
+	hitsupercontentsmask: number,
+	skipsupercontentsmask: number,
+	skipmaterialflagsmask: number
+)
+	collision.cleartrace(trace)
+	trace.fraction = 1
+	if model and model.TracePoint then
+		model.TracePoint(
+			model,
+			nil,
+			nil,
+			trace,
+			start,
+			hitsupercontentsmask,
+			skipsupercontentsmask,
+			skipmaterialflagsmask
+		)
+	end
+	trace.endpos[1], trace.endpos[2], trace.endpos[3] = start[1], start[2], start[3]
+end
+
+-- port: collision.c Collision_CombineTraces L1916-1952 @xonotic-v0.8.6
+function collision.Collision_CombineTraces(cliptrace: trace_t, trace: trace_t, touch: any, isbmodel: boolean)
+	-- take the 'best' answers from the new trace and combine with existing data
+	if trace.allsolid then
+		cliptrace.allsolid = true
+	end
+	if trace.startsolid then
+		if isbmodel then
+			cliptrace.bmodelstartsolid = true
+		end
+		cliptrace.startsolid = true
+		if cliptrace.fraction == 1 then
+			cliptrace.ent = touch
+		end
+		if cliptrace.startdepth > trace.startdepth then
+			cliptrace.startdepth = trace.startdepth
+			cliptrace.startdepthnormal[1] = trace.startdepthnormal[1]
+			cliptrace.startdepthnormal[2] = trace.startdepthnormal[2]
+			cliptrace.startdepthnormal[3] = trace.startdepthnormal[3]
+		end
+	end
+	-- don't set this except on the world, because it can easily confuse
+	-- monsters underwater if there's a bmodel involved in the trace
+	-- (inopen && inwater is how they check water visibility)
+	--if (trace->inopen)
+	--	cliptrace->inopen = true;
+	if trace.inwater then
+		cliptrace.inwater = true
+	end
+	local n = trace.plane.normal
+	if trace.fraction < cliptrace.fraction and R(R(R(n[1] * n[1]) + R(n[2] * n[2])) + R(n[3] * n[3])) > 0 then
+		cliptrace.fraction = trace.fraction
+		cliptrace.endpos[1], cliptrace.endpos[2], cliptrace.endpos[3] =
+			trace.endpos[1], trace.endpos[2], trace.endpos[3]
+		cliptrace.plane.normal[1], cliptrace.plane.normal[2], cliptrace.plane.normal[3] = n[1], n[2], n[3]
+		cliptrace.plane.dist = trace.plane.dist
+		cliptrace.ent = touch
+		cliptrace.hitsupercontents = trace.hitsupercontents
+		cliptrace.hitq3surfaceflags = trace.hitq3surfaceflags
+		cliptrace.hittexture = trace.hittexture
+	end
+	cliptrace.startsupercontents = bit32.bor(cliptrace.startsupercontents, trace.startsupercontents)
 end
 
 return collision
