@@ -90,7 +90,7 @@ unsigned char *FS_LoadFile(const char *path, mempool_t *pool, qboolean quiet, fs
 	long n;
 	unsigned char *buf;
 	(void)quiet;
-	snprintf(full, sizeof(full), "%s%s", TV_ROOT, path);
+	dpsnprintf(full, sizeof(full), "%s%s", TV_ROOT, path);
 	f = fopen(full, "rb");
 	if (!f)
 		return NULL;
@@ -138,7 +138,7 @@ fssearch_t *FS_Search(const char *pattern, int caseinsensitive, int quiet)
 		{
 			names = (char **)realloc(names, sizeof(char *) * (n + 1));
 			names[n] = (char *)malloc(l + 9);
-			snprintf(names[n], l + 9, "scripts/%s", e->d_name);
+			dpsnprintf(names[n], l + 9, "scripts/%s", e->d_name);
 			n++;
 		}
 	}
