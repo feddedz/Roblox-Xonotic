@@ -27,6 +27,7 @@ export type Server = {
 	active: boolean,
 	state: number,
 	time: number,
+	frametime: number, -- double frametime (server.h L92)
 	protocol: number,
 	model_precache: { [number]: string },
 	sound_precache: { [number]: string },
@@ -44,6 +45,7 @@ function server.New(): Server
 		active = false,
 		state = server.ss_dead,
 		time = 0,
+		frametime = 0,
 		protocol = common.PROTOCOL.DARKPLACES7,
 		model_precache = {},
 		sound_precache = {},
@@ -57,6 +59,11 @@ function server.New(): Server
 end
 
 server.sv = server.New()
+
+-- host.c `client_t *host_client` (the client being processed; nil = NULL). Its client_t is a table of
+-- host_cmd.svs.clients; the fields sv_phys.c reads are begun, edict (edict number), clmovement_inputtimeout
+-- (float), cmd (usercmd_t), fixangle_angles, fixangle_angles_set (nil = the zeroed C memory).
+server.host_client = nil :: any
 
 -- vm_customstats (svvm_cmds.c L1690-1695): [i] = { type, fieldoffset }, i = stat - 32
 server.vm_customstats = {} :: { [number]: { type: number, fieldoffset: number } }
