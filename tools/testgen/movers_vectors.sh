@@ -15,15 +15,12 @@ gcc "${flags[@]}" --coverage -o "$out/movers_vectors" "$out/movers_vectors.o" "$
 	"$dp/collision.c" "$dp/polygon.c" "$dp/bih.c" "$dp/mathlib.c" "$dp/matrixlib.c" \
 	-Wl,--gc-sections -Wl,--unresolved-symbols=ignore-all -lm
 "$out/movers_vectors" > tests/vectors/movers.tsv || { tail -n 3 tests/vectors/movers.tsv | cut -c1-300; exit 1; }
-root=$PWD
 (
-	cd "$out"
-	gcov -f -o "$out" "$root/tools/testgen/movers_vectors.c" > gcov.log 2>&1 || true
-	awk '/^Function/ { f = $2 } /^Lines executed/ && f ~ /SV_|ClipVelocity|AngleVectorsFLU/ { print f, $0; f = "" }' gcov.log
-	g=$(ls ./*sv_phys.c.gcov 2>/dev/null | head -n 1)
-	echo "gcov files: $(ls ./*.gcov 2>/dev/null | tr '\n' ' ')"
-	head -n 8 "$g" | cut -c1-120
-	grep -n -m 3 'SV_WalkMove (prvm_edict_t' "$g" | cut -c1-120
+	# gcov reads the sources by the paths they were compiled with (relative to the repository root)
+	gcov -f -o "$out" tools/testgen/movers_vectors.c > "$out/gcov.log" 2>&1 || true
+	mv ./*.gcov "$out/" 2>/dev/null || true
+	awk '/^Function/ { f = $2 } /^Lines executed/ && f ~ /SV_|ClipVelocity|AngleVectorsFLU/ { print f, $0; f = "" }' "$out/gcov.log"
+	g=$(ls "$out"/*sv_phys.c.gcov 2>/dev/null | head -n 1)
 	awk -F: '{ c = $1; gsub(/[ \t]/, "", c); l = $2 + 0 }
 		l >= 893 && l <= 3232 && c != "-" { n++; if (c ~ /#####/) { u++; miss = miss " " l } }
 		END { printf "sv_phys.c L893-3232: %d executable lines, %d never run\nnever run:%s\n", n, u, miss }' "$g"

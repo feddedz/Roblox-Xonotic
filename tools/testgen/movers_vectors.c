@@ -1017,7 +1017,7 @@ static void mv_makeclient(int i)
 {
 	static const int others[12] = {MOVETYPE_FLY, MOVETYPE_NOCLIP, MOVETYPE_STEP, MOVETYPE_TOSS, MOVETYPE_FOLLOW, MOVETYPE_NONE, MOVETYPE_PUSH, MOVETYPE_PHYSICS, MOVETYPE_FLY_WORLDONLY, MOVETYPE_BOUNCE, 150, 50};
 	prvm_prog_t *prog = SVVM_prog;
-	int n = i + 1, r, movetype = mv_rn(100) < 72 ? MOVETYPE_WALK : others[mv_rn(12)];
+	int n = i + 1, r, movetype = mv_rn(100) < 50 ? MOVETYPE_WALK : others[mv_rn(12)];
 	prvm_edict_t *ed = mv_ed + n;
 	client_t *c = mv_clients + i;
 	float t[3];
@@ -1361,7 +1361,7 @@ static int mv_freshfor(int op)
 		if (r < 2)
 		{
 			PRVM_serveredictfloat(ed, flags) = fl & ~(FL_ONGROUND | FL_FLY | FL_SWIM);
-			PRVM_serveredictvector(ed, velocity)[2] = -tv_frand(0, 600);
+			PRVM_serveredictvector(ed, velocity)[2] = -tv_frand(80, 1500);
 		}
 		else if (r == 2)
 		{
@@ -1857,8 +1857,7 @@ static void mv_unitcases(int calls)
 				mv_makeent(n, mv_randmovetype());
 				mv_commit(n);
 			}
-			if (mv_rn(3) == 0)
-				mv_makeclient(mv_rn(2));
+			mv_makeclient(mv_rn(2));
 		}
 		r = mv_rn(total);
 		for (k = 0; r >= w[k][1]; k++)
