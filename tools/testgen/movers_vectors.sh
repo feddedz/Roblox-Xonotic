@@ -22,7 +22,9 @@ root=$PWD
 	awk '/^Function/ { f = $2 } /^Lines executed/ && f ~ /SV_|ClipVelocity|AngleVectorsFLU/ { print f, $0; f = "" }' gcov.log
 	g=$(ls ./*sv_phys.c.gcov 2>/dev/null | head -n 1)
 	echo "gcov files: $(ls ./*.gcov 2>/dev/null | tr '\n' ' ')"
-	awk -F: '{ c = $1; gsub(/ /, "", c); l = $2 + 0 }
+	head -n 8 "$g" | cut -c1-120
+	grep -n -m 3 'SV_WalkMove (prvm_edict_t' "$g" | cut -c1-120
+	awk -F: '{ c = $1; gsub(/[ \t]/, "", c); l = $2 + 0 }
 		l >= 893 && l <= 3232 && c != "-" { n++; if (c ~ /#####/) { u++; miss = miss " " l } }
 		END { printf "sv_phys.c L893-3232: %d executable lines, %d never run\nnever run:%s\n", n, u, miss }' "$g"
 ) > tests/vectors/movers_coverage.txt 2>&1 || true

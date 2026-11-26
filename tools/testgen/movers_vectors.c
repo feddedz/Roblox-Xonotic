@@ -1186,6 +1186,12 @@ static void mv_fresh(int n, int movetype, int kind, int sizekind)
 	}
 	if (sizekind >= 0)
 		mv_size(mins, maxs, sizekind);
+	if (mv_rn(5)) // mostly something that collides with the box entities
+	{
+		PRVM_serveredictfloat(ed, solid) = mv_rn(2) ? SOLID_SLIDEBOX : SOLID_BBOX;
+		if (mv_rn(6))
+			PRVM_serveredictfloat(ed, dphitcontentsmask) = 0;
+	}
 	o = PRVM_serveredictvector(ed, origin);
 	v = PRVM_serveredictvector(ed, velocity);
 	k = tv_frand(1.1f, 4) / (float)sv.frametime; // a velocity that gets there in 1 / 4 .. 1 / 1.1 frames
@@ -1193,7 +1199,7 @@ static void mv_fresh(int n, int movetype, int kind, int sizekind)
 	{
 	case 0:
 		VectorSet(o, 1300 + tv_frand(-400, 400), tv_frand(-400, 380), -mins[2] + tv_frand(0, 30));
-		VectorSet(v, tv_frand(-300, 300), tv_frand(-300, 300), -tv_frand(20, 900));
+		VectorSet(v, tv_frand(-300, 300), tv_frand(-300, 300), -tv_frand(100, 1500));
 		break;
 	case 1:
 		bx = mv_boxes + 3 + mv_rn(MV_NBOX - 3);
@@ -1219,11 +1225,11 @@ static void mv_fresh(int n, int movetype, int kind, int sizekind)
 		break;
 	case 2:
 		VectorSet(o, 1700 - maxs[0] - tv_frand(0, 30), 420 - maxs[1] - tv_frand(0, 30), -mins[2] + tv_frand(0, 1));
-		VectorSet(v, tv_frand(100, 600), mv_rn(2) ? tv_frand(100, 600) : tv_frand(-300, 300), mv_rn(2) ? 0 : -tv_frand(0, 200));
+		VectorSet(v, tv_frand(300, 1500), mv_rn(2) ? tv_frand(300, 1500) : tv_frand(-300, 300), mv_rn(2) ? 0 : -tv_frand(0, 200));
 		break;
 	case 3:
 		VectorSet(o, 1100 - maxs[0] - tv_frand(0, 40), -400 + tv_frand(-50, 50), -mins[2] + tv_frand(0, 1));
-		VectorSet(v, tv_frand(150, 500), tv_frand(-50, 50), 0);
+		VectorSet(v, tv_frand(300, 1200), tv_frand(-50, 50), 0);
 		break;
 	case 4:
 		VectorSet(o, 1000 + tv_frand(-64, 64), 250 + tv_frand(-64, 64), 48 - mins[2] + tv_frand(0, 0.5f));
@@ -1237,7 +1243,7 @@ static void mv_fresh(int n, int movetype, int kind, int sizekind)
 		b = tv_pickbrush(0);
 		cb = tv_brush[b].colbrushf;
 		VectorSet(o, tv_frand(cb->mins[0], cb->maxs[0]), tv_frand(cb->mins[1], cb->maxs[1]), cb->maxs[2] - mins[2] + tv_frand(0, 6));
-		VectorSet(v, tv_frand(-300, 300), tv_frand(-300, 300), -tv_frand(0, 400));
+		VectorSet(v, tv_frand(-300, 300), tv_frand(-300, 300), -tv_frand(50, 800));
 		break;
 	case 6:
 	case 7:
@@ -1268,7 +1274,7 @@ static void mv_fresh(int n, int movetype, int kind, int sizekind)
 		break;
 	default:
 		VectorSet(o, 950 + tv_frand(-50, 50), tv_frand(-50, 50), -mins[2] + tv_frand(0, 1));
-		VectorSet(v, tv_frand(-300, 300), tv_frand(-300, 300), mv_rn(2) ? tv_frand(100, 300) : 0);
+		VectorSet(v, tv_frand(-600, 600), tv_frand(-600, 600), mv_rn(2) ? tv_frand(300, 1200) : 0);
 		break;
 	}
 	for (j = 0; j < 3; j++)
@@ -1832,8 +1838,8 @@ static void mv_unitcases(int calls)
 {
 	static const int w[][2] =
 	{
-		{MV_TEP, 6}, {MV_CCT, 3}, {MV_CV, 6}, {MV_RT, 6}, {MV_IMP, 4}, {MV_FLY, 14}, {MV_GRAV, 2}, {MV_NPK, 5},
-		{MV_PE, 10}, {MV_UNO, 4}, {MV_UN, 3}, {MV_CS, 4}, {MV_CW, 6}, {MV_WF, 4}, {MV_WM, 16}, {MV_FOL, 4},
+		{MV_TEP, 6}, {MV_CCT, 3}, {MV_CV, 6}, {MV_RT, 6}, {MV_IMP, 4}, {MV_FLY, 22}, {MV_GRAV, 2}, {MV_NPK, 5},
+		{MV_PE, 10}, {MV_UNO, 4}, {MV_UN, 3}, {MV_CS, 4}, {MV_CW, 6}, {MV_WF, 4}, {MV_WM, 20}, {MV_FOL, 4},
 		{MV_CWT, 5}, {MV_TOSS, 14}, {MV_STEP, 9}, {MV_PENT, 14}, {MV_CNT, 3}, {MV_CMOVE, 2}, {MV_CPRE, 2},
 		{MV_CPOST, 2}, {MV_CENT, 4}, {MV_PM, 3}, {MV_PP, 3},
 	};
