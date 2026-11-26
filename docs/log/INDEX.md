@@ -1,4 +1,5 @@
 # Session log index (newest first)
+2026-11-26 Claude-Quartz M4-PHYS — sv_phys.c movers / SV_Physics, sv_move.c and the world builtins are bit-identical to the C build (13,678 + 50,400 checks; one error-text fix); G-058 host sin / cos vs glibc, task PORT-LIBM → docs/log/2026-11-26-Claude-Quartz.md
 2026-11-26 Claude-Quartz M4-PHYS(partial) + M3-TRACE — all of sv_phys.c (movers, SV_Physics) and sv_move.c ported with their builtins (unit-tested, no C reference yet); sv traces / SV_LinkEdict now bit-identical to the C build (2,524 checks) → docs/log/2026-11-26-Claude-Quartz.md
 2026-11-26 Claude-Quartz M3-TRACE(partial) + M3-BSPLOAD — sv_phys.c traces / SV_LinkEdict and 7 world builtins ported (unit-tested, no C reference yet); Q3 shader code now bit-identical to the C build (4,363 checks, 3 fixes) → docs/log/2026-11-26-Claude-Quartz.md
 2026-11-25 Claude-Quartz M3-TRACE(partial) — world.c area grid ported (engine/world.luau), entity lists identical to the C build → docs/log/2026-11-25-Claude-Quartz.md

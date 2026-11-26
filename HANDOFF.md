@@ -36,7 +36,7 @@ Every section except §MAP and §DIFFS stays under ~60 lines; detail lives in `d
 - **M2-RUNNER done** (stormkeep entities load, first StartFrame spawns them; world builtins wait on M3).
   ~170 builtins ported; server state (engine/server.luau), SZ/MSG writes, mathlib bit-exact.
 - **M2-AOT-SHIP (claimed, Claude-Anvil):** lazy chunk loading + background preload; Q-014 (startup 17.7 s).
-- **Tests:** 28 Lune files, all pass; StyLua/Selene clean; check_port_lines 0 wrong.
+- **Tests:** 31 Lune files, all pass; StyLua/Selene clean; check_port_lines 0 wrong.
 - **Stale claims:** M3-BSPLOAD and REF-DP branches have only claim commits from 2026-11-20 — owner to reassign.
 - **Local + Studio (2026-11-25):** the owner cannot use cloud sessions; work happens on the owner's Windows PC.
   Toolchain there: `rokit install` (shims in %USERPROFILE%/.rokit/bin; stylua, selene, lune 14/14, rojo pass).
@@ -69,9 +69,11 @@ Every section except §MAP and §DIFFS stays under ~60 lines; detail lives in `d
   sv_phys_ref 2,524 checks on a synthetic map). Open: the stock-map reference (M3-TRACEREF / REF-DP).
 - **M4-PHYS (claimed, Claude-Quartz):** all of sv_phys.c (movers, SV_Physics) and sv_move.c are ported
   (engine/sv_phys.luau, engine/sv_move.luau) with the builtins setorigin, setsize, traceline, tracebox,
-  tracetoss, findradius, droptofloor, pointcontents, walkmove, checkbottom, movetogoal. Unit-tested only:
-  **movers, sv_move and builtins are not yet checked against the C build** (next step). Stubs: SV_StartSound,
-  SV_ClientThink, ODE, setmodel, checkclient / checkpvs / aim. Log: docs/log/2026-11-26-Claude-Quartz.md.
+  tracetoss, findradius, droptofloor, pointcontents, walkmove, checkbottom, movetogoal, copyentity relink, and
+  are **bit-identical to the C build** on synthetic maps: sv_phys_movers_ref 13,678 checks (incl. 273 whole
+  SV_Physics frames), sv_move_ref 50,400 checks. Open: G-058 (host sin / cos vs glibc, task PORT-LIBM).
+  Stubs: SV_StartSound, SV_ClientThink, ODE, setmodel, checkclient / checkpvs / aim. Next: PORT-LIBM, then
+  SV_SpawnServer + the model registry. Log: docs/log/2026-11-26-Claude-Quartz.md.
 - **Branches (2026-11-25):** PRs 1, 2, 3 merged into main: start every new branch from main (D-012). Owner
   decided NOT to archive the 68 old images (archive-now.tsv is only a list).
 - **Next:** owner: heavymetal.ogg appeal (optional); M1-TEX / M5-RENDER use texture_assets.luau;
@@ -190,6 +192,7 @@ before working. One claimed task per subsystem at a time. Details per task in th
 | M3-TRACEREF | Record ≥1000 traceline/tracebox per stock map from REF-DP | open | tests/reference/traces/ | REF-DP |
 | M3-TRACE | Port world.c/sv traces; bit-identical vs M3-TRACEREF on all stock maps | claimed by Claude-Quartz 2026-11-25 (world.c area grid, sv_phys.c SV_Trace*, world builtins; M3-TRACEREF / REF-DP are not available on the owner's PC: checked against the C build on synthetic maps through the Testgen workflow instead, the stock-map reference stays open) | engine/ | M3-BSPLOAD, M3-TRACEREF |
 | M4-* | Server: sv_phys/sv_main/sv_user/sv_move, prvm_*, svvm_cmds builtins, host loop; bot match frame-diff | open (split when M3 done); part M4-PHYS (sv_phys.c movers, sv_move.c and their builtins) claimed by Claude-Quartz 2026-11-26 | engine/ | M2-RUNNER, M3-TRACE |
+| PORT-LIBM | Pure-Luau, glibc-exact sin / cos (+ other libm calls the engine makes) in engine/_port, checked against the runner's glibc via Testgen; switch mathlib / matrixlib / sv_move / svvm_cmds to it (G-058) | open | engine/_port | — |
 | M5-* | Client: map render, models, input, CSQC + prediction, camera/viewmodel (CPU logic headless; visual check **[needs Studio]**) | open (split later) | engine/, platform/render, platform/input | M1-*, M4 |
 | M6-NET | DarkPlaces message layer on RemoteEvents, fragmentation, byte-match | open | engine/netconn, platform/net | M4 |
 | M7-* | 2D draw builtins, menu.dat, fonts, DataStore persistence, Credits & License entry | open | engine/, platform/ | M2, M5 |
@@ -554,4 +557,5 @@ One line each; **details and sources: `docs/gotchas.md`** (add to both). Roblox 
 - **G-053** (2026-11-25) string.format calls the C runtime: Windows prints "i.nf" for "%#.0e" of infinity, glibc "inf". Roblox servers are Linux, clients mostly Windows, so printf-like code must not hand non-finite numbers to string.format (engine/_port/libc.luau format1 does them itself). Lune on Windows found it; CI (Linux) could not.
 - **G-052** (read 2026-11-25) Open Cloud can archive assets: `POST /assets/v1/assets/{id}:archive` (no body, scope asset:write, beta) → `"state": "Archived"` (gone from the website, not usable in experiences); `...:restore` undoes it. `GET /assets/v1/assets/{id}?readMask=moderationResult,state` shows both states; GETs are rate-limited (429 with x-ratelimit-reset; ~4,100 reads ≈ 20 min). A 1x1 grey JPEG was Rejected while 1x1 colour swatches were Approved: moderation of tiny images is not predictable. **Tried: only Audio can be archived; Image answers 400 "not an archivable asset type" → dashboard only.** tools/upload/check_assets.py, archive_assets.py.
 - **G-057** (2026-11-25) Trace port notes. (a) A C generator may `#include "model_brush.c"` itself to call its static functions (tools/testgen/trace_vectors.c); it must then define `loadmodel` and `developer_extra`, and set cvar `.integer` / `.value` by hand (they are 0 until Cvar_RegisterVariable). (b) The same holds in the port: collision.cv / model_brush.cv are 0 until Collision_Init / Mod_BrushInit run (host.luau calls them; tests call them after cvar.reset()). (c) Collision_BoundingBoxOfBrushTraceSegment uses min() for maxs too (engine bug, kept). (d) A degenerate triangle sets the triangle brush's numplanes to 0 and it is still traced (edge planes only), and numplanes stays 0 for the following triangles of a mesh until a good one sets it back to 5 (kept). (e) C's min(a,b)/max(a,b) macros return b on ties (-0 vs 0), math.min/max return the first: harmless where a +-1 follows, check it if a sign-of-zero mismatch ever shows up.
+- **G-058** (2026-11-26) Luau's math.sin / math.cos call the host C library: on Windows they differ from glibc by one ulp for about 3 % of inputs (277 cos / 315 sin of 9,761 yaws in tests/vectors/svmove.tsv). No float result of walkmove / SV_StepDirection changed in the vectors, but it can, and Roblox servers and clients run different C libraries. Needs a pure-Luau, glibc-exact sin / cos (task PORT-LIBM); until then tests/unit/sv_move_libm_ref.test.luau prints the count and fails only when a float move changes. Also: string.format of non-finite numbers is host-specific ("-nan(ind)" on Windows) -- use libc.format1.
 <!-- /§GOTCHAS -->
