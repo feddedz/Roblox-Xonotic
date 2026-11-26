@@ -1,0 +1,21 @@
+// custom infoparms in the q3map2 format (tests/unit/q3shaders_ref.test.luau, tools/testgen/shader_vectors.c)
+// first section: content flags, skipped by DarkPlaces
+{
+	tvcontent 0x10
+	anothercontent 4
+}
+// second section: surface flags, name then strtol(value, NULL, 0)
+{
+	tvflag1 0x100000
+	TVFlag2 0x40
+	tvneg -1
+	tvoct 010
+	tvbig 99999999999999999999
+	tvnegbig -0x80000001
+	tvhuge 0x1ffffffff
+	tvprec 0x7fffffffffffff01
+	tvdup 1
+	tvdup 2
+	tvx 0x
+	tvlast
+}

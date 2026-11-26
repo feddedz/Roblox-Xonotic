@@ -3,7 +3,8 @@
 Copyright (C) 1996-1997 Id Software, Inc. (DarkPlaces sv_main.c; GPLv2 or later, see engine/prvm_exec.luau)
 ]]
 --[[
-	Port of sv_main.c @xonotic-v0.8.6. PARTIAL: SV_VM_Setup up to PRVM_Prog_Load.
+	Port of sv_main.c @xonotic-v0.8.6. PARTIAL: SV_VM_Setup up to PRVM_Prog_Load, SV_GetModelByIndex,
+	SV_GetModelFromEdict.
 	NOT YET PORTED: the PROGHEADER_CRC branch that sets engine field offsets from entvars_t (applies to
 	Xonotic: progs crc 5927), the remaining PRVM_Prog_Load steps (autocvar_* globals from cvars, .po
 	translation, PRVM_Init_Exec, field/global offset lookup), the rest of SV_VM_Setup, and everything else.
@@ -132,6 +133,23 @@ function sv_main.SVVM_load_edict(prog: any, ent: number): boolean
 		return false
 	end
 	return true
+end
+
+-- port: sv_main.c SV_GetModelByIndex L3089-3092 @xonotic-v0.8.6 (nil = NULL)
+function sv_main.SV_GetModelByIndex(modelindex: number): any
+	return if modelindex > 0 and modelindex < server.MAX_MODELS then server.sv.models[modelindex] else nil
+end
+
+-- port: sv_main.c SV_GetModelFromEdict L3094-3102 @xonotic-v0.8.6 (ed: edict number, nil = NULL; 0 is the world)
+function sv_main.SV_GetModelFromEdict(ed: number?): any
+	local prog = cvar.prvm_prog_list[0] -- SVVM_prog
+	if ed == nil or prog.ed_free[ed] then
+		return nil
+	end
+	local modelindex = libc.toint(
+		buffer.readf32(prog.edictsfields, (ed * prog.entityfields + prvm_edict.FieldOfs(prog, "modelindex")) * 4)
+	)
+	return if modelindex > 0 and modelindex < server.MAX_MODELS then server.sv.models[modelindex] else nil
 end
 
 local MAX_EDICTS = 32768 -- quakedef.h (non-DP_SMALLMEMORY)

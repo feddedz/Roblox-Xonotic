@@ -4,11 +4,14 @@
 ]]
 --[[
 	The server state the ported builtins read and write. PARTIAL: precache lists, light styles, signon and
-	reliable datagram buffers, custom stats, time/state/protocol. Filled by SV_SpawnServer (sv_main.c,
-	M4) — until then sv.protocol keeps the value sv_protocolname "DP7" (the Xonotic default) selects.
-	NOT YET PORTED: the rest of server_t (worldmodel, areagrid, entity frames, ...), added with their users.
+	reliable datagram buffers, custom stats, time/state/protocol, world (the area grid), worldmodel and
+	models. Filled by SV_SpawnServer (sv_main.c, M4) — until then sv.protocol keeps the value
+	sv_protocolname "DP7" (the Xonotic default) selects.
+	sv.models is `dp_model_t *models[MAX_MODELS]`: C element i at [i] (nil = NULL), like the precache lists.
+	NOT YET PORTED: the rest of server_t (entity frames, ...), added with their users.
 ]]
 local common = require("./common")
+local world = require("./world")
 
 local server = {}
 
@@ -30,6 +33,9 @@ export type Server = {
 	lightstyles: { [number]: string },
 	signon: common.SizeBuf,
 	reliable_datagram: common.SizeBuf,
+	world: world.world_t, -- collision culling data
+	worldmodel: any, -- dp_model_t * (nil = NULL)
+	models: { [number]: any }, -- dp_model_t *models[MAX_MODELS], C index i at [i]
 }
 
 -- a cleared server_t (memset 0 in SV_SpawnServer, then the buffers are set up, sv_main.c L3431-3436)
@@ -44,6 +50,9 @@ function server.New(): Server
 		lightstyles = {},
 		signon = common.SZ_New(server.NET_MAXMESSAGE),
 		reliable_datagram = common.SZ_New(server.NET_MAXMESSAGE),
+		world = world.new(),
+		worldmodel = nil,
+		models = {},
 	}
 end
 

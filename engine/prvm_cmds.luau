@@ -1607,6 +1607,7 @@ local function GlobalOfs(prog: any, name: string): number
 	end
 	return o
 end
+prvm_cmds.GlobalOfs = GlobalOfs
 local function E_OFS(prog: any, ed: number, f: number): number
 	return (ed * prog.entityfields + f) * 4
 end
