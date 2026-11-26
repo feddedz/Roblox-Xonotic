@@ -176,7 +176,12 @@ return function(ctx: t.Ctx)
 		m.render_bih = bih.new()
 		model_brush.Mod_MakeCollisionBIH(m, false, m.collision_bih)
 		model_brush.Mod_MakeCollisionBIH(m, true, m.render_bih)
-		t.eq(ctx, `{m.collision_bih.numnodes}\t{m.render_bih.numnodes}`, c[7] .. "\t" .. c[8], "model " .. c[2] .. ": BIH nodes")
+		t.eq(
+			ctx,
+			`{m.collision_bih.numnodes}\t{m.render_bih.numnodes}`,
+			c[7] .. "\t" .. c[8],
+			"model " .. c[2] .. ": BIH nodes"
+		)
 		models[num(c[2]) + 1] = m
 	end
 
@@ -350,8 +355,20 @@ return function(ctx: t.Ctx)
 		elseif kind == "MOVET" then
 			local s, e = boxbrushes(c, 6, 0, 0, nil)
 			local texture = tex(c[5])
-			local os = collision.Collision_BrushForBox(v3(c, 18), v3(c, 21), texture.supercontents, texture.surfaceflags, texture)
-			local oe = collision.Collision_BrushForBox(v3(c, 24), v3(c, 27), texture.supercontents, texture.surfaceflags, texture)
+			local os = collision.Collision_BrushForBox(
+				v3(c, 18),
+				v3(c, 21),
+				texture.supercontents,
+				texture.surfaceflags,
+				texture
+			)
+			local oe = collision.Collision_BrushForBox(
+				v3(c, 24),
+				v3(c, 27),
+				texture.supercontents,
+				texture.surfaceflags,
+				texture
+			)
 			s.isaabb = false
 			e.isaabb = false
 			local tr = tinit(c[2], c[3], c[4])
@@ -460,7 +477,16 @@ return function(ctx: t.Ctx)
 			begin({ statestr(tr) }, nil)
 		elseif kind == "XPOINT" then
 			local tr = collision.newtrace()
-			model_brush.Mod_Q3BSP_TracePoint(models[num(c[2]) + 1], nil, nil, tr, v3(c, 6), num(c[3]), num(c[4]), num(c[5]))
+			model_brush.Mod_Q3BSP_TracePoint(
+				models[num(c[2]) + 1],
+				nil,
+				nil,
+				tr,
+				v3(c, 6),
+				num(c[3]),
+				num(c[4]),
+				num(c[5])
+			)
 			begin({ statestr(tr) }, nil)
 		elseif kind == "XPSC" then
 			t.eq(
@@ -470,7 +496,8 @@ return function(ctx: t.Ctx)
 				`line {lineno}: Mod_Q3BSP_PointSuperContents`
 			)
 		elseif kind == "XLOS" then
-			local r = model_brush.Mod_Q3BSP_TraceLineOfSight(models[num(c[2]) + 1], v3(c, 3), v3(c, 6), v3(c, 9), v3(c, 12))
+			local r =
+				model_brush.Mod_Q3BSP_TraceLineOfSight(models[num(c[2]) + 1], v3(c, 3), v3(c, 6), v3(c, 9), v3(c, 12))
 			t.eq(ctx, if r then "1" else "0", c[15], `line {lineno}: Mod_Q3BSP_TraceLineOfSight`)
 		elseif kind == "S" then
 			local k = num(c[2]) + 1

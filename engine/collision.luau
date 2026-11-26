@@ -744,7 +744,7 @@ local function currentmaterialflags(texture: any): number
 	return if texture then (texture.currentmaterialflags or 0) else 0
 end
 
--- port: collision.c nearestplanedist_float L126-141 @xonotic-v0.8.6 (points: f32 buffer; normal: 3 floats)
+-- port: collision.c nearestplanedist_float L126-140 @xonotic-v0.8.6 (points: f32 buffer; normal: 3 floats)
 local function nearestplanedist_float(n1: number, n2: number, n3: number, points: buffer, numpoints: number): number
 	if numpoints == 0 then
 		return 0
@@ -807,7 +807,7 @@ local function CrossProduct(a: { number }, b: { number }, c: { number })
 	c[1], c[2], c[3] = c1, c2, c3
 end
 
--- port: collision.c Collision_CalcPlanesForTriangleBrushFloat L453-557 @xonotic-v0.8.6
+-- port: collision.c Collision_CalcPlanesForTriangleBrushFloat L453-558 @xonotic-v0.8.6
 function collision.Collision_CalcPlanesForTriangleBrushFloat(brush: colbrushf_t)
 	local edge0, edge1, edge2 = { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }
 	local pts = brush.points
@@ -919,7 +919,7 @@ function collision.Collision_CalcPlanesForTriangleBrushFloat(brush: colbrushf_t)
 	end
 end
 
--- port: collision.c Collision_TraceBrushBrushFloat L560-759 @xonotic-v0.8.6
+-- port: collision.c Collision_TraceBrushBrushFloat L561-759 @xonotic-v0.8.6
 -- NOTE: start and end of each brush pair must have same numplanes/numpoints
 function collision.Collision_TraceBrushBrushFloat(
 	trace: trace_t,
@@ -1153,7 +1153,7 @@ local Collision_TraceBrushBrushFloat = collision.Collision_TraceBrushBrushFloat
 
 -- collision.h colboxbrushf_t L130-137: the brush for a box (or a point). C embeds the arrays in the struct;
 -- here Collision_BrushForBox returns the colbrushf_t itself.
--- port: collision.c Collision_BrushForBox L1143-1201 @xonotic-v0.8.6
+-- port: collision.c Collision_BrushForBox L1143-1200 @xonotic-v0.8.6
 function collision.Collision_BrushForBox(
 	mins: { number },
 	maxs: { number },
@@ -1231,7 +1231,7 @@ function collision.Collision_BrushForBox(
 	return brush
 end
 
--- port: collision.c Collision_TraceLineBrushFloat L761-909 @xonotic-v0.8.6
+-- port: collision.c Collision_TraceLineBrushFloat L762-910 @xonotic-v0.8.6
 -- NOTE: start and end of each brush pair must have same numplanes/numpoints
 function collision.Collision_TraceLineBrushFloat(
 	trace: trace_t,
@@ -1375,7 +1375,7 @@ function collision.Collision_TraceLineBrushFloat(
 	end
 end
 
--- port: collision.c Collision_PointInsideBrushFloat L911-922 @xonotic-v0.8.6
+-- port: collision.c Collision_PointInsideBrushFloat L912-923 @xonotic-v0.8.6
 function collision.Collision_PointInsideBrushFloat(point: { number }, brush: colbrushf_t): boolean
 	-- BoxesOverlap(point, point, brush->mins, brush->maxs)
 	if
@@ -1400,7 +1400,7 @@ function collision.Collision_PointInsideBrushFloat(point: { number }, brush: col
 	return true
 end
 
--- port: collision.c Collision_TracePointBrushFloat L924-984 @xonotic-v0.8.6
+-- port: collision.c Collision_TracePointBrushFloat L925-985 @xonotic-v0.8.6
 function collision.Collision_TracePointBrushFloat(trace: trace_t, linestart: { number }, other_start: colbrushf_t)
 	local numplanes = other_start.numplanes
 	local startdist: number

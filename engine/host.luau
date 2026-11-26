@@ -16,9 +16,11 @@ Copyright (C) 1996-1997 Id Software, Inc. (DarkPlaces host.c; GPLv2 or later, se
 	`-dedicated N` / other command-line options except -noconfig.
 ]]
 local cmd = require("./cmd")
+local collision = require("./collision")
 local cvar = require("./cvar")
 local defs = require("./_port/sv_init_defs")
 local host_cmd = require("./host_cmd")
+local model_brush = require("./model_brush")
 
 local host = {}
 
@@ -61,6 +63,10 @@ function host.Host_Init_Dedicated(opts: { com_argv: { string }?, maxclients: num
 			end
 		end
 	end
+	-- Collision_Init and Mod_Init -> Mod_BrushInit (host.c Host_Init): their cvars are in the table above; the
+	-- calls bind the cvar_t records that the trace code reads as struct fields (collision.cv, model_brush.cv).
+	collision.Collision_Init()
+	model_brush.Mod_BrushInit()
 	-- COM_Init_Commands (common.c): Cvar_Set("cmdline", com_cmdline)
 	if #cmd.com_argv > 1 then
 		print("NOT YET PORTED: com_cmdline quoting for command-line arguments (common.c COM_Init_Commands)")
