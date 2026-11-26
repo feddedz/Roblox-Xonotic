@@ -622,6 +622,12 @@ function common.COM_ParseToken_VM_Tokenize(s: string, data: number?, returnnewli
 	return true, d
 end
 
+-- port: common.c COM_ParseToken_QuakeC L1113-1218 @xonotic-v0.8.6 (data: 1-based index, nil = NULL)
+-- (the C body is the same, character for character, as COM_ParseToken_VM_Tokenize L1227-1332)
+function common.COM_ParseToken_QuakeC(s: string, data: number?, returnnewline: boolean): (boolean, number?)
+	return common.COM_ParseToken_VM_Tokenize(s, data, returnnewline)
+end
+
 -- port: common.c COM_ParseToken_Simple L1000-1104 @xonotic-v0.8.6 (data: 1-based index, nil = NULL)
 function common.COM_ParseToken_Simple(
 	s: string,

@@ -39,8 +39,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 	    data_texcoordtexture2f, data_texcoordlightmap2f, data_color4f) are f32 buffers, data_element3i,
 	    data_leafbrushes and data_leafsurfaces are i32 buffers, data_pvsclusters and data_lightgrid are byte
 	    buffers. Element k of a float array is buffer.readf32(b, 4 * k).
-	NOT YET PORTED (each logs once when reached): Mod_LoadTextureFromQ3Shader (model_shared.c; texture_t has
-	only name / surfaceflags / supercontents), Mod_Q3BSP_LoadLightmaps and the lightmap parts of
+	Textures go through model_shared.Mod_LoadTextureFromQ3Shader (scripts/*.shader through engine/fs.luau: set
+	the VFS provider before loading a map, or every texture takes the no-shader path).
+	NOT YET PORTED (each logs once when reached): Mod_Q3BSP_LoadLightmaps and the lightmap parts of
 	Mod_Q3BSP_LoadFaces (surfaces load as on a dedicated server), Mod_Q1BSP_MakePortals, Mod_Q1BSP_CreateShadowMesh, the model registry (submodels are only in
 	brush.submodels), the PVS / light-point functions, the Q1 / Q2 /
 	HL BSP and OBJ loaders, Mod_BrushInit (cvar registration: the cvars are read with their defaults).
@@ -537,7 +538,7 @@ local function Mod_Q3BSP_LoadTextures(l: lump_t)
 		local p = inofs + i * SIZEOF_q3dtexture_t
 		local t: texture_t = {
 			index = i,
-			name = cstring(mod_base, p, Q3PATHLENGTH),
+			name = "",
 			surfaceflags = readi32(mod_base, p + Q3PATHLENGTH),
 			supercontents = Mod_Q3BSP_SuperContentsFromNativeContents(
 				bit32.band(readi32(mod_base, p + Q3PATHLENGTH + 4), 0xFFFFFFFF)
@@ -545,7 +546,13 @@ local function Mod_Q3BSP_LoadTextures(l: lump_t)
 			basematerialflags = 0,
 		}
 		out[i + 1] = t
-		NOT_YET_PORTED("Mod_LoadTextureFromQ3Shader (model_shared.c): textures keep only the lump's name and flags")
+		model_shared.Mod_LoadTextureFromQ3Shader(
+			t,
+			cstring(mod_base, p, Q3PATHLENGTH),
+			true,
+			true,
+			0x00000002 + 0x00004000 + 0x00000100 + 0x00000200 -- TEXF_MIPMAP | TEXF_ISWORLD | TEXF_PICMIP | TEXF_COMPRESS
+		)
 		-- restore the surfaceflags and supercontents
 		t.surfaceflags = readi32(mod_base, p + Q3PATHLENGTH)
 		t.supercontents =
@@ -3764,6 +3771,7 @@ local function Mod_Q3BSP_Load(mod: dp_model_t, data: string)
 
 	mod_base = header
 	loadmodel = mod
+	model_shared.loadmodel = mod
 
 	-- swap all the lumps
 	local ident = readi32(header, 0)

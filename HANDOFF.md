@@ -36,7 +36,7 @@ Every section except §MAP and §DIFFS stays under ~60 lines; detail lives in `d
 - **M2-RUNNER done** (stormkeep entities load, first StartFrame spawns them; world builtins wait on M3).
   ~170 builtins ported; server state (engine/server.luau), SZ/MSG writes, mathlib bit-exact.
 - **M2-AOT-SHIP (claimed, Claude-Anvil):** lazy chunk loading + background preload; Q-014 (startup 17.7 s).
-- **Tests:** 20 Lune files, all pass; StyLua/Selene clean; check_port_lines 0 wrong.
+- **Tests:** 21 Lune files, all pass; StyLua/Selene clean; check_port_lines 0 wrong.
 - **Stale claims:** M3-BSPLOAD and REF-DP branches have only claim commits from 2026-11-20 — owner to reassign.
 - **Local + Studio (2026-11-25):** the owner cannot use cloud sessions; work happens on the owner's Windows PC.
   Toolchain there: `rokit install` (shims in %USERPROFILE%/.rokit/bin; stylua, selene, lune 14/14, rojo pass).
@@ -55,9 +55,11 @@ Every section except §MAP and §DIFFS stays under ~60 lines; detail lives in `d
   q3bsp_trace.test.luau on stock maps (BIH = plain loop over all leafs, 77/77 spawn points land). The loader
   sets mod.TraceBox / TraceBrush / TraceLine / TracePoint / PointSuperContents / TraceLineAgainstSurfaces /
   brush.TraceLineOfSight. Trace cvars are bound by collision.Collision_Init / model_brush.Mod_BrushInit
-  (host.luau calls both). **Next in this task:** Mod_LoadTextureFromQ3Shader (basematerialflags /
-  currentmaterialflags are 0 until then: MESHCOLLISIONS surfaces not in the collision BIH), lightmaps, the
-  model registry; then M3-TRACE (world.c, Collision_ClipTo*, Collision_CombineTraces, the trace cache). C
+  (host.luau calls both). Q3 shader scripts: Mod_LoadQ3Shaders / Mod_LookupQ3Shader and
+  Mod_LoadTextureFromQ3Shader ported (all 2,447 release shaders agree with tools/shaders/parse.py; map textures
+  get basematerialflags, shader passes, skybox name; load maps with the VFS provider set; not yet checked
+  against the C build). **Next in this task:** a C reference for the shader code (fixture shaders), lightmaps,
+  the model registry; then M3-TRACE (world.c, Collision_ClipTo*, Collision_CombineTraces, the trace cache). C
   reference vectors: push tools/testgen/*_vectors.{c,sh} -> the Testgen workflow builds them on GitHub (no C
   compiler on the owner's PC, G-054) -> `gh run download`.
 - **Branches (2026-11-25):** PRs 1, 2, 3 merged into main: start every new branch from main (D-012). Owner

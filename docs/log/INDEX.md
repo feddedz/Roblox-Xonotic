@@ -1,4 +1,5 @@
 # Session log index (newest first)
+2026-11-25 Claude-Quartz M3-BSPLOAD(partial) — Q3 shader scripts (Mod_LoadQ3Shaders, Mod_LookupQ3Shader, Mod_LoadTextureFromQ3Shader): 2,447 release shaders agree with the independent parser, map textures get material flags → docs/log/2026-11-25-Claude-Quartz.md
 2026-11-25 Claude-Quartz M3-BSPLOAD(partial) — all Q3BSP trace functions ported (collision.c brush/line/point/triangle traces, model_brush.c BIH + BSP-tree traces), 4,905 checks bit-identical to the C build; stock maps: BIH = plain loop, 77/77 spawns land → docs/log/2026-11-25-Claude-Quartz.md
 2026-11-25 Claude-Quartz M3-BSPLOAD(partial) — bih, curves, polygon, collision brush builder, Q3 BSP lump + face loaders ported, bit-identical to the C build; all 30 stock maps load (81,874 checks); Testgen CI for C reference vectors → docs/log/2026-11-25-Claude-Quartz.md
 2026-11-25 Claude-Quartz UPLOAD-FIX4 (done) — 43 pre-ban flagged images fixed (CP sign etc.) + uploaded, all Approved; texture lookup table for the game (platform/render/texture_assets.luau); 16 old sounds archived, 68 images left for the owner → docs/log/2026-11-24-Claude-Quartz.md
