@@ -306,6 +306,10 @@ end
 local function isnan(x: number): boolean
 	return x ~= x
 end
+-- printf "%f" of a float argument (promoted to double), as glibc prints it, non-finite values included
+local function pf(x: number): string
+	return libc.format1("", 0, -1, "f", x)
+end
 
 -- port: svvm_cmds.c VM_SV_setorigin L242-263 @xonotic-v0.8.6
 local function VM_SV_setorigin(prog: any)
@@ -378,15 +382,16 @@ local function VM_SV_traceline(prog: any)
 
 	if isnan(v1[1]) or isnan(v1[2]) or isnan(v1[3]) or isnan(v2[1]) or isnan(v2[2]) or isnan(v2[3]) then
 		prog.error_cmd(
+			-- %f of a NaN as glibc prints it ("nan" / "-nan"; string.format gives the host C runtime's text)
 			string.format(
-				"%s: NAN errors detected in traceline('%f %f %f', '%f %f %f', %i, entity %i)\n",
+				"%s: NAN errors detected in traceline('%s %s %s', '%s %s %s', %i, entity %i)\n",
 				prog.name,
-				v1[1],
-				v1[2],
-				v1[3],
-				v2[1],
-				v2[2],
-				v2[3],
+				pf(v1[1]),
+				pf(v1[2]),
+				pf(v1[3]),
+				pf(v2[1]),
+				pf(v2[2]),
+				pf(v2[3]),
 				move,
 				ent
 			)
@@ -424,20 +429,20 @@ local function VM_SV_tracebox(prog: any)
 	if isnan(v1[1]) or isnan(v1[2]) or isnan(v1[3]) or isnan(v2[1]) or isnan(v2[2]) or isnan(v2[3]) then
 		prog.error_cmd(
 			string.format(
-				"%s: NAN errors detected in tracebox('%f %f %f', '%f %f %f', '%f %f %f', '%f %f %f', %i, entity %i)\n",
+				"%s: NAN errors detected in tracebox('%s %s %s', '%s %s %s', '%s %s %s', '%s %s %s', %i, entity %i)\n",
 				prog.name,
-				v1[1],
-				v1[2],
-				v1[3],
-				m1[1],
-				m1[2],
-				m1[3],
-				m2[1],
-				m2[2],
-				m2[3],
-				v2[1],
-				v2[2],
-				v2[3],
+				pf(v1[1]),
+				pf(v1[2]),
+				pf(v1[3]),
+				pf(m1[1]),
+				pf(m1[2]),
+				pf(m1[3]),
+				pf(m2[1]),
+				pf(m2[2]),
+				pf(m2[3]),
+				pf(v2[1]),
+				pf(v2[2]),
+				pf(v2[3]),
 				move,
 				ent
 			)
