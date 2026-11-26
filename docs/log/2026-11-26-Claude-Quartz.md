@@ -76,13 +76,33 @@ None new. (sv.models uses the C index directly, matching model_precache; noted i
   Helpers' own risk list: SV_PushMove (rotation, crush path, entity order), SV_FlyMove / SV_WalkMove step
   logic, float-vs-double in the frametime updates, cos / sin and the rand() order in sv_move.
 
+## Part 3 (same day): movers, sv_move and builtins checked against the C build
+- PR 12 merged. Branch M4-PHYS-ref, two Opus sub-agents.
+- tools/testgen/movers_vectors.{c,sh} (`#include "sv_phys.c"` for the statics, the map of trace_vectors.c,
+  gcov-instrumented), tests/vectors/movers.tsv (6 MB), tests/unit/sv_phys_movers_ref.test.luau: 3,770 calls,
+  13,678 checks, incl. 273 whole SV_Physics frames in 14 sequences under Xonotic's own cvar values and the
+  engine defaults. **No difference found; engine/sv_phys.luau unchanged.** gcov: 1012 of 1052 executable
+  lines of sv_phys.c L893-3232 ran (24 unreachable with a Q3BSP world / enum defaults; 16 rare paths not hit:
+  L960, L1271-1285, L1325-1327, L1371-1373, L1494, L2367, L2392, L2403, L2444).
+- tools/testgen/svmove_vectors.{c,sh} (one .c compiled four times to reach the statics of svvm_cmds.c,
+  sv_main.c, sv_move.c), tests/vectors/svmove.tsv (6.8 MB), tests/unit/sv_move_ref.test.luau: 12,515 calls,
+  50,400 checks over sv_move.c and the builtins setorigin, setsize, traceline, tracebox, tracetoss,
+  findradius, walkmove, droptofloor, checkbottom, pointcontents, copyentity, MoveToGoal and the edict hooks.
+  One fix: the NaN error text of traceline / tracebox used string.format ("-nan(ind)" on Windows); now
+  libc.format1 (svvm_cmds.c L657, L696). libc.snprintf has the same weakness for non-finite %f (open).
+- **G-058:** the host's math.cos / math.sin differ from glibc by one ulp for about 3 % of the yaws on
+  Windows (277 / 315 of 9,761). No float move changed in any vector, but it can. tests/unit/
+  sv_move_libm_ref.test.luau fails only if a float move changes and prints the count. Task PORT-LIBM added.
+- Tests: unit 23 files, 0 failed. StyLua, Selene clean; check_port_lines 0 wrong. Vector files are the
+  Testgen artifacts byte for byte.
+
 ## Next step
-1. C reference for the movers and sv_move: extend tools/testgen/svphys_vectors.c (it already has the prog,
-   the map and an ExecuteProgram stub) to run SV_Physics frames, SV_FlyMove, SV_PushMove, SV_Physics_Toss /
-   Step, SV_WalkMove, SV_movestep, SV_NewChaseDir on scripted entities and print every edict field after each
-   call; the builtins (static in svvm_cmds.c) need a generator that includes svvm_cmds.c.
-2. Still stubs: setmodel #3 (Mod_ForName / model registry), checkclient / checkpvs / aim (PVS), SV_StartSound,
-   SV_ClientThink (sv_user.c).
-3. SV_SpawnServer (sv_main.c): worldmodel, sv.models, World_SetSize, then the stormkeep entity load of
-   M2-RUNNER with real traces, then the host frame loop calling SV_Physics.
-4. Mod_Q3BSP_LoadLightmaps, tokenizer speed, BIH leaf memory, cached field offsets in sv_phys / builtins.
+1. PORT-LIBM: glibc-exact sin / cos (and whatever else of libm the engine calls: atan2, sqrt is exact, pow,
+   floor / ceil are exact) in engine/_port, checked against the runner's glibc through Testgen; then switch
+   mathlib.luau, matrixlib.luau, sv_move.luau, svvm_cmds.luau to it.
+2. SV_SpawnServer (sv_main.c): worldmodel, sv.models, World_SetSize, then the stormkeep entity load of
+   M2-RUNNER with real traces, then the host frame loop calling SV_Physics. Needs setmodel #3 and the model
+   registry (Mod_ForName / Mod_FindName).
+3. Still stubs: checkclient / checkpvs / aim (PVS), SV_StartSound, SV_ClientThink (sv_user.c).
+4. Mod_Q3BSP_LoadLightmaps, tokenizer speed, BIH leaf memory, cached field offsets in sv_phys / builtins;
+   the two big vector files (movers.tsv, svmove.tsv: 13 MB) could be stored compressed.
