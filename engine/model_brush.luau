@@ -42,7 +42,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 	NOT YET PORTED (each logs once when reached): Mod_LoadTextureFromQ3Shader (model_shared.c; texture_t has
 	only name / surfaceflags / supercontents), Mod_Q3BSP_LoadLightmaps and the lightmap parts of
 	Mod_Q3BSP_LoadFaces (surfaces load as on a dedicated server), Mod_Q1BSP_MakePortals, Mod_Q1BSP_CreateShadowMesh, the model registry (submodels are only in
-	brush.submodels), all tracing / PVS / light-point functions, the Q1 / Q2 /
+	brush.submodels), the PVS / light-point functions, the Q1 / Q2 /
 	HL BSP and OBJ loaders, Mod_BrushInit (cvar registration: the cvars are read with their defaults).
 ]]
 local bih = require("./bih")
@@ -905,6 +905,7 @@ local function newsurface(index: number): any
 		deprecatedq3num_collisionbboxstride = 0,
 		deprecatedq3data_bbox6f = nil,
 		deprecatedq3num_bboxstride = 0,
+		deprecatedq3collisionmarkframe = 0, -- don't collide twice in one trace
 	}
 end
 
@@ -1940,6 +1941,1643 @@ local MATERIALFLAG_REFRACTION = 0x00080000
 local MATERIALFLAG_REFLECTION = 0x00100000
 local MATERIALFLAG_CAMERA = 0x02000000
 
+-- ---------------------------------------------------------------------------------------------------------
+-- Tracing (model_brush.c L6800-7677)
+
+-- model_brush.h L133, bspfile.h L214
+local MATERIALFLAGMASK_TRANSLUCENT = 0x00000010
+	+ 0x00000080
+	+ 0x00000200
+	+ 0x00000800
+	+ 0x00001000
+	+ 0x00040000
+	+ 0x00080000
+local SUPERCONTENTS_VISBLOCKERMASK = SUPERCONTENTS_OPAQUE
+
+local BIH_SPLITX, BIH_SPLITZ, BIH_UNORDERED = bih.BIH_SPLITX, bih.BIH_SPLITZ, bih.BIH_UNORDERED
+local BIH_BRUSH, BIH_COLLISIONTRIANGLE, BIH_RENDERTRIANGLE =
+	bih.BIH_BRUSH, bih.BIH_COLLISIONTRIANGLE, bih.BIH_RENDERTRIANGLE
+local BIH_MAXUNORDEREDCHILDREN = bih.BIH_MAXUNORDEREDCHILDREN
+
+-- model_brush.c L46-64: the static cvar_t that the trace functions read as struct fields (same scheme as
+-- collision.cv: 0 until Mod_BrushInit registers them, as in C). The loader still reads its cvars with cvi().
+local TRACE_CVAR_DEFS: { { string } } = {
+	{ "mod_q3bsp_curves_collisions", "1", "enables collisions with curves (SLOW)" },
+	{
+		"mod_q3bsp_optimizedtraceline",
+		"1",
+		"whether to use optimized traceline code for line traces (as opposed to tracebox code)",
+	},
+	{
+		"mod_q3bsp_tracelineofsight_brushes",
+		"0",
+		"enables culling of entities behind detail brushes, curves, etc",
+	},
+	{
+		"mod_collision_bih",
+		"1",
+		"enables use of generated Bounding Interval Hierarchy tree instead of compiled bsp tree in collision code",
+	},
+}
+local cv: { [string]: cvar.Cvar } = {}
+for _, d in TRACE_CVAR_DEFS do
+	cv[d[1]] = cvar.static(0, d[1], d[2], d[3])
+end
+model_brush.cv = cv
+
+-- port: model_brush.c Mod_BrushInit L75-143 @xonotic-v0.8.6
+-- PARTIAL: the four cvars above (a cvar host.luau already registered is this file's cvar_t, see
+-- collision.Collision_Init). NOT YET PORTED: the other Cvar_RegisterVariable calls (the loader reads those
+-- cvars by name), the GAME_NEXUIZ hack and the mod_q1bsp_texture_* records (Q1BSP loader).
+function model_brush.Mod_BrushInit()
+	for _, d in TRACE_CVAR_DEFS do
+		local existing = cvar.Cvar_FindVar(d[1])
+		if existing then
+			cv[d[1]] = existing
+		else
+			local c = cvar.static(0, d[1], d[2], d[3])
+			cvar.Cvar_RegisterVariable(c)
+			cv[d[1]] = c
+		end
+	end
+end
+
+-- port: mathlib.c BoxOnPlaneSide L331-347 @xonotic-v0.8.6
+local function BoxOnPlaneSide(emins: { number }, emaxs: { number }, p: mplane_t): number
+	if p.type < 3 then
+		return (if emaxs[p.type + 1] >= p.dist then 1 else 0) + (if emins[p.type + 1] < p.dist then 2 else 0)
+	end
+	local n = p.normal
+	local s = p.signbits
+	-- the corner the normal points at (a) and the opposite one (b); signbits picks mins or maxs per axis
+	local a1 = if bit32.band(s, 1) ~= 0 then emins[1] else emaxs[1]
+	local a2 = if bit32.band(s, 2) ~= 0 then emins[2] else emaxs[2]
+	local a3 = if bit32.band(s, 4) ~= 0 then emins[3] else emaxs[3]
+	local b1 = if bit32.band(s, 1) ~= 0 then emaxs[1] else emins[1]
+	local b2 = if bit32.band(s, 2) ~= 0 then emaxs[2] else emins[2]
+	local b3 = if bit32.band(s, 4) ~= 0 then emaxs[3] else emins[3]
+	return (if R(R(R(n[1] * a1) + R(n[2] * a2)) + R(n[3] * a3)) >= p.dist then 1 else 0)
+		+ (if R(R(R(n[1] * b1) + R(n[2] * b2)) + R(n[3] * b3)) < p.dist then 2 else 0)
+end
+model_brush.BoxOnPlaneSide = BoxOnPlaneSide
+
+-- port: model_brush.c Mod_Q3BSP_TraceLineOfSight_RecursiveNodeCheck L6800-6860 @xonotic-v0.8.6
+-- (p1, p2, endpos are double[3]: no float rounding)
+local function Mod_Q3BSP_TraceLineOfSight_RecursiveNodeCheck(
+	node: mnode_t,
+	p1: { number },
+	p2: { number },
+	endpos: { number }
+): number
+	local t1: number, t2: number
+	local side: number
+	-- check for empty
+	while node.plane do
+		-- find the point distances
+		local plane = node.plane
+		if plane.type < 3 then
+			t1 = p1[plane.type + 1] - plane.dist
+			t2 = p2[plane.type + 1] - plane.dist
+		else
+			local n = plane.normal
+			t1 = (n[1] * p1[1] + n[2] * p1[2] + n[3] * p1[3]) - plane.dist
+			t2 = (n[1] * p2[1] + n[2] * p2[2] + n[3] * p2[3]) - plane.dist
+		end
+
+		if t1 < 0 then
+			if t2 < 0 then
+				node = node.children[2]
+				continue
+			end
+			side = 1
+		else
+			if t2 >= 0 then
+				node = node.children[1]
+				continue
+			end
+			side = 0
+		end
+
+		local midf = t1 / (t1 - t2)
+		local mid = {
+			p1[1] + midf * (p2[1] - p1[1]),
+			p1[2] + midf * (p2[2] - p1[2]),
+			p1[3] + midf * (p2[3] - p1[3]),
+		}
+
+		-- recurse both sides, front side first
+		-- return 2 if empty is followed by solid (hit something)
+		-- do not return 2 if both are solid or both empty,
+		-- or if start is solid and end is empty
+		-- as these degenerate cases usually indicate the eye is in solid and
+		-- should see the target point anyway
+		local ret = Mod_Q3BSP_TraceLineOfSight_RecursiveNodeCheck(node.children[side + 1], p1, mid, endpos)
+		if ret ~= 0 then
+			return ret
+		end
+		ret = Mod_Q3BSP_TraceLineOfSight_RecursiveNodeCheck(node.children[bit32.bxor(side, 1) + 1], mid, p2, endpos)
+		if ret ~= 1 then
+			return ret
+		end
+		endpos[1], endpos[2], endpos[3] = mid[1], mid[2], mid[3]
+		return 2
+	end
+	return if node.clusterindex < 0 then 1 else 0
+end
+
+-- port: model_brush.c Mod_Q3BSP_TraceLineOfSight L6862-6879 @xonotic-v0.8.6
+local function Mod_Q3BSP_TraceLineOfSight(
+	model: dp_model_t,
+	start: { number },
+	end_: { number },
+	acceptmins: { number },
+	acceptmaxs: { number }
+): boolean
+	if model.brush.submodel ~= 0 or cv.mod_q3bsp_tracelineofsight_brushes.integer ~= 0 then
+		local trace = collision.newtrace()
+		model.TraceLine(
+			model,
+			nil,
+			nil,
+			trace,
+			start,
+			end_,
+			SUPERCONTENTS_VISBLOCKERMASK,
+			0,
+			MATERIALFLAGMASK_TRANSLUCENT
+		)
+		local e = trace.endpos
+		return trace.fraction == 1
+			or (
+				e[1] <= acceptmaxs[1]
+				and e[1] >= acceptmins[1]
+				and e[2] <= acceptmaxs[2]
+				and e[2] >= acceptmins[2]
+				and e[3] <= acceptmaxs[3]
+				and e[3] >= acceptmins[3]
+			)
+	else
+		local tracestart = { start[1], start[2], start[3] }
+		local traceend = { end_[1], end_[2], end_[3] }
+		local e = { end_[1], end_[2], end_[3] }
+		Mod_Q3BSP_TraceLineOfSight_RecursiveNodeCheck(model.brush.data_nodes[1], tracestart, traceend, e)
+		return e[1] <= acceptmaxs[1]
+			and e[1] >= acceptmins[1]
+			and e[2] <= acceptmaxs[2]
+			and e[2] >= acceptmins[2]
+			and e[3] <= acceptmaxs[3]
+			and e[3] >= acceptmins[3]
+	end
+end
+
+-- int nodestack[1024]; vec_t nodestackline[1024][6]; (C: locals of each BIH trace function. The functions never
+-- run nested with a live stack, so one pair is shared.) nodestackline holds entry i at [6 * i + 1 .. 6 * i + 6].
+local nodestack: { number } = table.create(1024, 0)
+local nodestackline: { number } = table.create(1024 * 6, 0)
+-- vec3_t nodestart, nodeend of the BIH_UNORDERED branch
+local clipstart: { number } = { 0, 0, 0 }
+local clipend: { number } = { 0, 0, 0 }
+
+-- memset(trace, 0, sizeof(*trace)); trace->fraction = 1; and the three masks
+local function trace_begin(
+	trace: collision.trace_t,
+	hitsupercontentsmask: number,
+	skipsupercontentsmask: number,
+	skipmaterialflagsmask: number
+)
+	collision.cleartrace(trace)
+	trace.fraction = 1
+	trace.hitsupercontentsmask = hitsupercontentsmask
+	trace.skipsupercontentsmask = skipsupercontentsmask
+	trace.skipmaterialflagsmask = skipmaterialflagsmask
+end
+
+-- port: model_brush.c Mod_CollisionBIH_TracePoint L6881-6945 @xonotic-v0.8.6
+local function Mod_CollisionBIH_TracePoint(
+	model: dp_model_t,
+	_frameblend: any,
+	_skeleton: any,
+	trace: collision.trace_t,
+	start: { number },
+	hitsupercontentsmask: number,
+	skipsupercontentsmask: number,
+	skipmaterialflagsmask: number
+)
+	local nodestackpos = 0
+
+	trace_begin(trace, hitsupercontentsmask, skipsupercontentsmask, skipmaterialflagsmask)
+
+	local b: bih.bih_t = model.collision_bih
+	if b.nodes[1] == nil then
+		return
+	end
+	local nodes, leafs = b.nodes, b.leafs
+	local brushes: { q3mbrush_t } = model.brush.data_brushes
+	local s1, s2, s3 = start[1], start[2], start[3]
+
+	nodestackpos += 1
+	nodestack[nodestackpos] = b.rootnode
+	while nodestackpos > 0 do
+		local node = nodes[nodestack[nodestackpos] + 1]
+		nodestackpos -= 1
+		local nmins, nmaxs = node.mins, node.maxs
+		if
+			not (
+				s1 <= nmaxs[1]
+				and s1 >= nmins[1]
+				and s2 <= nmaxs[2]
+				and s2 >= nmins[2]
+				and s3 <= nmaxs[3]
+				and s3 >= nmins[3]
+			)
+		then
+			continue
+		end
+		if node.type <= BIH_SPLITZ and nodestackpos + 2 <= 1024 then
+			local axis = node.type - BIH_SPLITX
+			if start[axis + 1] >= node.frontmin then
+				nodestackpos += 1
+				nodestack[nodestackpos] = node.front
+			end
+			if start[axis + 1] <= node.backmax then
+				nodestackpos += 1
+				nodestack[nodestackpos] = node.back
+			end
+		elseif node.type == BIH_UNORDERED then
+			local children = node.children
+			for axis = 1, BIH_MAXUNORDEREDCHILDREN do
+				if children[axis] < 0 then
+					break
+				end
+				local leaf = leafs[children[axis] + 1]
+				local lmins, lmaxs = leaf.mins, leaf.maxs
+				if
+					not (
+						s1 <= lmaxs[1]
+						and s1 >= lmins[1]
+						and s2 <= lmaxs[2]
+						and s2 >= lmins[2]
+						and s3 <= lmaxs[3]
+						and s3 >= lmins[3]
+					)
+				then
+					continue
+				end
+				if leaf.type == BIH_BRUSH then
+					collision.Collision_TracePointBrushFloat(trace, start, brushes[leaf.itemindex + 1].colbrushf)
+				end
+				-- BIH_COLLISIONTRIANGLE: collision triangle - skipped because they have no volume
+				-- BIH_RENDERTRIANGLE: render triangle - skipped because they have no volume
+			end
+		end
+	end
+end
+model_brush.Mod_CollisionBIH_TracePoint = Mod_CollisionBIH_TracePoint
+
+-- The 16-case switch of the BIH traces (model_brush.c L7007-7025 and L7162-7180), which pushes the back child
+-- and then the front child with the part of the line that can reach it:
+--   back child:  skipped when d1 < 0 and d2 < 0; start is moved to the split when d1 < 0, end when d2 < 0
+--   front child: skipped when d3 < 0 and d4 < 0; start is moved to the split when d3 < 0, end when d4 < 0
+-- Returns the new nodestackpos. (f = d / (d - dother); VectorLerp(nodestart, f, nodeend, out), all float.)
+local function pushsplit(
+	nodestackpos: number,
+	child: number,
+	da: number,
+	db: number,
+	ns1: number,
+	ns2: number,
+	ns3: number,
+	ne1: number,
+	ne2: number,
+	ne3: number
+): number
+	if da < 0 then
+		if db < 0 then
+			return nodestackpos
+		end
+		local f = R(da / R(da - db))
+		local o = nodestackpos * 6
+		nodestackline[o + 1] = R(ns1 + R(f * R(ne1 - ns1)))
+		nodestackline[o + 2] = R(ns2 + R(f * R(ne2 - ns2)))
+		nodestackline[o + 3] = R(ns3 + R(f * R(ne3 - ns3)))
+		nodestackline[o + 4] = ne1
+		nodestackline[o + 5] = ne2
+		nodestackline[o + 6] = ne3
+	elseif db < 0 then
+		local f = R(da / R(da - db))
+		local o = nodestackpos * 6
+		nodestackline[o + 1] = ns1
+		nodestackline[o + 2] = ns2
+		nodestackline[o + 3] = ns3
+		nodestackline[o + 4] = R(ns1 + R(f * R(ne1 - ns1)))
+		nodestackline[o + 5] = R(ns2 + R(f * R(ne2 - ns2)))
+		nodestackline[o + 6] = R(ns3 + R(f * R(ne3 - ns3)))
+	else
+		local o = nodestackpos * 6
+		nodestackline[o + 1] = ns1
+		nodestackline[o + 2] = ns2
+		nodestackline[o + 3] = ns3
+		nodestackline[o + 4] = ne1
+		nodestackline[o + 5] = ne2
+		nodestackline[o + 6] = ne3
+	end
+	nodestack[nodestackpos + 1] = child
+	return nodestackpos + 1
+end
+
+-- "clip line to this node bounds" (model_brush.c L7034-7036 and L7189-7191): clips clipstart / clipend to the
+-- box; false when the line is entirely outside (the C code `continue`s).
+local function clipline(
+	bigmins1: number,
+	bigmins2: number,
+	bigmins3: number,
+	bigmaxs1: number,
+	bigmaxs2: number,
+	bigmaxs3: number
+): boolean
+	local cs, ce = clipstart, clipend
+	for axis = 1, 3 do
+		local lo = if axis == 1 then bigmins1 elseif axis == 2 then bigmins2 else bigmins3
+		local hi = if axis == 1 then bigmaxs1 elseif axis == 2 then bigmaxs2 else bigmaxs3
+		local d1 = R(cs[axis] - lo)
+		local d2 = R(ce[axis] - lo)
+		if d1 < 0 then
+			if d2 < 0 then
+				return false
+			end
+			local f = R(d1 / R(d1 - d2))
+			cs[1] = R(cs[1] + R(f * R(ce[1] - cs[1])))
+			cs[2] = R(cs[2] + R(f * R(ce[2] - cs[2])))
+			cs[3] = R(cs[3] + R(f * R(ce[3] - cs[3])))
+		elseif d2 < 0 then
+			local f = R(d1 / R(d1 - d2))
+			ce[1] = R(cs[1] + R(f * R(ce[1] - cs[1])))
+			ce[2] = R(cs[2] + R(f * R(ce[2] - cs[2])))
+			ce[3] = R(cs[3] + R(f * R(ce[3] - cs[3])))
+		end
+		d1 = R(hi - cs[axis])
+		d2 = R(hi - ce[axis])
+		if d1 < 0 then
+			if d2 < 0 then
+				return false
+			end
+			local f = R(d1 / R(d1 - d2))
+			cs[1] = R(cs[1] + R(f * R(ce[1] - cs[1])))
+			cs[2] = R(cs[2] + R(f * R(ce[2] - cs[2])))
+			cs[3] = R(cs[3] + R(f * R(ce[3] - cs[3])))
+		elseif d2 < 0 then
+			local f = R(d1 / R(d1 - d2))
+			ce[1] = R(cs[1] + R(f * R(ce[1] - cs[1])))
+			ce[2] = R(cs[2] + R(f * R(ce[2] - cs[2])))
+			ce[3] = R(cs[3] + R(f * R(ce[3] - cs[3])))
+		end
+	end
+	return true
+end
+
+-- port: model_brush.c Mod_CollisionBIH_TraceLineShared L6947-7072 @xonotic-v0.8.6
+local function Mod_CollisionBIH_TraceLineShared(
+	model: dp_model_t,
+	frameblend: any,
+	skeleton: any,
+	trace: collision.trace_t,
+	start: { number },
+	end_: { number },
+	hitsupercontentsmask: number,
+	skipsupercontentsmask: number,
+	skipmaterialflagsmask: number,
+	b: bih.bih_t
+)
+	local nodestackpos = 0
+
+	if b.nodes[1] == nil then
+		return
+	end
+
+	if start[1] == end_[1] and start[2] == end_[2] and start[3] == end_[3] then
+		Mod_CollisionBIH_TracePoint(
+			model,
+			frameblend,
+			skeleton,
+			trace,
+			start,
+			hitsupercontentsmask,
+			skipsupercontentsmask,
+			skipmaterialflagsmask
+		)
+		return
+	end
+
+	trace_begin(trace, hitsupercontentsmask, skipsupercontentsmask, skipmaterialflagsmask)
+
+	local nodes, leafs = b.nodes, b.leafs
+	local brushes: { q3mbrush_t } = model.brush.data_brushes
+	local fullrecursion = collision.cv.collision_bih_fullrecursion.integer ~= 0
+	local curves_collisions = cv.mod_q3bsp_curves_collisions.integer ~= 0
+
+	-- push first node
+	nodestackline[1] = start[1]
+	nodestackline[2] = start[2]
+	nodestackline[3] = start[3]
+	nodestackline[4] = end_[1]
+	nodestackline[5] = end_[2]
+	nodestackline[6] = end_[3]
+	nodestack[1] = b.rootnode
+	nodestackpos = 1
+	while nodestackpos > 0 do
+		nodestackpos -= 1
+		local node = nodes[nodestack[nodestackpos + 1] + 1]
+		local o = nodestackpos * 6
+		local ns1, ns2, ns3 = nodestackline[o + 1], nodestackline[o + 2], nodestackline[o + 3]
+		local ne1, ne2, ne3 = nodestackline[o + 4], nodestackline[o + 5], nodestackline[o + 6]
+		local nmins, nmaxs = node.mins, node.maxs
+		if
+			not (
+				R(math.min(ns1, ne1) - 1) <= nmaxs[1]
+				and R(math.max(ns1, ne1) + 1) >= nmins[1]
+				and R(math.min(ns2, ne2) - 1) <= nmaxs[2]
+				and R(math.max(ns2, ne2) + 1) >= nmins[2]
+				and R(math.min(ns3, ne3) - 1) <= nmaxs[3]
+				and R(math.max(ns3, ne3) + 1) >= nmins[3]
+			) and not fullrecursion
+		then
+			continue
+		end
+		if node.type <= BIH_SPLITZ and nodestackpos + 2 <= 1024 then
+			-- recurse children of the split
+			local axis = node.type - BIH_SPLITX
+			local nsa = if axis == 0 then ns1 elseif axis == 1 then ns2 else ns3
+			local nea = if axis == 0 then ne1 elseif axis == 1 then ne2 else ne3
+			local d1 = R(node.backmax - nsa)
+			local d2 = R(node.backmax - nea)
+			local d3 = R(nsa - node.frontmin)
+			local d4 = R(nea - node.frontmin)
+			if fullrecursion then
+				d1, d2, d3, d4 = 1, 1, 1, 1 -- force full recursion
+			end
+			nodestackpos = pushsplit(nodestackpos, node.back, d1, d2, ns1, ns2, ns3, ne1, ne2, ne3)
+			nodestackpos = pushsplit(nodestackpos, node.front, d3, d4, ns1, ns2, ns3, ne1, ne2, ne3)
+		elseif node.type == BIH_UNORDERED then
+			-- calculate sweep bounds for this node
+			-- copy node bounds into local variables
+			-- clip line to this node bounds
+			clipstart[1], clipstart[2], clipstart[3] = ns1, ns2, ns3
+			clipend[1], clipend[2], clipend[3] = ne1, ne2, ne3
+			if not clipline(nmins[1], nmins[2], nmins[3], nmaxs[1], nmaxs[2], nmaxs[3]) then
+				continue
+			end
+			-- some of the line intersected the enlarged node box
+			-- calculate sweep bounds for this node
+			local swmin1 = R(math.min(clipstart[1], clipend[1]) - 1)
+			local swmin2 = R(math.min(clipstart[2], clipend[2]) - 1)
+			local swmin3 = R(math.min(clipstart[3], clipend[3]) - 1)
+			local swmax1 = R(math.max(clipstart[1], clipend[1]) + 1)
+			local swmax2 = R(math.max(clipstart[2], clipend[2]) + 1)
+			local swmax3 = R(math.max(clipstart[3], clipend[3]) + 1)
+			local children = node.children
+			for axis = 1, BIH_MAXUNORDEREDCHILDREN do
+				if children[axis] < 0 then
+					break
+				end
+				local leaf = leafs[children[axis] + 1]
+				local lmins, lmaxs = leaf.mins, leaf.maxs
+				if
+					not (
+						swmin1 <= lmaxs[1]
+						and swmax1 >= lmins[1]
+						and swmin2 <= lmaxs[2]
+						and swmax2 >= lmins[2]
+						and swmin3 <= lmaxs[3]
+						and swmax3 >= lmins[3]
+					)
+				then
+					continue
+				end
+				local leaftype = leaf.type
+				if leaftype == BIH_BRUSH then
+					local brush = brushes[leaf.itemindex + 1].colbrushf
+					collision.Collision_TraceLineBrushFloat(trace, start, end_, brush, brush)
+				elseif leaftype == BIH_COLLISIONTRIANGLE then
+					if not curves_collisions then
+						continue
+					end
+					local element3i: buffer = model.brush.data_collisionelement3i
+					local e = 12 * leaf.itemindex
+					local texture = model.data_textures[leaf.textureindex + 1]
+					collision.Collision_TraceLineTriangleFloat(
+						trace,
+						start,
+						end_,
+						model.brush.data_collisionvertex3f,
+						readi32(element3i, e) * 12,
+						readi32(element3i, e + 4) * 12,
+						readi32(element3i, e + 8) * 12,
+						texture.supercontents,
+						texture.surfaceflags,
+						texture
+					)
+				elseif leaftype == BIH_RENDERTRIANGLE then
+					local element3i: buffer = model.surfmesh.data_element3i
+					local e = 12 * leaf.itemindex
+					local texture = model.data_textures[leaf.textureindex + 1]
+					collision.Collision_TraceLineTriangleFloat(
+						trace,
+						start,
+						end_,
+						model.surfmesh.data_vertex3f,
+						readi32(element3i, e) * 12,
+						readi32(element3i, e + 4) * 12,
+						readi32(element3i, e + 8) * 12,
+						texture.supercontents,
+						texture.surfaceflags,
+						texture
+					)
+				end
+			end
+		end
+	end
+end
+
+-- port: model_brush.c Mod_CollisionBIH_TraceLine L7074-7082 @xonotic-v0.8.6
+local function Mod_CollisionBIH_TraceLine(
+	model: dp_model_t,
+	frameblend: any,
+	skeleton: any,
+	trace: collision.trace_t,
+	start: { number },
+	end_: { number },
+	hitsupercontentsmask: number,
+	skipsupercontentsmask: number,
+	skipmaterialflagsmask: number
+)
+	if start[1] == end_[1] and start[2] == end_[2] and start[3] == end_[3] then
+		Mod_CollisionBIH_TracePoint(
+			model,
+			frameblend,
+			skeleton,
+			trace,
+			start,
+			hitsupercontentsmask,
+			skipsupercontentsmask,
+			skipmaterialflagsmask
+		)
+		return
+	end
+	Mod_CollisionBIH_TraceLineShared(
+		model,
+		frameblend,
+		skeleton,
+		trace,
+		start,
+		end_,
+		hitsupercontentsmask,
+		skipsupercontentsmask,
+		skipmaterialflagsmask,
+		model.collision_bih
+	)
+end
+model_brush.Mod_CollisionBIH_TraceLine = Mod_CollisionBIH_TraceLine
+
+-- port: model_brush.c Mod_CollisionBIH_TraceBrush L7084-7227 @xonotic-v0.8.6
+local function Mod_CollisionBIH_TraceBrush(
+	model: dp_model_t,
+	frameblend: any,
+	skeleton: any,
+	trace: collision.trace_t,
+	thisbrush_start: collision.colbrushf_t,
+	thisbrush_end: collision.colbrushf_t,
+	hitsupercontentsmask: number,
+	skipsupercontentsmask: number,
+	skipmaterialflagsmask: number
+)
+	local nodestackpos = 0
+	local smins, smaxs = thisbrush_start.mins, thisbrush_start.maxs
+	local emins, emaxs = thisbrush_end.mins, thisbrush_end.maxs
+
+	if
+		cv.mod_q3bsp_optimizedtraceline.integer ~= 0
+		and smins[1] == smaxs[1]
+		and smins[2] == smaxs[2]
+		and smins[3] == smaxs[3]
+		and emins[1] == emaxs[1]
+		and emins[2] == emaxs[2]
+		and emins[3] == emaxs[3]
+	then
+		if smins[1] == emins[1] and smins[2] == emins[2] and smins[3] == emins[3] then
+			Mod_CollisionBIH_TracePoint(
+				model,
+				frameblend,
+				skeleton,
+				trace,
+				smins,
+				hitsupercontentsmask,
+				skipsupercontentsmask,
+				skipmaterialflagsmask
+			)
+		else
+			Mod_CollisionBIH_TraceLine(
+				model,
+				frameblend,
+				skeleton,
+				trace,
+				smins,
+				emins,
+				hitsupercontentsmask,
+				skipsupercontentsmask,
+				skipmaterialflagsmask
+			)
+		end
+		return
+	end
+
+	local b: bih.bih_t = model.collision_bih
+	if b.nodes[1] == nil then
+		return
+	end
+	local nodes, leafs = b.nodes, b.leafs
+	local brushes: { q3mbrush_t } = model.brush.data_brushes
+	local curves_collisions = cv.mod_q3bsp_curves_collisions.integer ~= 0
+
+	-- box trace, performed as brush trace
+	trace_begin(trace, hitsupercontentsmask, skipsupercontentsmask, skipmaterialflagsmask)
+
+	-- calculate tracebox-like parameters for efficient culling
+	local start1 = R(R(0.5 * smins[1]) + R(0.5 * smaxs[1]))
+	local start2 = R(R(0.5 * smins[2]) + R(0.5 * smaxs[2]))
+	local start3 = R(R(0.5 * smins[3]) + R(0.5 * smaxs[3]))
+	local end1 = R(R(0.5 * emins[1]) + R(0.5 * emaxs[1]))
+	local end2 = R(R(0.5 * emins[2]) + R(0.5 * emaxs[2]))
+	local end3 = R(R(0.5 * emins[3]) + R(0.5 * emaxs[3]))
+	-- mins = min(startmins, endmins), maxs = max(startmaxs, endmaxs)
+	local mins1 = math.min(R(smins[1] - start1), R(emins[1] - end1))
+	local mins2 = math.min(R(smins[2] - start2), R(emins[2] - end2))
+	local mins3 = math.min(R(smins[3] - start3), R(emins[3] - end3))
+	local maxs1 = math.max(R(smaxs[1] - start1), R(emaxs[1] - end1))
+	local maxs2 = math.max(R(smaxs[2] - start2), R(emaxs[2] - end2))
+	local maxs3 = math.max(R(smaxs[3] - start3), R(emaxs[3] - end3))
+
+	-- push first node
+	nodestackline[1] = start1
+	nodestackline[2] = start2
+	nodestackline[3] = start3
+	nodestackline[4] = end1
+	nodestackline[5] = end2
+	nodestackline[6] = end3
+	nodestack[1] = b.rootnode
+	nodestackpos = 1
+	while nodestackpos > 0 do
+		nodestackpos -= 1
+		local node = nodes[nodestack[nodestackpos + 1] + 1]
+		local o = nodestackpos * 6
+		local ns1, ns2, ns3 = nodestackline[o + 1], nodestackline[o + 2], nodestackline[o + 3]
+		local ne1, ne2, ne3 = nodestackline[o + 4], nodestackline[o + 5], nodestackline[o + 6]
+		local nmins, nmaxs = node.mins, node.maxs
+		if
+			not (
+				R(R(math.min(ns1, ne1) + mins1) - 1) <= nmaxs[1]
+				and R(R(math.max(ns1, ne1) + maxs1) + 1) >= nmins[1]
+				and R(R(math.min(ns2, ne2) + mins2) - 1) <= nmaxs[2]
+				and R(R(math.max(ns2, ne2) + maxs2) + 1) >= nmins[2]
+				and R(R(math.min(ns3, ne3) + mins3) - 1) <= nmaxs[3]
+				and R(R(math.max(ns3, ne3) + maxs3) + 1) >= nmins[3]
+			)
+		then
+			continue
+		end
+		if node.type <= BIH_SPLITZ and nodestackpos + 2 <= 1024 then
+			-- recurse children of the split
+			local axis = node.type - BIH_SPLITX
+			local nsa = if axis == 0 then ns1 elseif axis == 1 then ns2 else ns3
+			local nea = if axis == 0 then ne1 elseif axis == 1 then ne2 else ne3
+			local minsa = if axis == 0 then mins1 elseif axis == 1 then mins2 else mins3
+			local maxsa = if axis == 0 then maxs1 elseif axis == 1 then maxs2 else maxs3
+			local d1 = R(R(node.backmax - nsa) - minsa)
+			local d2 = R(R(node.backmax - nea) - minsa)
+			local d3 = R(R(nsa - node.frontmin) + maxsa)
+			local d4 = R(R(nea - node.frontmin) + maxsa)
+			nodestackpos = pushsplit(nodestackpos, node.back, d1, d2, ns1, ns2, ns3, ne1, ne2, ne3)
+			nodestackpos = pushsplit(nodestackpos, node.front, d3, d4, ns1, ns2, ns3, ne1, ne2, ne3)
+		elseif node.type == BIH_UNORDERED then
+			-- calculate sweep bounds for this node
+			-- copy node bounds into local variables and expand to get Minkowski Sum of the two shapes
+			-- clip line to this node bounds
+			clipstart[1], clipstart[2], clipstart[3] = ns1, ns2, ns3
+			clipend[1], clipend[2], clipend[3] = ne1, ne2, ne3
+			if
+				not clipline(
+					R(nmins[1] - maxs1),
+					R(nmins[2] - maxs2),
+					R(nmins[3] - maxs3),
+					R(nmaxs[1] - mins1),
+					R(nmaxs[2] - mins2),
+					R(nmaxs[3] - mins3)
+				)
+			then
+				continue
+			end
+			-- some of the line intersected the enlarged node box
+			-- calculate sweep bounds for this node
+			local swmin1 = R(R(math.min(clipstart[1], clipend[1]) + mins1) - 1)
+			local swmin2 = R(R(math.min(clipstart[2], clipend[2]) + mins2) - 1)
+			local swmin3 = R(R(math.min(clipstart[3], clipend[3]) + mins3) - 1)
+			local swmax1 = R(R(math.max(clipstart[1], clipend[1]) + maxs1) + 1)
+			local swmax2 = R(R(math.max(clipstart[2], clipend[2]) + maxs2) + 1)
+			local swmax3 = R(R(math.max(clipstart[3], clipend[3]) + maxs3) + 1)
+			local children = node.children
+			for axis = 1, BIH_MAXUNORDEREDCHILDREN do
+				if children[axis] < 0 then
+					break
+				end
+				local leaf = leafs[children[axis] + 1]
+				local lmins, lmaxs = leaf.mins, leaf.maxs
+				if
+					not (
+						swmin1 <= lmaxs[1]
+						and swmax1 >= lmins[1]
+						and swmin2 <= lmaxs[2]
+						and swmax2 >= lmins[2]
+						and swmin3 <= lmaxs[3]
+						and swmax3 >= lmins[3]
+					)
+				then
+					continue
+				end
+				local leaftype = leaf.type
+				if leaftype == BIH_BRUSH then
+					local brush = brushes[leaf.itemindex + 1].colbrushf
+					collision.Collision_TraceBrushBrushFloat(trace, thisbrush_start, thisbrush_end, brush, brush)
+				elseif leaftype == BIH_COLLISIONTRIANGLE then
+					if not curves_collisions then
+						continue
+					end
+					local element3i: buffer = model.brush.data_collisionelement3i
+					local e = 12 * leaf.itemindex
+					local texture = model.data_textures[leaf.textureindex + 1]
+					collision.Collision_TraceBrushTriangleFloat(
+						trace,
+						thisbrush_start,
+						thisbrush_end,
+						model.brush.data_collisionvertex3f,
+						readi32(element3i, e) * 12,
+						readi32(element3i, e + 4) * 12,
+						readi32(element3i, e + 8) * 12,
+						texture.supercontents,
+						texture.surfaceflags,
+						texture
+					)
+				elseif leaftype == BIH_RENDERTRIANGLE then
+					local element3i: buffer = model.surfmesh.data_element3i
+					local e = 12 * leaf.itemindex
+					local texture = model.data_textures[leaf.textureindex + 1]
+					collision.Collision_TraceBrushTriangleFloat(
+						trace,
+						thisbrush_start,
+						thisbrush_end,
+						model.surfmesh.data_vertex3f,
+						readi32(element3i, e) * 12,
+						readi32(element3i, e + 4) * 12,
+						readi32(element3i, e + 8) * 12,
+						texture.supercontents,
+						texture.surfaceflags,
+						texture
+					)
+				end
+			end
+		end
+	end
+end
+model_brush.Mod_CollisionBIH_TraceBrush = Mod_CollisionBIH_TraceBrush
+
+-- port: model_brush.c Mod_CollisionBIH_TraceBox L7229-7242 @xonotic-v0.8.6
+local function Mod_CollisionBIH_TraceBox(
+	model: dp_model_t,
+	frameblend: any,
+	skeleton: any,
+	trace: collision.trace_t,
+	start: { number },
+	boxmins: { number },
+	boxmaxs: { number },
+	end_: { number },
+	hitsupercontentsmask: number,
+	skipsupercontentsmask: number,
+	skipmaterialflagsmask: number
+)
+	-- box trace, performed as brush trace
+	local boxstartmins = { R(start[1] + boxmins[1]), R(start[2] + boxmins[2]), R(start[3] + boxmins[3]) }
+	local boxstartmaxs = { R(start[1] + boxmaxs[1]), R(start[2] + boxmaxs[2]), R(start[3] + boxmaxs[3]) }
+	local boxendmins = { R(end_[1] + boxmins[1]), R(end_[2] + boxmins[2]), R(end_[3] + boxmins[3]) }
+	local boxendmaxs = { R(end_[1] + boxmaxs[1]), R(end_[2] + boxmaxs[2]), R(end_[3] + boxmaxs[3]) }
+	local thisbrush_start = collision.Collision_BrushForBox(boxstartmins, boxstartmaxs, 0, 0, nil)
+	local thisbrush_end = collision.Collision_BrushForBox(boxendmins, boxendmaxs, 0, 0, nil)
+	Mod_CollisionBIH_TraceBrush(
+		model,
+		frameblend,
+		skeleton,
+		trace,
+		thisbrush_start,
+		thisbrush_end,
+		hitsupercontentsmask,
+		skipsupercontentsmask,
+		skipmaterialflagsmask
+	)
+end
+model_brush.Mod_CollisionBIH_TraceBox = Mod_CollisionBIH_TraceBox
+
+-- port: model_brush.c Mod_CollisionBIH_PointSuperContents L7245-7250 @xonotic-v0.8.6
+local function Mod_CollisionBIH_PointSuperContents(model: dp_model_t, _frame: number, point: { number }): number
+	local trace = collision.newtrace()
+	Mod_CollisionBIH_TracePoint(model, nil, nil, trace, point, 0, 0, 0)
+	return trace.startsupercontents
+end
+model_brush.Mod_CollisionBIH_PointSuperContents = Mod_CollisionBIH_PointSuperContents
+
+-- port: model_brush.c Mod_CollisionBIH_TraceLineOfSight L7252-7257 @xonotic-v0.8.6
+function model_brush.Mod_CollisionBIH_TraceLineOfSight(
+	model: dp_model_t,
+	start: { number },
+	end_: { number },
+	acceptmins: { number },
+	acceptmaxs: { number }
+): boolean
+	local trace = collision.newtrace()
+	Mod_CollisionBIH_TraceLine(
+		model,
+		nil,
+		nil,
+		trace,
+		start,
+		end_,
+		SUPERCONTENTS_VISBLOCKERMASK,
+		0,
+		MATERIALFLAGMASK_TRANSLUCENT
+	)
+	local e = trace.endpos
+	return trace.fraction == 1
+		or (
+			e[1] <= acceptmaxs[1]
+			and e[1] >= acceptmins[1]
+			and e[2] <= acceptmaxs[2]
+			and e[2] >= acceptmins[2]
+			and e[3] <= acceptmaxs[3]
+			and e[3] >= acceptmins[3]
+		)
+end
+
+-- port: model_brush.c Mod_CollisionBIH_TracePoint_Mesh L7259-7282 @xonotic-v0.8.6
+-- (the C body is #if 0 "broken - needs to be modified to count front faces and backfaces")
+function model_brush.Mod_CollisionBIH_TracePoint_Mesh(
+	_model: dp_model_t,
+	_frameblend: any,
+	_skeleton: any,
+	trace: collision.trace_t,
+	_start: { number },
+	hitsupercontentsmask: number,
+	skipsupercontentsmask: number,
+	skipmaterialflagsmask: number
+)
+	trace_begin(trace, hitsupercontentsmask, skipsupercontentsmask, skipmaterialflagsmask)
+end
+
+-- port: model_brush.c Mod_CollisionBIH_PointSuperContents_Mesh L7284-7301 @xonotic-v0.8.6
+function model_brush.Mod_CollisionBIH_PointSuperContents_Mesh(
+	_model: dp_model_t,
+	_frame: number,
+	_start: { number }
+): number
+	return 0
+end
+
+-- port: model_brush.c Mod_Q3BSP_TracePoint_RecursiveBSPNode L7303-7323 @xonotic-v0.8.6
+local function Mod_Q3BSP_TracePoint_RecursiveBSPNode(
+	trace: collision.trace_t,
+	model: dp_model_t,
+	node: mnode_t,
+	point: { number },
+	markframe: number
+)
+	-- find which leaf the point is in
+	while node.plane do
+		local plane = node.plane
+		local n = plane.normal
+		local d = if plane.type < 3
+			then point[plane.type + 1]
+			else R(R(R(point[1] * n[1]) + R(point[2] * n[2])) + R(point[3] * n[3]))
+		node = node.children[if d < plane.dist then 2 else 1]
+	end
+	-- point trace the brushes
+	local leaf = node
+	local leafbrushes: buffer = model.brush.data_leafbrushes
+	local brushes: { q3mbrush_t } = model.brush.data_brushes
+	for i = 0, leaf.numleafbrushes - 1 do
+		local brush = brushes[readi32(leafbrushes, (leaf.firstleafbrush + i) * 4) + 1].colbrushf
+		if
+			brush
+			and brush.markframe ~= markframe
+			and point[1] <= brush.maxs[1]
+			and point[1] >= brush.mins[1]
+			and point[2] <= brush.maxs[2]
+			and point[2] >= brush.mins[2]
+			and point[3] <= brush.maxs[3]
+			and point[3] >= brush.mins[3]
+		then
+			brush.markframe = markframe
+			collision.Collision_TracePointBrushFloat(trace, point, brush)
+		end
+	end
+	-- can't do point traces on curves (they have no thickness)
+end
+
+-- BoxesOverlap(a, b, c, d) with a / b as three numbers each
+local function boxoverlaps(
+	a1: number,
+	a2: number,
+	a3: number,
+	b1: number,
+	b2: number,
+	b3: number,
+	c: { number },
+	d: { number }
+): boolean
+	return a1 <= d[1] and b1 >= c[1] and a2 <= d[2] and b2 >= c[2] and a3 <= d[3] and b3 >= c[3]
+end
+
+-- port: model_brush.c Mod_Q3BSP_TraceLine_RecursiveBSPNode L7325-7421 @xonotic-v0.8.6
+local function Mod_Q3BSP_TraceLine_RecursiveBSPNode(
+	trace: collision.trace_t,
+	model: dp_model_t,
+	node: mnode_t,
+	start: { number },
+	end_: { number },
+	startfrac: number,
+	endfrac: number,
+	linestart: { number },
+	lineend: { number },
+	markframe: number,
+	segmentmins: { number },
+	segmentmaxs: { number }
+)
+	local dist1: number, dist2: number
+	-- walk the tree until we hit a leaf, recursing for any split cases
+	while node.plane do
+		-- abort if this part of the bsp tree can not be hit by this trace
+		--		if (!(node->combinedsupercontents & trace->hitsupercontentsmask))
+		--			return;
+		local plane = node.plane
+		local n = plane.normal
+		-- axial planes are much more common than non-axial, so an optimized
+		-- axial case pays off here
+		if plane.type < 3 then
+			dist1 = R(start[plane.type + 1] - plane.dist)
+			dist2 = R(end_[plane.type + 1] - plane.dist)
+		else
+			dist1 = R(R(R(R(start[1] * n[1]) + R(start[2] * n[2])) + R(start[3] * n[3])) - plane.dist)
+			dist2 = R(R(R(R(end_[1] * n[1]) + R(end_[2] * n[2])) + R(end_[3] * n[3])) - plane.dist)
+		end
+		local startside = if dist1 < 0 then 1 else 0
+		local endside = if dist2 < 0 then 1 else 0
+		if startside == endside then
+			-- most of the time the line fragment is on one side of the plane
+			node = node.children[startside + 1]
+		else
+			-- line crosses node plane, split the line
+			-- dist1 = PlaneDiff(linestart, plane); dist2 = PlaneDiff(lineend, plane);
+			if plane.type < 3 then
+				dist1 = R(linestart[plane.type + 1] - plane.dist)
+				dist2 = R(lineend[plane.type + 1] - plane.dist)
+			else
+				dist1 = R(R(R(R(linestart[1] * n[1]) + R(linestart[2] * n[2])) + R(linestart[3] * n[3])) - plane.dist)
+				dist2 = R(R(R(R(lineend[1] * n[1]) + R(lineend[2] * n[2])) + R(lineend[3] * n[3])) - plane.dist)
+			end
+			local midfrac = R(dist1 / R(dist1 - dist2))
+			local mid = {
+				R(linestart[1] + R(midfrac * R(lineend[1] - linestart[1]))),
+				R(linestart[2] + R(midfrac * R(lineend[2] - linestart[2]))),
+				R(linestart[3] + R(midfrac * R(lineend[3] - linestart[3]))),
+			}
+			-- take the near side first
+			Mod_Q3BSP_TraceLine_RecursiveBSPNode(
+				trace,
+				model,
+				node.children[startside + 1],
+				start,
+				mid,
+				startfrac,
+				midfrac,
+				linestart,
+				lineend,
+				markframe,
+				segmentmins,
+				segmentmaxs
+			)
+			-- if we found an impact on the front side, don't waste time
+			-- exploring the far side
+			if midfrac <= trace.fraction then
+				Mod_Q3BSP_TraceLine_RecursiveBSPNode(
+					trace,
+					model,
+					node.children[endside + 1],
+					mid,
+					end_,
+					midfrac,
+					endfrac,
+					linestart,
+					lineend,
+					markframe,
+					segmentmins,
+					segmentmaxs
+				)
+			end
+			return
+		end
+	end
+	-- abort if this part of the bsp tree can not be hit by this trace
+	--	if (!(node->combinedsupercontents & trace->hitsupercontentsmask))
+	--		return;
+	-- hit a leaf
+	local nsmin1 = R(math.min(start[1], end_[1]) - 1)
+	local nsmin2 = R(math.min(start[2], end_[2]) - 1)
+	local nsmin3 = R(math.min(start[3], end_[3]) - 1)
+	local nsmax1 = R(math.max(start[1], end_[1]) + 1)
+	local nsmax2 = R(math.max(start[2], end_[2]) + 1)
+	local nsmax3 = R(math.max(start[3], end_[3]) + 1)
+	-- line trace the brushes
+	local leaf = node
+	local leafbrushes: buffer = model.brush.data_leafbrushes
+	local brushes: { q3mbrush_t } = model.brush.data_brushes
+	for i = 0, leaf.numleafbrushes - 1 do
+		local brush = brushes[readi32(leafbrushes, (leaf.firstleafbrush + i) * 4) + 1].colbrushf
+		if
+			brush
+			and brush.markframe ~= markframe
+			and boxoverlaps(nsmin1, nsmin2, nsmin3, nsmax1, nsmax2, nsmax3, brush.mins, brush.maxs)
+		then
+			brush.markframe = markframe
+			collision.Collision_TraceLineBrushFloat(trace, linestart, lineend, brush, brush)
+		end
+	end
+	-- can't do point traces on curves (they have no thickness)
+	if
+		leaf.containscollisionsurfaces
+		and cv.mod_q3bsp_curves_collisions.integer ~= 0
+		and not (start[1] == end_[1] and start[2] == end_[2] and start[3] == end_[3])
+	then
+		-- line trace the curves
+		local leafsurfaces: buffer = model.brush.data_leafsurfaces
+		for i = 0, leaf.numleafsurfaces - 1 do
+			local surface = model.data_surfaces[readi32(leafsurfaces, (leaf.firstleafsurface + i) * 4) + 1]
+			if
+				surface.num_collisiontriangles ~= 0
+				and surface.deprecatedq3collisionmarkframe ~= markframe
+				and boxoverlaps(nsmin1, nsmin2, nsmin3, nsmax1, nsmax2, nsmax3, surface.mins, surface.maxs)
+			then
+				surface.deprecatedq3collisionmarkframe = markframe
+				collision.Collision_TraceLineTriangleMeshFloat(
+					trace,
+					linestart,
+					lineend,
+					surface.num_collisiontriangles,
+					surface.deprecatedq3data_collisionelement3i,
+					0,
+					surface.deprecatedq3data_collisionvertex3f,
+					surface.deprecatedq3num_collisionbboxstride,
+					surface.deprecatedq3data_collisionbbox6f,
+					surface.texture.supercontents,
+					surface.texture.surfaceflags,
+					surface.texture,
+					segmentmins,
+					segmentmaxs
+				)
+			end
+		end
+	end
+end
+
+-- port: model_brush.c Mod_Q3BSP_TraceBrush_RecursiveBSPNode L7423-7513 @xonotic-v0.8.6
+local function Mod_Q3BSP_TraceBrush_RecursiveBSPNode(
+	trace: collision.trace_t,
+	model: dp_model_t,
+	node: mnode_t,
+	thisbrush_start: collision.colbrushf_t,
+	thisbrush_end: collision.colbrushf_t,
+	markframe: number,
+	segmentmins: { number },
+	segmentmaxs: { number }
+)
+	local sides: number
+	-- walk the tree until we hit a leaf, recursing for any split cases
+	while node.plane do
+		-- abort if this part of the bsp tree can not be hit by this trace
+		--		if (!(node->combinedsupercontents & trace->hitsupercontentsmask))
+		--			return;
+		local plane = node.plane
+		-- axial planes are much more common than non-axial, so an optimized
+		-- axial case pays off here
+		if plane.type < 3 then
+			-- this is an axial plane, compare bounding box directly to it and
+			-- recurse sides accordingly
+			-- recurse down node sides
+			-- use an inlined axial BoxOnPlaneSide to slightly reduce overhead
+			sides = (if segmentmaxs[plane.type + 1] >= plane.dist then 1 else 0)
+				+ (if segmentmins[plane.type + 1] < plane.dist then 2 else 0)
+		else
+			-- this is a non-axial plane, so check if the start and end boxes
+			-- are both on one side of the plane to handle 'diagonal' cases
+			sides = bit32.bor(
+				BoxOnPlaneSide(thisbrush_start.mins, thisbrush_start.maxs, plane),
+				BoxOnPlaneSide(thisbrush_end.mins, thisbrush_end.maxs, plane)
+			)
+		end
+		if sides == 3 then
+			-- segment crosses plane
+			Mod_Q3BSP_TraceBrush_RecursiveBSPNode(
+				trace,
+				model,
+				node.children[1],
+				thisbrush_start,
+				thisbrush_end,
+				markframe,
+				segmentmins,
+				segmentmaxs
+			)
+			sides = 2
+		end
+		-- if sides == 0 then the trace itself is bogus (Not A Number values),
+		-- in this case we simply pretend the trace hit nothing
+		if sides == 0 then
+			return -- ERROR: NAN bounding box!
+		end
+		-- take whichever side the segment box is on
+		node = node.children[sides]
+	end
+	-- abort if this part of the bsp tree can not be hit by this trace
+	--	if (!(node->combinedsupercontents & trace->hitsupercontentsmask))
+	--		return;
+	local nsmin1 = math.max(segmentmins[1], R(node.mins[1] - 1))
+	local nsmin2 = math.max(segmentmins[2], R(node.mins[2] - 1))
+	local nsmin3 = math.max(segmentmins[3], R(node.mins[3] - 1))
+	local nsmax1 = math.min(segmentmaxs[1], R(node.maxs[1] + 1))
+	local nsmax2 = math.min(segmentmaxs[2], R(node.maxs[2] + 1))
+	local nsmax3 = math.min(segmentmaxs[3], R(node.maxs[3] + 1))
+	-- hit a leaf
+	local leaf = node
+	local leafbrushes: buffer = model.brush.data_leafbrushes
+	local brushes: { q3mbrush_t } = model.brush.data_brushes
+	for i = 0, leaf.numleafbrushes - 1 do
+		local brush = brushes[readi32(leafbrushes, (leaf.firstleafbrush + i) * 4) + 1].colbrushf
+		if
+			brush
+			and brush.markframe ~= markframe
+			and boxoverlaps(nsmin1, nsmin2, nsmin3, nsmax1, nsmax2, nsmax3, brush.mins, brush.maxs)
+		then
+			brush.markframe = markframe
+			collision.Collision_TraceBrushBrushFloat(trace, thisbrush_start, thisbrush_end, brush, brush)
+		end
+	end
+	if leaf.containscollisionsurfaces and cv.mod_q3bsp_curves_collisions.integer ~= 0 then
+		local leafsurfaces: buffer = model.brush.data_leafsurfaces
+		for i = 0, leaf.numleafsurfaces - 1 do
+			local surface = model.data_surfaces[readi32(leafsurfaces, (leaf.firstleafsurface + i) * 4) + 1]
+			if
+				surface.num_collisiontriangles ~= 0
+				and surface.deprecatedq3collisionmarkframe ~= markframe
+				and boxoverlaps(nsmin1, nsmin2, nsmin3, nsmax1, nsmax2, nsmax3, surface.mins, surface.maxs)
+			then
+				surface.deprecatedq3collisionmarkframe = markframe
+				collision.Collision_TraceBrushTriangleMeshFloat(
+					trace,
+					thisbrush_start,
+					thisbrush_end,
+					surface.num_collisiontriangles,
+					surface.deprecatedq3data_collisionelement3i,
+					0,
+					surface.deprecatedq3data_collisionvertex3f,
+					surface.deprecatedq3num_collisionbboxstride,
+					surface.deprecatedq3data_collisionbbox6f,
+					surface.texture.supercontents,
+					surface.texture.surfaceflags,
+					surface.texture,
+					segmentmins,
+					segmentmaxs
+				)
+			end
+		end
+	end
+end
+
+-- model_brush.c L7516: static int markframe = 0;
+local markframe = 0
+
+-- port: model_brush.c Mod_Q3BSP_TracePoint L7518-7537 @xonotic-v0.8.6
+local function Mod_Q3BSP_TracePoint(
+	model: dp_model_t,
+	frameblend: any,
+	skeleton: any,
+	trace: collision.trace_t,
+	start: { number },
+	hitsupercontentsmask: number,
+	skipsupercontentsmask: number,
+	skipmaterialflagsmask: number
+)
+	trace_begin(trace, hitsupercontentsmask, skipsupercontentsmask, skipmaterialflagsmask)
+	if cv.mod_collision_bih.integer ~= 0 then
+		Mod_CollisionBIH_TracePoint(
+			model,
+			frameblend,
+			skeleton,
+			trace,
+			start,
+			hitsupercontentsmask,
+			skipsupercontentsmask,
+			skipmaterialflagsmask
+		)
+	elseif model.brush.submodel ~= 0 then
+		local brushes: { q3mbrush_t } = model.brush.data_brushes
+		for i = 0, model.nummodelbrushes - 1 do
+			local brush = brushes[model.firstmodelbrush + i + 1]
+			if brush.colbrushf then
+				collision.Collision_TracePointBrushFloat(trace, start, brush.colbrushf)
+			end
+		end
+	else
+		markframe += 1
+		Mod_Q3BSP_TracePoint_RecursiveBSPNode(trace, model, model.brush.data_nodes[1], start, markframe)
+	end
+end
+
+-- port: model_brush.c Mod_Q3BSP_TraceLine L7539-7577 @xonotic-v0.8.6
+local function Mod_Q3BSP_TraceLine(
+	model: dp_model_t,
+	frameblend: any,
+	skeleton: any,
+	trace: collision.trace_t,
+	start: { number },
+	end_: { number },
+	hitsupercontentsmask: number,
+	skipsupercontentsmask: number,
+	skipmaterialflagsmask: number
+)
+	if start[1] == end_[1] and start[2] == end_[2] and start[3] == end_[3] then
+		Mod_Q3BSP_TracePoint(
+			model,
+			frameblend,
+			skeleton,
+			trace,
+			start,
+			hitsupercontentsmask,
+			skipsupercontentsmask,
+			skipmaterialflagsmask
+		)
+		return
+	end
+
+	trace_begin(trace, hitsupercontentsmask, skipsupercontentsmask, skipmaterialflagsmask)
+	local segmentmins = {
+		R(math.min(start[1], end_[1]) - 1),
+		R(math.min(start[2], end_[2]) - 1),
+		R(math.min(start[3], end_[3]) - 1),
+	}
+	local segmentmaxs = {
+		R(math.max(start[1], end_[1]) + 1),
+		R(math.max(start[2], end_[2]) + 1),
+		R(math.max(start[3], end_[3]) + 1),
+	}
+	if cv.mod_collision_bih.integer ~= 0 then
+		Mod_CollisionBIH_TraceLine(
+			model,
+			frameblend,
+			skeleton,
+			trace,
+			start,
+			end_,
+			hitsupercontentsmask,
+			skipsupercontentsmask,
+			skipmaterialflagsmask
+		)
+	elseif model.brush.submodel ~= 0 then
+		local brushes: { q3mbrush_t } = model.brush.data_brushes
+		for i = 0, model.nummodelbrushes - 1 do
+			local cb = brushes[model.firstmodelbrush + i + 1].colbrushf
+			if
+				cb
+				and boxoverlaps(
+					segmentmins[1],
+					segmentmins[2],
+					segmentmins[3],
+					segmentmaxs[1],
+					segmentmaxs[2],
+					segmentmaxs[3],
+					cb.mins,
+					cb.maxs
+				)
+			then
+				collision.Collision_TraceLineBrushFloat(trace, start, end_, cb, cb)
+			end
+		end
+		if cv.mod_q3bsp_curves_collisions.integer ~= 0 then
+			for i = 0, model.nummodelsurfaces - 1 do
+				local surface = model.data_surfaces[model.firstmodelsurface + i + 1]
+				if
+					surface.num_collisiontriangles ~= 0
+					and boxoverlaps(
+						segmentmins[1],
+						segmentmins[2],
+						segmentmins[3],
+						segmentmaxs[1],
+						segmentmaxs[2],
+						segmentmaxs[3],
+						surface.mins,
+						surface.maxs
+					)
+				then
+					collision.Collision_TraceLineTriangleMeshFloat(
+						trace,
+						start,
+						end_,
+						surface.num_collisiontriangles,
+						surface.deprecatedq3data_collisionelement3i,
+						0,
+						surface.deprecatedq3data_collisionvertex3f,
+						surface.deprecatedq3num_collisionbboxstride,
+						surface.deprecatedq3data_collisionbbox6f,
+						surface.texture.supercontents,
+						surface.texture.surfaceflags,
+						surface.texture,
+						segmentmins,
+						segmentmaxs
+					)
+				end
+			end
+		end
+	else
+		markframe += 1
+		Mod_Q3BSP_TraceLine_RecursiveBSPNode(
+			trace,
+			model,
+			model.brush.data_nodes[1],
+			start,
+			end_,
+			0,
+			1,
+			start,
+			end_,
+			markframe,
+			segmentmins,
+			segmentmaxs
+		)
+	end
+end
+
+-- port: model_brush.c Mod_Q3BSP_TraceBrush L7579-7621 @xonotic-v0.8.6
+local function Mod_Q3BSP_TraceBrush(
+	model: dp_model_t,
+	frameblend: any,
+	skeleton: any,
+	trace: collision.trace_t,
+	start: collision.colbrushf_t,
+	end_: collision.colbrushf_t,
+	hitsupercontentsmask: number,
+	skipsupercontentsmask: number,
+	skipmaterialflagsmask: number
+)
+	local smins, smaxs = start.mins, start.maxs
+	local emins, emaxs = end_.mins, end_.maxs
+	if
+		cv.mod_q3bsp_optimizedtraceline.integer ~= 0
+		and smins[1] == smaxs[1]
+		and smins[2] == smaxs[2]
+		and smins[3] == smaxs[3]
+		and emins[1] == emaxs[1]
+		and emins[2] == emaxs[2]
+		and emins[3] == emaxs[3]
+	then
+		if smins[1] == emins[1] and smins[2] == emins[2] and smins[3] == emins[3] then
+			Mod_Q3BSP_TracePoint(
+				model,
+				frameblend,
+				skeleton,
+				trace,
+				smins,
+				hitsupercontentsmask,
+				skipsupercontentsmask,
+				skipmaterialflagsmask
+			)
+		else
+			Mod_Q3BSP_TraceLine(
+				model,
+				frameblend,
+				skeleton,
+				trace,
+				smins,
+				emins,
+				hitsupercontentsmask,
+				skipsupercontentsmask,
+				skipmaterialflagsmask
+			)
+		end
+		return
+	end
+
+	-- box trace, performed as brush trace
+	trace_begin(trace, hitsupercontentsmask, skipsupercontentsmask, skipmaterialflagsmask)
+	local segmentmins = {
+		R(math.min(smins[1], emins[1]) - 1),
+		R(math.min(smins[2], emins[2]) - 1),
+		R(math.min(smins[3], emins[3]) - 1),
+	}
+	local segmentmaxs = {
+		R(math.max(smaxs[1], emaxs[1]) + 1),
+		R(math.max(smaxs[2], emaxs[2]) + 1),
+		R(math.max(smaxs[3], emaxs[3]) + 1),
+	}
+	if cv.mod_collision_bih.integer ~= 0 then
+		Mod_CollisionBIH_TraceBrush(
+			model,
+			frameblend,
+			skeleton,
+			trace,
+			start,
+			end_,
+			hitsupercontentsmask,
+			skipsupercontentsmask,
+			skipmaterialflagsmask
+		)
+	elseif model.brush.submodel ~= 0 then
+		local brushes: { q3mbrush_t } = model.brush.data_brushes
+		for i = 0, model.nummodelbrushes - 1 do
+			local cb = brushes[model.firstmodelbrush + i + 1].colbrushf
+			if
+				cb
+				and boxoverlaps(
+					segmentmins[1],
+					segmentmins[2],
+					segmentmins[3],
+					segmentmaxs[1],
+					segmentmaxs[2],
+					segmentmaxs[3],
+					cb.mins,
+					cb.maxs
+				)
+			then
+				collision.Collision_TraceBrushBrushFloat(trace, start, end_, cb, cb)
+			end
+		end
+		if cv.mod_q3bsp_curves_collisions.integer ~= 0 then
+			for i = 0, model.nummodelsurfaces - 1 do
+				local surface = model.data_surfaces[model.firstmodelsurface + i + 1]
+				if
+					surface.num_collisiontriangles ~= 0
+					and boxoverlaps(
+						segmentmins[1],
+						segmentmins[2],
+						segmentmins[3],
+						segmentmaxs[1],
+						segmentmaxs[2],
+						segmentmaxs[3],
+						surface.mins,
+						surface.maxs
+					)
+				then
+					collision.Collision_TraceBrushTriangleMeshFloat(
+						trace,
+						start,
+						end_,
+						surface.num_collisiontriangles,
+						surface.deprecatedq3data_collisionelement3i,
+						0,
+						surface.deprecatedq3data_collisionvertex3f,
+						surface.deprecatedq3num_collisionbboxstride,
+						surface.deprecatedq3data_collisionbbox6f,
+						surface.texture.supercontents,
+						surface.texture.surfaceflags,
+						surface.texture,
+						segmentmins,
+						segmentmaxs
+					)
+				end
+			end
+		end
+	else
+		markframe += 1
+		Mod_Q3BSP_TraceBrush_RecursiveBSPNode(
+			trace,
+			model,
+			model.brush.data_nodes[1],
+			start,
+			end_,
+			markframe,
+			segmentmins,
+			segmentmaxs
+		)
+	end
+end
+
+-- port: model_brush.c Mod_Q3BSP_TraceBox L7623-7636 @xonotic-v0.8.6
+local function Mod_Q3BSP_TraceBox(
+	model: dp_model_t,
+	frameblend: any,
+	skeleton: any,
+	trace: collision.trace_t,
+	start: { number },
+	boxmins: { number },
+	boxmaxs: { number },
+	end_: { number },
+	hitsupercontentsmask: number,
+	skipsupercontentsmask: number,
+	skipmaterialflagsmask: number
+)
+	-- box trace, performed as brush trace
+	local boxstartmins = { R(start[1] + boxmins[1]), R(start[2] + boxmins[2]), R(start[3] + boxmins[3]) }
+	local boxstartmaxs = { R(start[1] + boxmaxs[1]), R(start[2] + boxmaxs[2]), R(start[3] + boxmaxs[3]) }
+	local boxendmins = { R(end_[1] + boxmins[1]), R(end_[2] + boxmins[2]), R(end_[3] + boxmins[3]) }
+	local boxendmaxs = { R(end_[1] + boxmaxs[1]), R(end_[2] + boxmaxs[2]), R(end_[3] + boxmaxs[3]) }
+	local thisbrush_start = collision.Collision_BrushForBox(boxstartmins, boxstartmaxs, 0, 0, nil)
+	local thisbrush_end = collision.Collision_BrushForBox(boxendmins, boxendmaxs, 0, 0, nil)
+	Mod_Q3BSP_TraceBrush(
+		model,
+		frameblend,
+		skeleton,
+		trace,
+		thisbrush_start,
+		thisbrush_end,
+		hitsupercontentsmask,
+		skipsupercontentsmask,
+		skipmaterialflagsmask
+	)
+end
+
+-- port: model_brush.c Mod_Q3BSP_PointSuperContents L7638-7672 @xonotic-v0.8.6
+local function Mod_Q3BSP_PointSuperContents(model: dp_model_t, frame: number, point: { number }): number
+	local supercontents = 0
+	local brushes: { q3mbrush_t } = model.brush.data_brushes
+	if cv.mod_collision_bih.integer ~= 0 then
+		supercontents = Mod_CollisionBIH_PointSuperContents(model, frame, point)
+	-- test if the point is inside each brush
+	elseif model.brush.submodel ~= 0 then
+		-- submodels are effectively one leaf
+		for i = 0, model.nummodelbrushes - 1 do
+			local cb = brushes[model.firstmodelbrush + i + 1].colbrushf
+			if cb and collision.Collision_PointInsideBrushFloat(point, cb) then
+				supercontents = bit32.bor(supercontents, cb.supercontents)
+			end
+		end
+	else
+		local node: mnode_t = model.brush.data_nodes[1]
+		-- find which leaf the point is in
+		while node.plane do
+			local plane = node.plane
+			local n = plane.normal
+			local d = if plane.type < 3
+				then point[plane.type + 1]
+				else R(R(R(point[1] * n[1]) + R(point[2] * n[2])) + R(point[3] * n[3]))
+			node = node.children[if d < plane.dist then 2 else 1]
+		end
+		local leaf = node
+		-- now check the brushes in the leaf
+		local leafbrushes: buffer = model.brush.data_leafbrushes
+		for i = 0, leaf.numleafbrushes - 1 do
+			local cb = brushes[readi32(leafbrushes, (leaf.firstleafbrush + i) * 4) + 1].colbrushf
+			if cb and collision.Collision_PointInsideBrushFloat(point, cb) then
+				supercontents = bit32.bor(supercontents, cb.supercontents)
+			end
+		end
+	end
+	return supercontents
+end
+
+-- The C-static trace functions (reached through the model's function pointers in C), for tests.
+model_brush.Mod_Q3BSP_TracePoint = Mod_Q3BSP_TracePoint
+model_brush.Mod_Q3BSP_TraceLine = Mod_Q3BSP_TraceLine
+model_brush.Mod_Q3BSP_TraceBrush = Mod_Q3BSP_TraceBrush
+model_brush.Mod_Q3BSP_TraceBox = Mod_Q3BSP_TraceBox
+model_brush.Mod_Q3BSP_PointSuperContents = Mod_Q3BSP_PointSuperContents
+model_brush.Mod_Q3BSP_TraceLineOfSight = Mod_Q3BSP_TraceLineOfSight
+
+-- port: model_brush.c Mod_CollisionBIH_TraceLineAgainstSurfaces L7674-7677 @xonotic-v0.8.6
+function model_brush.Mod_CollisionBIH_TraceLineAgainstSurfaces(
+	model: dp_model_t,
+	frameblend: any,
+	skeleton: any,
+	trace: collision.trace_t,
+	start: { number },
+	end_: { number },
+	hitsupercontentsmask: number,
+	skipsupercontentsmask: number,
+	skipmaterialflagsmask: number
+)
+	Mod_CollisionBIH_TraceLineShared(
+		model,
+		frameblend,
+		skeleton,
+		trace,
+		start,
+		end_,
+		hitsupercontentsmask,
+		skipsupercontentsmask,
+		skipmaterialflagsmask,
+		model.render_bih
+	)
+end
+
 -- bounds of triangle (three vertex indexes at byte offset e of element3i) in vertex3f, each -1 / +1 (float)
 local function trianglebounds(vertex3f: buffer, element3i: buffer, e: number): ({ number }, { number })
 	local a, b, c = readi32(element3i, e) * 12, readi32(element3i, e + 4) * 12, readi32(element3i, e + 8) * 12
@@ -2113,7 +3751,14 @@ local function Mod_Q3BSP_Load(mod: dp_model_t, data: string)
 	end
 
 	mod.soundfromcenter = true
-	-- mod->TraceBox ... mod->DrawLight (function pointers): tracing and drawing are NOT YET PORTED
+	mod.TraceBox = Mod_Q3BSP_TraceBox
+	mod.TraceBrush = Mod_Q3BSP_TraceBrush
+	mod.TraceLine = Mod_Q3BSP_TraceLine
+	mod.TracePoint = Mod_Q3BSP_TracePoint
+	mod.PointSuperContents = Mod_Q3BSP_PointSuperContents
+	mod.TraceLineAgainstSurfaces = Mod_CollisionBIH_TraceLine
+	mod.brush.TraceLineOfSight = Mod_Q3BSP_TraceLineOfSight
+	-- mod->brush.GetPVS ... mod->DrawLight (function pointers): PVS, light point and drawing are NOT YET PORTED
 	mod.brush.SuperContentsFromNativeContents = Mod_Q3BSP_SuperContentsFromNativeContents
 	mod.brush.NativeContentsFromSuperContents = Mod_Q3BSP_NativeContentsFromSuperContents
 
