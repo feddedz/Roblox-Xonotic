@@ -1975,6 +1975,61 @@ static void mv_edgecases(void)
 		mv_commit(n);
 		mv_call(MV_TOSS, n);
 	}
+	// bouncing missiles that stop at the first impact (sv_gameplayfix_slidemoveprojectiles 0)
+	MV_SETCV(sv_gameplayfix_slidemoveprojectiles, 0);
+	for (i = 0; i < 3; i++)
+	{
+		n = MV_DYN0 + 45;
+		ed = mv_ed + n;
+		mv_fresh(n, MOVETYPE_BOUNCEMISSILE, 0, 4);
+		PRVM_serveredictfloat(ed, solid) = SOLID_BBOX;
+		PRVM_serveredictfloat(ed, flags) = 0;
+		PRVM_serveredictfloat(ed, dphitcontentsmask) = 0;
+		PRVM_serveredictfunction(ed, touch) = 0;
+		PRVM_serveredictvector(ed, velocity)[2] = -1500;
+		mv_commit(n);
+		mv_call(MV_TOSS, n);
+	}
+	MV_SETCV(sv_gameplayfix_slidemoveprojectiles, 1);
+	// walking off the low bump: the step down lands on the floor, whose impact runs a touch that teleports
+	for (i = 0; i < 4; i++)
+	{
+		float d[3];
+		n = MV_DYN0 + 46;
+		ed = mv_ed + n;
+		mv_fresh(n, MOVETYPE_WALK, 0, 0);
+		VectorSet(PRVM_serveredictvector(ed, origin), 1250 + tv_frand(-36, 36), 250 + tv_frand(-36, 36), 10 + 24 + 0.03125f);
+		VectorSet(d, PRVM_serveredictvector(ed, origin)[0] - 1250, PRVM_serveredictvector(ed, origin)[1] - 250, 0);
+		VectorNormalize(d);
+		VectorScale(d, tv_frand(250, 450), PRVM_serveredictvector(ed, velocity));
+		PRVM_serveredictfloat(ed, solid) = SOLID_SLIDEBOX;
+		PRVM_serveredictfloat(ed, flags) = FL_ONGROUND;
+		PRVM_serveredictedict(ed, groundentity) = MV_SCENE0 + 15;
+		PRVM_serveredictfloat(ed, dphitcontentsmask) = 0;
+		PRVM_serveredictfloat(ed, watertype) = 0;
+		PRVM_serveredictfloat(ed, waterlevel) = 0;
+		PRVM_serveredictfunction(ed, touch) = i < 3 ? 75 : 0;
+		mv_commit(n);
+		mv_call(MV_WM, n);
+	}
+	// an entity spawned during the frame below the spawner's number gets its move in the second pass
+	// (sv_gameplayfix_delayprojectiles < 0)
+	MV_SETCV(sv_gameplayfix_delayprojectiles, -1);
+	n = MV_SENT - 1;
+	ed = mv_ed + n;
+	mv_clearent(n);
+	PRVM_serveredictfloat(ed, solid) = SOLID_NOT;
+	PRVM_serveredictfunction(ed, think) = 10;
+	PRVM_serveredictfloat(ed, nextthink) = (float)sv.time;
+	VectorSet(PRVM_serveredictvector(ed, origin), 1300, 300, 300);
+	mv_priv[n].move = true;
+	mv_commit(n);
+	for (i = MV_DYN0; i < MV_SENT - 1 && !mv_priv[i].free; i++)
+		;
+	if (i == MV_SENT - 1)
+		mv_setfree(MV_DYN0 + 40, 1);
+	mv_call(MV_PHYS, 0);
+	MV_SETCV(sv_gameplayfix_delayprojectiles, 0);
 }
 // single calls of the movers a cvar variant changes, on entities set up for them
 static void mv_variantcalls(void)
