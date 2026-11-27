@@ -315,7 +315,7 @@ static void pm_table(void)
 		printf("PN\t%d\t%d\n", numbers[i], (int)Protocol_EnumForNumber(numbers[i]));
 	for (i = 0; i < (int)(sizeof(sizes) / sizeof(sizes[0])); i++)
 	{
-		strcpy(buf, "untouched");
+		memcpy(buf, "untouched", 10);
 		Protocol_Names(buf, sizes[i]);
 		printf("PS\t%d\t%s\n", (int)sizes[i], buf);
 	}
