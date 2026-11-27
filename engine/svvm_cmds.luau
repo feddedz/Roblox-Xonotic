@@ -238,6 +238,7 @@ end
 local collision = require("./collision")
 local cvar = require("./cvar")
 local f32 = require("./_port/f32")
+local libm = require("./_port/libm")
 local R = f32.round
 local toint = libc.toint
 local FieldOfs = prvm_edict.FieldOfs
@@ -864,8 +865,8 @@ local function VM_SV_walkmove(prog: any)
 	yaw = R(yaw * M_PI * 2 / 360)
 
 	-- cos / sin take and return double; * dist (double), stored float
-	move[1] = R(math.cos(yaw) * dist)
-	move[2] = R(math.sin(yaw) * dist)
+	move[1] = R(libm.cos(yaw) * dist)
+	move[2] = R(libm.sin(yaw) * dist)
 	move[3] = 0
 
 	-- save program state, because SV_movestep may call other progs
