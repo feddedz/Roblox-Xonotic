@@ -680,6 +680,7 @@ static void pm_writestats(int ncases)
 	memset(host_client->stats, 0, sizeof(host_client->stats));
 	memset(host_client->statsdeltabits, 0, sizeof(host_client->statsdeltabits));
 	memset(pm_stats, 0, sizeof(pm_stats));
+	printf("WI\n");
 	for (c = 0; c < ncases; c++)
 	{
 		int nk = 1 + (int)(pm_rnd() % 6);
