@@ -96,13 +96,46 @@ None new. (sv.models uses the C index directly, matching model_precache; noted i
 - Tests: unit 23 files, 0 failed. StyLua, Selene clean; check_port_lines 0 wrong. Vector files are the
   Testgen artifacts byte for byte.
 
+## Part 4 (same day): PORT-LIBM done, M4-SPAWN (a map starts)
+- PR 13 merged. PORT-LIBM and M4-SPAWN claimed on main. Branch M4-SPAWN-libm, two Opus sub-agents.
+- **PORT-LIBM done:** engine/_port/libm.luau = pure-Luau ports of glibc sin, cos, tan, asin, acos, atan,
+  atan2, pow, log (+ fmod wrapper), LGPL notices kept. Reference = the runner's glibc **2.43** on a CPU with
+  FMA: the port emulates the fused multiply-adds of the FMA build exactly (double-double product + round to
+  odd); branred is built without FMA, as in glibc. tools/testgen/libm_vectors.{c,sh}, tests/vectors/libm.tsv,
+  tests/unit/libm.test.luau: 36,631 checks, 0 differences (the host's math.* differed on 3 to 297 of the
+  vectors per function). Every caller switched (mathlib, matrixlib, curves, sv_phys, sv_move, prvm_cmds,
+  svvm_cmds): no math.sin / cos / tan / asin / acos / atan / atan2 / pow / log / ^ left in engine/. G-058 is
+  closed for these functions. Note: the bits are those of an FMA-capable x86-64 with glibc 2.43; a C build on
+  a CPU without FMA, or an older glibc, differs in rare last bits -- that machine is our reference.
+- **M4-SPAWN:** engine/model_shared.luau: model registry (Mod_Init, Mod_UnloadModel, Mod_LoadModel,
+  Mod_ClearUsed, Mod_PurgeUnused, Mod_FindName, Mod_ForName, Mod_Reload, Mem_ExpandableArray slots);
+  model_brush submodels go through Mod_FindName. engine/sv_main.luau: SV_ModelIndex, SV_SpawnServer
+  (entry: sv_main.SV_SpawnServer(mapname), compiled QC through sv_main.vm_setup_opts). engine/svvm_cmds.luau:
+  setmodel #3, precache_model #20, setmodelindex #333, modelnameforindex #334, VM_CustomStats_Clear.
+  engine/host_cmd.luau: Host_Map_f (`map <name>`). engine/server.luau: server.Clear(), CStrRef, more fields.
+- **Compiled QuakeC on the owner's PC:** `python tools/qcaot/compile.py work/vfs-high/progs.dat
+  game/generated/progs` (3 s, 13,042 functions, 37 MB, not in git; .styluaignore added for game/generated).
+  The server integration tests now run here instead of skipping.
+- tests/integration/sv_spawnserver.test.luau (60 checks): stormkeep and space-elevator spawn with the real
+  QC: stormkeep 4,052 live edicts, 38 submodels resolved, 11 brush entities with the C setmodel boxes, 88
+  triggers, 311 models / 434 sounds precached, 13 of 13 spawn points land, 100 SV_Physics frames run.
+  **The first init frame stops on a QC error** (WarpZone init needs getsurface*, #434-437, still stubs).
+  Stubs hit: #277 frameduration, #437 getsurfacetexture, #451 gettagindex, #443 setattachment, #513 uri_get,
+  #52 WriteByte, #54 WriteShort.
+- Alias / sprite model loaders (md3, iqm, dpm, zym, psk, spr, obj) are NOT YET PORTED: such models keep the
+  +-16 box Mod_LoadModel sets before the loader call (as the C does for an unrecognised file), so setmodel on
+  them gives a wrong box until the loaders exist (sv_gameplayfix_setmodelrealbox). Biggest gameplay risk.
+- tests/integration/sv_loadentities.test.luau fails now that it runs (it loads entities without
+  SV_SpawnServer: no area grid; expects stale custom stats): rebase it and sv_config_worldspawn onto
+  SV_SpawnServer.
+- Not checked against the C build: the registry, SV_SpawnServer, the new builtins.
+
 ## Next step
-1. PORT-LIBM: glibc-exact sin / cos (and whatever else of libm the engine calls: atan2, sqrt is exact, pow,
-   floor / ceil are exact) in engine/_port, checked against the runner's glibc through Testgen; then switch
-   mathlib.luau, matrixlib.luau, sv_move.luau, svvm_cmds.luau to it.
-2. SV_SpawnServer (sv_main.c): worldmodel, sv.models, World_SetSize, then the stormkeep entity load of
-   M2-RUNNER with real traces, then the host frame loop calling SV_Physics. Needs setmodel #3 and the model
-   registry (Mod_ForName / Mod_FindName).
-3. Still stubs: checkclient / checkpvs / aim (PVS), SV_StartSound, SV_ClientThink (sv_user.c).
-4. Mod_Q3BSP_LoadLightmaps, tokenizer speed, BIH leaf memory, cached field offsets in sv_phys / builtins;
-   the two big vector files (movers.tsv, svmove.tsv: 13 MB) could be stored compressed.
+1. prvm_cmds.c getsurface* (#434-437 and friends), frameduration #277, gettagindex #451, setattachment #443,
+   so the QC init frame completes; rebase the two old server integration tests onto SV_SpawnServer.
+2. model_alias.c + the format loaders (md3 / iqm / dpm / zym / psk), model_sprite.c: real model boxes, frames,
+   tags (gettagindex needs them).
+3. SV_StartSound, WriteByte / WriteShort and the rest of the message builtins, SV_ClientThink (sv_user.c),
+   checkclient / checkpvs / aim (PVS), then the host frame loop (Host_Main / SV_Frame).
+4. C reference for the registry / SV_SpawnServer / setmodel where feasible.
+5. Mod_Q3BSP_LoadLightmaps, tokenizer speed, BIH leaf memory, cached field offsets; compress the big vectors.

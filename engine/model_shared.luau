@@ -29,8 +29,12 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 	Q3 shader scripts: Mod_LoadQ3Shaders, Mod_LookupQ3Shader and their helpers; Mod_CreateShaderPass,
 	Mod_CreateShaderPassFromQ3ShaderLayer, Mod_LoadTextureFromQ3Shader (end of this file; the renderer calls
 	they make on a client are hooks, see R_SkinFrame_LoadMissing below).
-	NOT YET PORTED: everything else (model registry and loading,
-	skins, shadow meshes, sorted surfaces, lightmap allocation, ...).
+	Model registry (task M4-SPAWN): Mod_Init (dedicated part), Mod_UnloadModel, Mod_FindPotentialDeforms,
+	Mod_LoadModel (Q3 BSP through model_brush.Mod_IBSP_Load; the other format loaders log NOT YET PORTED and
+	leave the 16-unit default box), Mod_ClearUsed, Mod_PurgeUnused, Mod_FindName, Mod_ForName, Mod_Reload.
+	NOT YET PORTED: everything else (the alias / sprite / OBJ / Q1BSP loaders, Mod_FrameGroupify, mod_start /
+	mod_shutdown / mod_newmap (renderer module), Mod_Print / Mod_Precache / Mod_Decompile_f commands,
+	skins, shadow meshes, lightmap allocation, ...).
 ]]
 local common = require("./common")
 local console = require("./console")
@@ -38,6 +42,7 @@ local cvar = require("./cvar")
 local f32 = require("./_port/f32")
 local fs = require("./fs")
 local libc = require("./_port/libc")
+local matrixlib = require("./matrixlib")
 
 local model_shared = {}
 
@@ -47,6 +52,491 @@ local readf32, writef32, readi32, writei32 = buffer.readf32, buffer.writef32, bu
 
 -- model_shared.c L47: dp_model_t *loadmodel;
 model_shared.loadmodel = nil :: any
+
+--[[
+	Model registry (model_shared.c L43-46, L156-648).
+	`static memexpandablearray_t models` (zone.c Mem_ExpandableArray_*, 16 records per array) is a flat list:
+	registry.records[i] is the record at C index i (0-based) and registry.allocflags[i] says whether it is in use.
+	AllocRecord takes the first free index (the C arrays are scanned in order, slots in order, so the order is
+	the same) and IndexRange is the highest used index + 1, as in zone.c. A record keeps its table across
+	FreeRecord / AllocRecord, like the C memory (the pointer of a reused slot is the same), and is zeroed in
+	place on allocation.
+	The brush loader is reached through hooks model_brush.luau installs when it loads (model_brush requires this
+	module): model_shared.Mod_IBSP_Load, model_shared.Mod_BrushInit.
+]]
+model_shared.Mod_IBSP_Load = nil :: any -- model_brush.c Mod_IBSP_Load (installed by model_brush.luau)
+model_shared.Mod_BrushInit = nil :: any -- model_brush.c Mod_BrushInit (installed by model_brush.luau)
+
+local registry: { records: { [number]: any }, allocflags: { [number]: boolean } } = { records = {}, allocflags = {} }
+model_shared.registry = registry
+
+local notported_once: { [string]: boolean } = {}
+local function NOT_YET_PORTED(what: string)
+	if not notported_once[what] then
+		notported_once[what] = true
+		print("NOT YET PORTED: " .. what)
+	end
+end
+
+-- The fields of a zeroed dp_model_t (memset 0 / Mem_ExpandableArray_AllocRecord) the port reads before a
+-- loader sets them; everything else is nil (= 0 / NULL / false). Filled into `mod` in place.
+local function zeromodel(mod: any, name: string)
+	table.clear(mod)
+	mod.name = name
+	mod.brush = {}
+	mod.brushq3 = {
+		num_lightgrid_cellsize = { 0, 0, 0 },
+		num_lightgrid_scale = { 0, 0, 0 },
+		num_lightgrid_imins = { 0, 0, 0 },
+		num_lightgrid_imaxs = { 0, 0, 0 },
+		num_lightgrid_isize = { 0, 0, 0 },
+		num_lightgrid_indexfromworld = matrixlib.new(),
+		num_lightgrid = 0,
+		deluxemapping = false,
+		deluxemapping_modelspace = false,
+	}
+	mod.num_surfaces = 0
+	mod.lit = false
+	mod.used = false
+	mod.loaded = false
+	mod.crc = 0
+end
+
+-- A zeroed dp_model_t outside the registry (port support: loaders tested on their own, model_brush.newmodel).
+-- C has no such models; a loader run on one puts its submodels outside the registry too (see
+-- Mod_IsRegistered), so standalone loads do not fill the registry with records no Mod_FindName asked for.
+function model_shared.Mod_NewModel(name: string): any
+	local mod = {}
+	zeromodel(mod, name)
+	mod.unregistered = true
+	return mod
+end
+
+-- port support: true for a record of the registry (every model of the engine path), false for Mod_NewModel's
+function model_shared.Mod_IsRegistered(mod: any): boolean
+	return not mod.unregistered
+end
+
+-- port: zone.c Mem_ExpandableArray_AllocRecord L703-740 @xonotic-v0.8.6
+local function Mem_ExpandableArray_AllocRecord(): any
+	local i = 0
+	while registry.allocflags[i] do
+		i += 1
+	end
+	registry.allocflags[i] = true
+	local mod = registry.records[i]
+	if not mod then
+		mod = {}
+		registry.records[i] = mod
+	end
+	zeromodel(mod, "")
+	return mod
+end
+
+-- port: zone.c Mem_ExpandableArray_FreeRecord L751-769 @xonotic-v0.8.6
+local function Mem_ExpandableArray_FreeRecord(record: any)
+	for i, r in registry.records do
+		if r == record then
+			if not registry.allocflags[i] then
+				error(string.format("Mem_ExpandableArray_FreeRecord: record %s is already free!", tostring(record)), 0)
+			end
+			registry.allocflags[i] = false
+			return
+		end
+	end
+	error(string.format("Mem_ExpandableArray_FreeRecord: no such record %s", tostring(record)), 0)
+end
+
+-- port: zone.c Mem_ExpandableArray_IndexRange L771-786 @xonotic-v0.8.6
+local function Mem_ExpandableArray_IndexRange(): number
+	local e = 0
+	for i, used in registry.allocflags do
+		if used and i + 1 > e then
+			e = i + 1
+		end
+	end
+	return e
+end
+
+-- port: zone.c Mem_ExpandableArray_RecordAtIndex L788-796 @xonotic-v0.8.6
+local function Mem_ExpandableArray_RecordAtIndex(index: number): any
+	if not registry.allocflags[index] then
+		return nil
+	end
+	return registry.records[index]
+end
+
+local function cvarint_ms(name: string, default: number): number
+	local v = cvar.Cvar_FindVar(name)
+	return if v then v.integer else default
+end
+
+-- port: model_shared.c Mod_Init L156-183 @xonotic-v0.8.6
+function model_shared.Mod_Init()
+	-- mod_mempool = Mem_AllocPool("modelinfo", 0, NULL);
+	-- Mem_ExpandableArray_NewArray(&models, mod_mempool, sizeof(dp_model_t), 16);
+	registry.records = {}
+	registry.allocflags = {}
+
+	model_shared.Mod_BrushInit()
+	NOT_YET_PORTED("Mod_AliasInit (model_alias.c)")
+	NOT_YET_PORTED("Mod_SpriteInit (model_sprite.c)")
+
+	-- Cvar_RegisterVariable(&r_enableshadowvolumes) ... (&mod_generatelightmaps_gridradius): registered by
+	-- engine/host.luau from engine/_port/sv_init_defs.luau, like every cvar of the dedicated init path.
+	-- Cmd_AddCommand modellist / modelprecache / modeldecompile / mod_generatelightmaps: registered by host.luau
+	-- (NOT YET PORTED stubs: Mod_Print, Mod_Precache, Mod_Decompile_f, Mod_GenerateLightmaps_f).
+end
+
+-- port: model_shared.c Mod_UnloadModel L190-224 @xonotic-v0.8.6
+function model_shared.Mod_UnloadModel(mod: any)
+	if cvarint_ms("developer_loading", 0) ~= 0 then
+		Con_Printf("unloading model %s\n", mod.name)
+	end
+
+	local name = string.sub(mod.name, 1, 127) -- strlcpy(name, mod->name, sizeof(name)) (MAX_QPATH)
+	local parentmodel = mod.brush.parentmodel
+	local used = mod.used
+	-- (mod->mempool: the GL index / vertex buffers, R_Mesh_DestroyMeshBuffer; no renderer on the server)
+	-- free textures/memory attached to the model
+	-- R_FreeTexturePool(&mod->texturepool); Mem_FreePool(&mod->mempool);
+	-- clear the struct to make it available
+	zeromodel(mod, "")
+	-- restore the fields we want to preserve
+	mod.name = name
+	mod.brush.parentmodel = parentmodel
+	mod.used = used
+	mod.loaded = false
+end
+
+local MOD_RADIUS_DEFAULT = 16
+
+-- the text after the last '.' of the last path component, else "" (fs.c's module has no copy yet)
+-- port: fs.c FS_FileExtension L1328-1345 @xonotic-v0.8.6
+local function FS_FileExtension(s: string): string
+	local sep = 0
+	for i = #s, 1, -1 do
+		local c = string.sub(s, i, i)
+		if c == "/" or c == "\\" or c == ":" then
+			sep = i
+			break
+		end
+	end
+	local dot = nil
+	for i = #s, 1, -1 do
+		if string.sub(s, i, i) == "." then
+			dot = i
+			break
+		end
+	end
+	if dot == nil or (sep ~= 0 and dot < sep) then
+		return ""
+	end
+	return string.sub(s, dot + 1)
+end
+
+-- port: model_shared.c Mod_FindPotentialDeforms L343-368 @xonotic-v0.8.6
+-- (texture.deforms[j + 1] nil = Q3DEFORM_NONE; Q3TCGEN_ENVIRONMENT = 2, Q3DEFORM_AUTOSPRITE = 2, model_shared.h)
+function model_shared.Mod_FindPotentialDeforms(mod: any)
+	mod.wantnormals = false
+	mod.wanttangents = false
+	for i = 0, (mod.num_textures or 0) - 1 do
+		local texture = mod.data_textures[i + 1]
+		if texture.materialshaderpass and texture.materialshaderpass.tcgen.tcgen == 2 then
+			mod.wantnormals = true
+		end
+		if texture.materialshaderpass and texture.materialshaderpass.tcgen.tcgen == 2 then
+			mod.wantnormals = true
+		end
+		for j = 0, 4 - 1 do -- Q3MAXDEFORMS
+			local d = texture.deforms and texture.deforms[j + 1]
+			local deform = if d then d.deform else 0
+			if deform == 2 then
+				mod.wanttangents = true
+				mod.wantnormals = true
+				break
+			end
+			if deform ~= 0 then
+				mod.wantnormals = true
+			end
+		end
+	end
+end
+
+-- the format loaders of Mod_LoadModel that are not ported: the model keeps what Mod_LoadModel set before the
+-- loader call (the 16-unit default box, type mod_invalid), as when the C loader is reached for an unknown type
+local function loader_not_ported(loader: string, mod: any)
+	NOT_YET_PORTED(
+		loader .. " (Mod_LoadModel keeps the default 16-unit box, type mod_invalid; first: " .. mod.name .. ")"
+	)
+end
+
+-- port: model_shared.c Mod_LoadModel L377-534 @xonotic-v0.8.6
+function model_shared.Mod_LoadModel(mod: any, crash: boolean, checkdisk: boolean): any
+	local num
+	local crc
+	local buf: string?
+
+	mod.used = true
+
+	if string.sub(mod.name, 1, 1) == "*" then -- submodel
+		return mod
+	end
+
+	if mod.name == "null" then
+		if mod.loaded then
+			return mod
+		end
+
+		if mod.loaded or mod.mempool then
+			model_shared.Mod_UnloadModel(mod)
+		end
+
+		if cvarint_ms("developer_loading", 0) ~= 0 then
+			Con_Printf("loading model %s\n", mod.name)
+		end
+
+		mod.used = true
+		mod.crc = 0xFFFFFFFF -- (unsigned int)-1
+		mod.loaded = false
+
+		mod.normalmins = { 0, 0, 0 }
+		mod.normalmaxs = { 0, 0, 0 }
+		mod.yawmins = { 0, 0, 0 }
+		mod.yawmaxs = { 0, 0, 0 }
+		mod.rotatedmins = { 0, 0, 0 }
+		mod.rotatedmaxs = { 0, 0, 0 }
+
+		mod.modeldatatypestring = "null"
+		mod.type = "mod_null"
+		mod.Draw = "R_Model_Null_Draw" -- (function pointer; no renderer on the server)
+		mod.numframes = 2
+		mod.numskins = 1
+
+		-- no fatal errors occurred, so this model is ready to use.
+		mod.loaded = true
+
+		return mod
+	end
+
+	crc = 0
+	buf = nil
+
+	-- even if the model is loaded it still may need reloading...
+
+	-- if it is not loaded or checkdisk is true we need to calculate the crc
+	if not mod.loaded or checkdisk then
+		if checkdisk and mod.loaded then
+			Con_DPrintf("checking model %s\n", mod.name)
+		end
+		buf = fs.FS_LoadFile(mod.name, false)
+		if buf then
+			crc = common.CRC_Block(buf)
+			-- we need to reload the model if the crc does not match
+			if mod.crc ~= crc then
+				mod.loaded = false
+			end
+		end
+	end
+
+	-- if the model is already loaded and checks passed, just return
+	if mod.loaded then
+		return mod
+	end
+
+	if cvarint_ms("developer_loading", 0) ~= 0 then
+		Con_Printf("loading model %s\n", mod.name)
+	end
+
+	-- SCR_PushLoadingScreen(true, mod->name, 1): loading screen (client only)
+
+	-- LordHavoc: unload the existing model in this slot (if there is one)
+	if mod.loaded or mod.mempool then
+		model_shared.Mod_UnloadModel(mod)
+	end
+
+	-- load the model
+	mod.used = true
+	mod.crc = crc
+	-- errors can prevent the corresponding mod->loaded = true;
+	mod.loaded = false
+
+	-- default lightmap scale
+	mod.lightmapscale = 1
+
+	-- default model radius and bounding box (mainly for missing models)
+	mod.radius = MOD_RADIUS_DEFAULT
+	local r = mod.radius
+	mod.normalmins = { -r, -r, -r }
+	mod.normalmaxs = { r, r, r }
+	mod.yawmins = { -r, -r, -r }
+	mod.yawmaxs = { r, r, r }
+	mod.rotatedmins = { -r, -r, -r }
+	mod.rotatedmaxs = { r, r, r }
+
+	if not model_shared.Mod_Q3ShadersLoaded() then
+		-- load q3 shaders for the first time, or after a level change
+		model_shared.Mod_LoadQ3Shaders()
+	end
+
+	if buf then
+		local data = buf :: string
+		-- all models use memory, so allocate a memory pool
+		mod.mempool = true -- Mem_AllocPool(mod->name, 0, NULL)
+
+		num = if #data >= 4 then string.unpack("<i4", data) else 0
+		local function magic(m: string): boolean
+			return string.sub(data, 1, #m) == m
+		end
+		-- call the apropriate loader
+		model_shared.loadmodel = mod
+		if string.lower(FS_FileExtension(mod.name)) == "obj" then
+			loader_not_ported("Mod_OBJ_Load (model_brush.c)", mod)
+		elseif magic("IDPO") then
+			loader_not_ported("Mod_IDP0_Load (model_alias.c)", mod)
+		elseif magic("IDP2") then
+			loader_not_ported("Mod_IDP2_Load (model_alias.c)", mod)
+		elseif magic("IDP3") then
+			loader_not_ported("Mod_IDP3_Load (model_alias.c)", mod)
+		elseif magic("IDSP") then
+			loader_not_ported("Mod_IDSP_Load (model_sprite.c)", mod)
+		elseif magic("IDS2") then
+			loader_not_ported("Mod_IDS2_Load (model_sprite.c)", mod)
+		elseif magic("IBSP") then
+			model_shared.Mod_IBSP_Load(mod, data)
+		elseif magic("ZYMOTICMODEL") then
+			loader_not_ported("Mod_ZYMOTICMODEL_Load (model_alias.c)", mod)
+		elseif magic("DARKPLACESMODEL\0") then
+			loader_not_ported("Mod_DARKPLACESMODEL_Load (model_alias.c)", mod)
+		elseif magic("ACTRHEAD") then
+			loader_not_ported("Mod_PSKMODEL_Load (model_alias.c)", mod)
+		elseif magic("INTERQUAKEMODEL\0") then
+			loader_not_ported("Mod_INTERQUAKEMODEL_Load (model_alias.c)", mod)
+		elseif #mod.name >= 4 and string.sub(mod.name, -4) == ".map" then
+			loader_not_ported("Mod_MAP_Load (model_brush.c)", mod)
+		elseif num == 29 or num == 30 or magic("BSP2") or magic("2PSB") then -- BSPVERSION 29
+			loader_not_ported("Mod_Q1BSP_Load (model_brush.c)", mod)
+		else
+			Con_Printf('Mod_LoadModel: model "%s" is of unknown/unsupported type\n', mod.name)
+		end
+		-- Mem_Free(buf);
+
+		model_shared.Mod_FindPotentialDeforms(mod)
+
+		-- va(vabuf, sizeof(vabuf), "%s.framegroups", mod->name): vabuf is char[1024]
+		local fg = fs.FS_LoadFile(string.sub(mod.name .. ".framegroups", 1, 1023), false)
+		if fg then
+			NOT_YET_PORTED("Mod_FrameGroupify (model_shared.c L322-341), for " .. mod.name)
+		end
+
+		-- Mod_BuildVBOs(): OpenGL vertex buffers (no renderer on the server)
+	elseif crash then
+		-- LordHavoc: Sys_Error was *ANNOYING*
+		Con_Printf("Mod_LoadModel: %s not found\n", mod.name)
+	end
+
+	-- no fatal errors occurred, so this model is ready to use.
+	mod.loaded = true
+
+	-- SCR_PopLoadingScreen(false)
+
+	return mod
+end
+
+-- port: model_shared.c Mod_ClearUsed L536-544 @xonotic-v0.8.6
+function model_shared.Mod_ClearUsed()
+	local nummodels = Mem_ExpandableArray_IndexRange()
+	for i = 0, nummodels - 1 do
+		local mod = Mem_ExpandableArray_RecordAtIndex(i)
+		if mod and mod.name ~= "" then
+			mod.used = false
+		end
+	end
+end
+
+-- port: model_shared.c Mod_PurgeUnused L546-559 @xonotic-v0.8.6
+function model_shared.Mod_PurgeUnused()
+	local nummodels = Mem_ExpandableArray_IndexRange()
+	for i = 0, nummodels - 1 do
+		local mod = Mem_ExpandableArray_RecordAtIndex(i)
+		if mod and mod.name ~= "" and not mod.used then
+			model_shared.Mod_UnloadModel(mod)
+			Mem_ExpandableArray_FreeRecord(mod)
+		end
+	end
+end
+
+-- port: model_shared.c Mod_FindName L567-604 @xonotic-v0.8.6
+function model_shared.Mod_FindName(name: string, parentname: string?): any
+	local pname = parentname or ""
+
+	-- if we're not dedicatd, the renderer calls will crash without video
+	-- Host_StartVideo(): does nothing on a dedicated server
+
+	local nummodels = Mem_ExpandableArray_IndexRange()
+
+	if name == "" then
+		error("Host_Error: Mod_ForName: empty name", 0)
+	end
+
+	-- search the currently loaded models
+	for i = 0, nummodels - 1 do
+		local mod = Mem_ExpandableArray_RecordAtIndex(i)
+		if
+			mod
+			and mod.name ~= ""
+			and mod.name == name
+			and (
+				(not mod.brush.parentmodel and pname == "")
+				or (mod.brush.parentmodel and pname ~= "" and mod.brush.parentmodel.name == pname)
+			)
+		then
+			mod.used = true
+			return mod
+		end
+	end
+
+	-- no match found, create a new one
+	local mod = Mem_ExpandableArray_AllocRecord()
+	mod.name = string.sub(name, 1, 127) -- strlcpy(mod->name, name, sizeof(mod->name)) (MAX_QPATH)
+	if pname ~= "" then
+		mod.brush.parentmodel = model_shared.Mod_FindName(pname, nil)
+	else
+		mod.brush.parentmodel = nil
+	end
+	mod.loaded = false
+	mod.used = true
+	return mod
+end
+
+-- port: model_shared.c Mod_ForName L613-620 @xonotic-v0.8.6
+function model_shared.Mod_ForName(name: string, crash: boolean, checkdisk: boolean, parentname: string?): any
+	local model = model_shared.Mod_FindName(name, parentname)
+	if not model.loaded or checkdisk then
+		model_shared.Mod_LoadModel(model, crash, checkdisk)
+	end
+	return model
+end
+
+-- port: model_shared.c Mod_Reload L629-648 @xonotic-v0.8.6 (the loading screen calls are client only)
+function model_shared.Mod_Reload()
+	local count
+	local nummodels = Mem_ExpandableArray_IndexRange()
+
+	count = 0
+	for i = 0, nummodels - 1 do
+		local mod = Mem_ExpandableArray_RecordAtIndex(i)
+		if mod and mod.name ~= "" and string.sub(mod.name, 1, 1) ~= "*" and mod.used then
+			count += 1
+		end
+	end
+	for i = 0, nummodels - 1 do
+		local mod = Mem_ExpandableArray_RecordAtIndex(i)
+		if mod and mod.name ~= "" and string.sub(mod.name, 1, 1) ~= "*" and mod.used then
+			model_shared.Mod_LoadModel(mod, true, true)
+		end
+	end
+end
 
 -- VectorNormalize (mathlib.h L118) on 3 floats at byte offset o of b
 local function VectorNormalize_b(b: buffer, o: number)
@@ -607,6 +1097,10 @@ end
 local Q3SHADER_HASH_SIZE = 1021
 local q3shaders_loaded = false
 local q3shader_data: { hash: { [number]: any } } = { hash = {} }
+-- q3shaders_mem != NULL (read by Mod_LoadModel, which is above this point in the file)
+function model_shared.Mod_Q3ShadersLoaded(): boolean
+	return q3shaders_loaded
+end
 
 local function hashhead(index: number): any
 	local entry = q3shader_data.hash[index]

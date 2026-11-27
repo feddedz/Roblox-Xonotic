@@ -20,7 +20,8 @@ local collision = require("./collision")
 local cvar = require("./cvar")
 local defs = require("./_port/sv_init_defs")
 local host_cmd = require("./host_cmd")
-local model_brush = require("./model_brush")
+local model_brush = require("./model_brush") -- installs the brush loader hooks of model_shared
+local model_shared = require("./model_shared")
 
 local host = {}
 
@@ -66,7 +67,9 @@ function host.Host_Init_Dedicated(opts: { com_argv: { string }?, maxclients: num
 	-- Collision_Init and Mod_Init -> Mod_BrushInit (host.c Host_Init): their cvars are in the table above; the
 	-- calls bind the cvar_t records that the trace code reads as struct fields (collision.cv, model_brush.cv).
 	collision.Collision_Init()
-	model_brush.Mod_BrushInit()
+	-- Mod_Init (model_shared.c) resets the model registry and calls Mod_BrushInit (hook from model_brush.luau)
+	assert(model_brush.Mod_IBSP_Load ~= nil, "model_brush installs the Mod_LoadModel hooks")
+	model_shared.Mod_Init()
 	-- COM_Init_Commands (common.c): Cvar_Set("cmdline", com_cmdline)
 	if #cmd.com_argv > 1 then
 		print("NOT YET PORTED: com_cmdline quoting for command-line arguments (common.c COM_Init_Commands)")

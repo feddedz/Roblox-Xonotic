@@ -8,10 +8,11 @@
 	Port of curves.c @xonotic-v0.8.6 (complete).
 	Float arrays (float *) are f32 buffers passed as (buffer, byte offset); strides are in bytes as in C.
 	Element arrays (int *) are i32 buffers passed the same way. Every float operation is rounded like C float
-	arithmetic (D-004); pow() and log() are C double functions (math.pow / math.log).
+	arithmetic (D-004); pow() and log() are C double functions (libm.pow / libm.log).
 	patchinfo_t: { xsize, ysize, lods = { { xtess, ytess }, { xtess, ytess } } } with lods[PATCH_LOD_x + 1].
 ]]
 local f32 = require("./_port/f32")
+local libm = require("./_port/libm")
 
 local curves = {}
 
@@ -129,14 +130,14 @@ end
 local function Q3PatchTesselation(largestsquared3xcurvearea: number, tolerance: number): number
 	local f: number
 	-- f is actually a squared 2x curve area... so the formula had to be adjusted to give roughly the same subdivisions
-	f = R(math.pow(R(largestsquared3xcurvearea / 64.0), 0.25) / tolerance)
+	f = R(libm.pow(R(largestsquared3xcurvearea / 64.0), 0.25) / tolerance)
 	--if(f < 0.25) // VERY flat patches
 	if f < 0.0001 then -- TOTALLY flat patches
 		return 0
 	elseif f < 2 then
 		return 1
 	else
-		return math.floor(math.log(f) / math.log(2.0)) + 1
+		return math.floor(libm.log(f) / libm.log(2.0)) + 1
 		-- this is always at least 2
 		-- maps [0.25..0.5[ to -1 (actually, 1 is returned)
 		-- maps [0.5..1[ to 0 (actually, 1 is returned)

@@ -238,6 +238,7 @@ end
 local collision = require("./collision")
 local cvar = require("./cvar")
 local f32 = require("./_port/f32")
+local libm = require("./_port/libm")
 local R = f32.round
 local toint = libc.toint
 local FieldOfs = prvm_edict.FieldOfs
@@ -370,6 +371,143 @@ local function VM_SV_setsize(prog: any)
 	SetMinMaxSize(prog, e, mins, maxs, false)
 end
 PORTED.VM_SV_setsize = VM_SV_setsize
+
+--[[
+=================
+VM_SV_setmodel
+
+setmodel(entity, model)
+=================
+]]
+-- SV_ModelIndex / SV_GetModelByIndex are in engine/sv_main.luau, which requires this module: required inside
+local quakemins, quakemaxs = { -16, -16, -16 }, { 16, 16, 16 }
+local vec3_origin = { 0, 0, 0 }
+-- port: svvm_cmds.c VM_SV_setmodel L324-358 @xonotic-v0.8.6
+local function VM_SV_setmodel(prog: any)
+	local sv_main = require("./sv_main") :: any
+	local mod
+	local i
+
+	SAFEPARMCOUNT(prog, 2, "VM_setmodel")
+
+	local e = G_INT(prog, OFS_PARM0)
+	if e == 0 then
+		prvm_cmds.VM_Warning(prog, "setmodel: can not modify world entity\n")
+		return
+	end
+	if prog.ed_free[e] then
+		prvm_cmds.VM_Warning(prog, "setmodel: can not modify free entity\n")
+		return
+	end
+	i = sv_main.SV_ModelIndex(G_STRING(prog, OFS_PARM1), 1)
+	SET_EI(
+		prog,
+		e,
+		"model",
+		prvm_edict.PRVM_SetEngineString(prog, server.CStrRef("model_precache " .. i, server.sv.model_precache[i] or ""))
+	)
+	SET_EF(prog, e, "modelindex", i)
+
+	mod = sv_main.SV_GetModelByIndex(i)
+
+	if mod then
+		if mod.type ~= "mod_alias" or cvarint("sv_gameplayfix_setmodelrealbox", 1) ~= 0 then
+			SetMinMaxSize(prog, e, mod.normalmins, mod.normalmaxs, true)
+		else
+			SetMinMaxSize(prog, e, quakemins, quakemaxs, true)
+		end
+	else
+		SetMinMaxSize(prog, e, vec3_origin, vec3_origin, true)
+	end
+end
+PORTED.VM_SV_setmodel = VM_SV_setmodel
+
+-- port: svvm_cmds.c VM_SV_precache_model L1058-1063 @xonotic-v0.8.6
+local function VM_SV_precache_model(prog: any)
+	SAFEPARMCOUNT(prog, 1, "VM_SV_precache_model")
+	require("./sv_main").SV_ModelIndex(G_STRING(prog, OFS_PARM0), 2)
+	buffer.writei32(prog.globals, OFS_RETURN * 4, G_INT(prog, OFS_PARM0))
+end
+PORTED.VM_SV_precache_model = VM_SV_precache_model
+
+-- port: svvm_cmds.c VM_CustomStats_Clear L1636-1644 @xonotic-v0.8.6
+function svvm_cmds.VM_CustomStats_Clear()
+	-- (if(vm_customstats): the table always exists here; clearing it is the same as Z_Free + NULL)
+	table.clear(server.vm_customstats)
+	server.vm_customstats_last = -1
+end
+
+-- #333 void(entity e, float mdlindex) setmodelindex (EXT_CSQC)
+-- port: svvm_cmds.c VM_SV_setmodelindex L2733-2777 @xonotic-v0.8.6
+local function VM_SV_setmodelindex(prog: any)
+	local sv_main = require("./sv_main") :: any
+	local mod
+	local i
+	SAFEPARMCOUNT(prog, 2, "VM_SV_setmodelindex")
+
+	local e = G_INT(prog, OFS_PARM0)
+	if e == 0 then
+		prvm_cmds.VM_Warning(prog, "setmodelindex: can not modify world entity\n")
+		return
+	end
+	if prog.ed_free[e] then
+		prvm_cmds.VM_Warning(prog, "setmodelindex: can not modify free entity\n")
+		return
+	end
+	i = toint(G_FLOAT(prog, OFS_PARM1))
+	if i <= 0 or i >= server.MAX_MODELS then
+		prvm_cmds.VM_Warning(prog, "setmodelindex: invalid modelindex\n")
+		return
+	end
+	local name = server.sv.model_precache[i]
+	if not name or name == "" then
+		prvm_cmds.VM_Warning(prog, "setmodelindex: model not precached\n")
+		return
+	end
+
+	SET_EI(prog, e, "model", prvm_edict.PRVM_SetEngineString(prog, server.CStrRef("model_precache " .. i, name)))
+	SET_EF(prog, e, "modelindex", i)
+
+	mod = sv_main.SV_GetModelByIndex(i)
+
+	if mod then
+		if mod.type ~= "mod_alias" or cvarint("sv_gameplayfix_setmodelrealbox", 1) ~= 0 then
+			SetMinMaxSize(prog, e, mod.normalmins, mod.normalmaxs, true)
+		else
+			SetMinMaxSize(prog, e, quakemins, quakemaxs, true)
+		end
+	else
+		SetMinMaxSize(prog, e, vec3_origin, vec3_origin, true)
+	end
+end
+PORTED.VM_SV_setmodelindex = VM_SV_setmodelindex
+
+-- #334 string(float mdlindex) modelnameforindex (EXT_CSQC)
+-- port: svvm_cmds.c VM_SV_modelnameforindex L2780-2800 @xonotic-v0.8.6
+local function VM_SV_modelnameforindex(prog: any)
+	local i
+	SAFEPARMCOUNT(prog, 1, "VM_SV_modelnameforindex")
+
+	buffer.writei32(prog.globals, OFS_RETURN * 4, 0) -- OFS_NULL
+
+	i = toint(G_FLOAT(prog, OFS_PARM0))
+	if i <= 0 or i >= server.MAX_MODELS then
+		prvm_cmds.VM_Warning(prog, "modelnameforindex: invalid modelindex\n")
+		return
+	end
+	local name = server.sv.model_precache[i]
+	if not name or name == "" then
+		prvm_cmds.VM_Warning(prog, "modelnameforindex: model not precached\n")
+		return
+	end
+
+	buffer.writei32(
+		prog.globals,
+		OFS_RETURN * 4,
+		prvm_edict.PRVM_SetEngineString(prog, server.CStrRef("model_precache " .. i, name))
+	)
+end
+PORTED.VM_SV_modelnameforindex = VM_SV_modelnameforindex
 
 -- port: svvm_cmds.c VM_SV_traceline L640-662 @xonotic-v0.8.6
 local function VM_SV_traceline(prog: any)
@@ -727,8 +865,8 @@ local function VM_SV_walkmove(prog: any)
 	yaw = R(yaw * M_PI * 2 / 360)
 
 	-- cos / sin take and return double; * dist (double), stored float
-	move[1] = R(math.cos(yaw) * dist)
-	move[2] = R(math.sin(yaw) * dist)
+	move[1] = R(libm.cos(yaw) * dist)
+	move[2] = R(libm.sin(yaw) * dist)
 	move[3] = 0
 
 	-- save program state, because SV_movestep may call other progs

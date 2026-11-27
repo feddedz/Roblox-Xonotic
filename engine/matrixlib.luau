@@ -12,6 +12,7 @@
 	NOT YET PORTED: everything else in matrixlib.c, added with its users.
 ]]
 local f32 = require("./_port/f32")
+local libm = require("./_port/libm")
 
 local matrixlib = {}
 
@@ -124,14 +125,14 @@ function matrixlib.Matrix4x4_CreateFromQuakeEntity(
 	local PI2_360 = math.pi * 2 / 360
 	if roll ~= 0 then
 		local angle = yaw * PI2_360
-		local sy = math.sin(angle)
-		local cy = math.cos(angle)
+		local sy = libm.sin(angle)
+		local cy = libm.cos(angle)
 		angle = pitch * PI2_360
-		local sp = math.sin(angle)
-		local cp = math.cos(angle)
+		local sp = libm.sin(angle)
+		local cp = libm.cos(angle)
 		angle = roll * PI2_360
-		local sr = math.sin(angle)
-		local cr = math.cos(angle)
+		local sr = libm.sin(angle)
+		local cr = libm.cos(angle)
 		o[1][1] = R((cp * cy) * scale)
 		o[1][2] = R((sr * sp * cy + cr * -sy) * scale)
 		o[1][3] = R((cr * sp * cy + -sr * -sy) * scale)
@@ -146,11 +147,11 @@ function matrixlib.Matrix4x4_CreateFromQuakeEntity(
 		o[3][4] = R(z)
 	elseif pitch ~= 0 then
 		local angle = yaw * PI2_360
-		local sy = math.sin(angle)
-		local cy = math.cos(angle)
+		local sy = libm.sin(angle)
+		local cy = libm.cos(angle)
 		angle = pitch * PI2_360
-		local sp = math.sin(angle)
-		local cp = math.cos(angle)
+		local sp = libm.sin(angle)
+		local cp = libm.cos(angle)
 		o[1][1] = R((cp * cy) * scale)
 		o[1][2] = R(-sy * scale)
 		o[1][3] = R((sp * cy) * scale)
@@ -165,8 +166,8 @@ function matrixlib.Matrix4x4_CreateFromQuakeEntity(
 		o[3][4] = R(z)
 	elseif yaw ~= 0 then
 		local angle = yaw * PI2_360
-		local sy = math.sin(angle)
-		local cy = math.cos(angle)
+		local sy = libm.sin(angle)
+		local cy = libm.cos(angle)
 		o[1][1] = R(cy * scale)
 		o[1][2] = R(-sy * scale)
 		o[1][3] = 0

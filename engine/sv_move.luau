@@ -31,6 +31,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 local collision = require("./collision")
 local cvar = require("./cvar")
 local f32 = require("./_port/f32")
+local libm = require("./_port/libm")
 local libc = require("./_port/libc")
 local mathlib = require("./mathlib")
 local prvm_cmds = require("./prvm_cmds")
@@ -412,8 +413,8 @@ local function SV_StepDirection(ent: number, yaw: number, dist: number): boolean
 	-- float * M_PI (double) * 2 / 360 in double, stored into the float yaw
 	yaw = R(yaw * M_PI * 2 / 360)
 	-- cos / sin take and return double; * dist (double), stored float
-	move[1] = R(math.cos(yaw) * dist)
-	move[2] = R(math.sin(yaw) * dist)
+	move[1] = R(libm.cos(yaw) * dist)
+	move[2] = R(libm.sin(yaw) * dist)
 	move[3] = 0
 
 	local oldorigin = EV(prog, ent, "origin")
