@@ -662,6 +662,7 @@ function protocol.EntityFrameCSQC_LostFrame(client: any, framenum: number)
 
 	buffer.fill(recoversendflags, 0, 0)
 
+	-- selene: allow(empty_if)
 	for jj = ringfirst, ringlast do
 		d = history[jj % NUM_CSQCENTITYDB_FRAMES + 1]
 		if d.framenum < 0 then
@@ -1034,7 +1035,12 @@ function protocol.Protocol_WriteStatsReliable()
 end
 
 -- port: protocol.c EntityFrameQuake_WriteFrame L701-869 @xonotic-v0.8.6 (NOT YET PORTED: pre-DP5 protocols)
-function protocol.EntityFrameQuake_WriteFrame(_msg: common.SizeBuf, _maxsize: number, _numstates: number, _states: any): boolean
+function protocol.EntityFrameQuake_WriteFrame(
+	_msg: common.SizeBuf,
+	_maxsize: number,
+	_numstates: number,
+	_states: any
+): boolean
 	notPorted("EntityFrameQuake_WriteFrame (protocol.c, QUAKE / NEHAHRA protocols)")
 	return false
 end
@@ -1605,7 +1611,8 @@ local function framegroupblendsDiffer(a: { framegroupblend_t }, b: { framegroupb
 	return false
 end
 
--- port: protocol.c EntityState5_DeltaBits L2633-2697 @xonotic-v0.8.6
+-- port: protocol.c EntityState5_DeltaBits L2633-2697 @xonotic-v0.8.6 (the COMPLEXANIMATION branches are separate in C)
+-- selene: allow(if_same_then_else)
 local function EntityState5_DeltaBits(o: entity_state_t, n: entity_state_t): number
 	local bits = 0
 	if n.active == ACTIVE_NETWORK then
