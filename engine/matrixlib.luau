@@ -4,7 +4,10 @@
 ]]
 --[[
 	Port of matrixlib.c @xonotic-v0.8.6. PARTIAL: Matrix4x4_Concat, CreateTranslate, CreateScale3,
-	ConcatTranslate (the users so far: model_brush.c light grid). MATRIX4x4_OPENGLORIENTATION is not defined in
+	ConcatTranslate (the users so far: model_brush.c light grid), Invert_Simple, CreateIdentity,
+	CreateFromQuakeEntity, Transform, TransformPositivePlane, and for model_alias.c: identitymatrix, Copy, Clear,
+	Accumulate, Normalize3, FromArray12FloatGL, ToArray12FloatD3D, FromArray12FloatD3D, FromOriginQuat,
+	ToOrigin3Quat4Float, FromDoom3Joint, FromBonePose7s, ToBonePose7s. MATRIX4x4_OPENGLORIENTATION is not defined in
 	the release (matrixlib.h L7), so the row-major branch is the one ported.
 	A matrix4x4_t is { m = { {4}, {4}, {4}, {4} } } with m[row + 1][col + 1]; vec_t is float: every element is a
 	float32, each product and sum is rounded like C float arithmetic (D-004). The double arguments of the

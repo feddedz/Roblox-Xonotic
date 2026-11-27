@@ -30,9 +30,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 	Mod_CreateShaderPassFromQ3ShaderLayer, Mod_LoadTextureFromQ3Shader (end of this file; the renderer calls
 	they make on a client are hooks, see R_SkinFrame_LoadMissing below).
 	Model registry (task M4-SPAWN): Mod_Init (dedicated part), Mod_UnloadModel, Mod_FindPotentialDeforms,
-	Mod_LoadModel (Q3 BSP through model_brush.Mod_IBSP_Load; the other format loaders log NOT YET PORTED and
-	leave the 16-unit default box), Mod_ClearUsed, Mod_PurgeUnused, Mod_FindName, Mod_ForName, Mod_Reload.
-	NOT YET PORTED: everything else (the alias / sprite / OBJ / Q1BSP loaders, Mod_FrameGroupify, mod_start /
+	Mod_LoadModel (Q3 BSP through model_brush.Mod_IBSP_Load; alias models through engine/model_alias.luau and
+	sprites through engine/model_sprite.luau, which install their loaders here; OBJ / Q1BSP / MAP log NOT YET
+	PORTED and leave the 16-unit default box), Mod_ClearUsed, Mod_PurgeUnused, Mod_FindName, Mod_ForName,
+	Mod_Reload.
+	For the alias / sprite loaders (task M4-ALIAS): Mod_FrameGroupify and its parser, Mod_LoadSkinFiles /
+	Mod_FreeSkinFiles / Mod_CountSkinFiles, Mod_ValidateElements, Mod_BuildNormals, Mod_BuildTriangleNeighbors.
+	NOT YET PORTED: everything else (the OBJ / Q1BSP loaders, Mod_BuildVBOs (renderer buffers), mod_start /
 	mod_shutdown / mod_newmap (renderer module), Mod_Print / Mod_Precache / Mod_Decompile_f commands,
 	skins, shadow meshes, lightmap allocation, ...).
 ]]

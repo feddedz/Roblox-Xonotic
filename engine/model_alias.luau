@@ -627,7 +627,7 @@ function model_alias.Mod_Skeletal_BuildTransforms(
 	end
 end
 
--- port: mod_skeletal_animatevertices_generic.c Mod_Skeletal_AnimateVertices_Generic L3-134 @xonotic-v0.8.6
+-- port: mod_skeletal_animatevertices_generic.c Mod_Skeletal_AnimateVertices_Generic L3-136 @xonotic-v0.8.6
 -- (vertex3f ... tvector3f: f32 buffers from vertex 0, nil = NULL)
 function model_alias.Mod_Skeletal_AnimateVertices_Generic(
 	model: any,
@@ -1771,7 +1771,7 @@ local function FS_FileExtension(s: string): string
 	return string.sub(s, dot + 1)
 end
 
--- port: fs.c FS_StripExtension L3421-3442 @xonotic-v0.8.6
+-- port: fs.c FS_StripExtension L3421-3443 @xonotic-v0.8.6
 local function FS_StripExtension(in_: string, size_out: number): string
 	local out = {}
 	local last: number? = nil
