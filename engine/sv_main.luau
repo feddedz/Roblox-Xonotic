@@ -33,25 +33,88 @@ local function notPorted(what: string)
 	end
 end
 
--- client_t data the edict hooks read (svs.clients[num]); no clients connect yet (M6-NET). Each char array
--- of a client_t is one C pointer, so each is one string reference for PRVM_SetEngineString.
+--[[
+	client_t (server.h L201-337): svs.clients[num] (0-based, host_cmd.svs.clients) is a table with the C field
+	names. Each char array of a client_t (name, old_name, playermodel, playerskin) is one C pointer, so each is
+	one string reference { str } for PRVM_SetEngineString that keeps its identity for the life of the slot
+	(memset of the client keeps the array addresses: ClearClient empties their text). spawn_parms[0..15] are
+	floats (0-based); cmd is the usercmd_t (a table, nil fields = 0); edict is the edict number (nil = NULL);
+	netconnection is nil for a bot (no network clients connect yet, M6-NET). unreliablemsg is a sizebuf_t of
+	NET_MAXMESSAGE bytes. The csqc entity tables, entity databases, stats and download state are not held yet
+	(their users are the network code, M6-NET).
+]]
 local NULL_BOTCLIENT = { str = "null/botclient" } -- string literal in SVVM_init_edict
+local MAX_SCOREBOARDNAME = 128 -- quakedef.h L145
+local NET_MAXMESSAGE = 65536 -- quakedef.h L137
+
+-- memset(client, 0, sizeof(*client)) (the char arrays keep their addresses)
+local function ClearClient(c: any)
+	local name, old_name = c.name or { str = "" }, c.old_name or { str = "" }
+	local playermodel, playerskin = c.playermodel or { str = "" }, c.playerskin or { str = "" }
+	table.clear(c)
+	name.str, old_name.str, playermodel.str, playerskin.str = "", "", "", ""
+	c.active = false
+	c.clientconnectcalled = false
+	c.prespawned = false
+	c.spawned = false
+	c.begun = false
+	c.sendsignon = 0
+	c.rate = 0
+	c.rate_burstsize = 0
+	c.connecttime = 0
+	c.keepalivetime = 0
+	c.netconnection = nil
+	c.movesequence = 0
+	c.movement_highestsequence_seen = 0
+	c.cmd = {}
+	c.edict = nil
+	c.ping = 0
+	c.clmovement_disabletimeout = 0
+	c.clmovement_inputtimeout = 0
+	c.spawn_parms = {}
+	for i = 0, 15 do -- NUM_SPAWN_PARMS (server.h L185)
+		c.spawn_parms[i] = 0
+	end
+	c.name, c.old_name = name, old_name
+	c.colors, c.old_colors = 0, 0
+	c.frags, c.old_frags = 0, 0
+	c.playermodel, c.playerskin = playermodel, playerskin
+	c.old_model, c.old_skin = "", ""
+	c.netaddress = ""
+	c.nametime = 0
+	c.latestframenum = 0
+	c.weaponmodel = ""
+	c.weaponmodelindex = 0
+	c.clientcamera = 0
+	c.unreliablemsg = { data = buffer.create(0), cursize = 0, maxsize = 0 } -- data / maxsize set by SV_ConnectClient
+	c.unreliablemsg_splitpoints = 0
+	c.unreliablemsg_splitpoint = {}
+	c.download_file = nil
+	c.download_expectedposition = 0
+	c.download_started = false
+	c.download_name = ""
+	c.download_deflate = false
+	c.fixangle_angles_set = false
+	c.fixangle_angles = { 0, 0, 0 }
+	c.sv_demo_file = nil
+	c.num_skippedentityframes = 0
+	c.lastmovesequence = 0
+end
+
+-- svs.clients + num (svs.clients is Mem_Alloc'd zeroed memory: a slot is created cleared on first use)
 local function client(num: number): any
 	local svs = host_cmd.svs :: any
 	svs.clients = svs.clients or {}
 	local c = svs.clients[num]
 	if not c then
-		c = {
-			colors = 0,
-			name = { str = "" },
-			playermodel = { str = "" },
-			playerskin = { str = "" },
-			netconnection = nil,
-		}
+		c = {}
+		ClearClient(c)
 		svs.clients[num] = c
 	end
 	return c
 end
+sv_main.client = client
+sv_main.ClearClient = ClearClient
 
 local function setf(prog: any, e: number, field: string, v: number)
 	local o = prvm_edict.FieldOfs(prog, field)
@@ -131,7 +194,7 @@ end
 
 -- port: sv_main.c SVVM_free_edict L3657-3684 @xonotic-v0.8.6
 function sv_main.SVVM_free_edict(prog: any, e: number)
-	require("./world").World_UnlinkEdict(prog, e) -- unlink from world bsp
+	world.World_UnlinkEdict(prog, e) -- unlink from world bsp
 	seti(prog, e, "model", 0)
 	setf(prog, e, "takedamage", 0)
 	setf(prog, e, "modelindex", 0)
@@ -146,7 +209,11 @@ function sv_main.SVVM_free_edict(prog: any, e: number)
 	end
 	setf(prog, e, "nextthink", -1)
 	setf(prog, e, "solid", 0)
-	notPorted("VM_RemoveEdictSkeleton, World_Physics_Remove*, csqc entity versions in SVVM_free_edict")
+
+	prvm_cmds.VM_RemoveEdictSkeleton(prog, e)
+	notPorted(
+		"World_Physics_RemoveFromEntity / World_Physics_RemoveJointFromEntity (world.c, ODE) and the csqc entity versions (sv.csqcentityversion, csqcentitysendflags, M6-NET) in SVVM_free_edict"
+	)
 end
 
 -- sv (engine/server.luau) and current_skill (sv_main.c L3377): set by SV_SpawnServer, M4
@@ -772,6 +839,821 @@ function sv_main.SV_SpawnServer(servername: string)
 	-- if(cls.state == ca_dedicated) Sys_MakeProcessMean();
 
 	--	SV_UnlockThreadMutex();
+end
+
+--[[
+===============================================================================
+
+	Sounds, effects, client spawning and the per-frame message updates (sv_main.c L640-1142, L1974-1983,
+	L2266-2280, L2491-2640, L3243-3262). DarkPlaces 0.8.6 has these in sv_main.c (sv_send.c is a later split),
+	so they are ported here. Every message goes into sv.datagram / sv.reliable_datagram; the parts that write to
+	a client's netconnection run only for clients with one (none connect yet, M6-NET).
+
+===============================================================================
+]]
+
+local R = require("./_port/f32").round
+local MAX_PACKETFRAGMENT = 1024 -- quakedef.h L138
+
+-- host.luau (host.c), required on first use and kept (host requires this module lazily; a require() call
+-- resolves the path every time in Lune, about 0.5 ms)
+local hostmod: any = nil
+local function HOST(): any
+	if not hostmod then
+		hostmod = require("./host")
+	end
+	return hostmod
+end
+-- protocol.h L190-256
+local svc_disconnect, svc_sound, svc_print, svc_stufftext = 2, 6, 8, 9
+local svc_updatename, svc_updatefrags, svc_updatecolors, svc_particle = 13, 14, 17, 18
+local svc_setview = 5
+local svc_effect, svc_effect2 = 52, 53
+-- protocol.h L163-168
+local SND_VOLUME, SND_ATTENUATION, SND_LARGEENTITY, SND_LARGESOUND, SND_SPEEDUSHORT4000 = 1, 2, 8, 16, 32
+-- sound.h L31-32
+local DEFAULT_SOUND_PACKET_VOLUME, DEFAULT_SOUND_PACKET_ATTENUATION = 255, 1.0
+local EF_MUZZLEFLASH = 2 -- protocol.h L45
+local PRVM_KNOWNSTRINGBASE = 0x40000000 -- prvm_edict.c L2958
+
+sv_main.svc_disconnect, sv_main.svc_print, sv_main.svc_stufftext = svc_disconnect, svc_print, svc_stufftext
+sv_main.svc_updatename, sv_main.svc_updatefrags, sv_main.svc_updatecolors =
+	svc_updatename, svc_updatefrags, svc_updatecolors
+
+local function getf(prog: any, e: number, field: string): number -- PRVM_serveredictfloat (0 if the field is missing)
+	local o = prvm_edict.FieldOfs(prog, field)
+	if o < 0 then
+		return 0
+	end
+	return buffer.readf32(prog.edictsfields, (e * prog.entityfields + o) * 4)
+end
+local function geti(prog: any, e: number, field: string): number -- PRVM_serveredictstring / edict
+	local o = prvm_edict.FieldOfs(prog, field)
+	if o < 0 then
+		return 0
+	end
+	return buffer.readi32(prog.edictsfields, (e * prog.entityfields + o) * 4)
+end
+local function getvi(prog: any, e: number, field: string, i: number): number -- PRVM_serveredictvector(e, f)[i]
+	local o = prvm_edict.FieldOfs(prog, field)
+	if o < 0 then
+		return 0
+	end
+	return buffer.readf32(prog.edictsfields, (e * prog.entityfields + o + i) * 4)
+end
+-- mathlib.h L51: bound(min,num,max) ((num) >= (min) ? ((num) < (max) ? (num) : (max)) : (min))
+local function bound(mn: number, num: number, mx: number): number
+	return if num >= mn then (if num < mx then num else mx) else mn
+end
+
+-- C `int` result of (int)x & ~bit, as a signed value
+local function andnot(x: number, b: number): number
+	local r = bit32.band(libc.toint(x), bit32.bnot(b))
+	return if r >= 0x80000000 then r - 0x100000000 else r
+end
+
+-- the C pointer comparison `PRVM_GetString(prog, num) != ref` (ref: a char array of a client_t): true unless
+-- the string number is the engine string that points at ref
+local function notSameString(prog: any, num: number, ref: { str: string }): boolean
+	if num >= PRVM_KNOWNSTRINGBASE then
+		local k = prog.knownstrings[num - PRVM_KNOWNSTRINGBASE + 1]
+		return k ~= ref
+	end
+	return true
+end
+
+--[[
+==================
+SV_StartParticle
+
+Make sure the event gets sent to all clients
+==================
+]]
+-- port: sv_main.c SV_StartParticle L647-662 @xonotic-v0.8.6
+function sv_main.SV_StartParticle(org: { number }, dir: { number }, color: number, count: number)
+	local sv = server.sv
+	if sv.datagram.cursize > MAX_PACKETFRAGMENT - 18 then
+		return
+	end
+	common.MSG_WriteByte(sv.datagram, svc_particle)
+	common.MSG_WriteCoord(sv.datagram, org[1], sv.protocol)
+	common.MSG_WriteCoord(sv.datagram, org[2], sv.protocol)
+	common.MSG_WriteCoord(sv.datagram, org[3], sv.protocol)
+	for i = 1, 3 do
+		-- (int)bound(-128, dir[i]*16, 127): the float product (rounded), then the int conversion
+		common.MSG_WriteChar(sv.datagram, libc.toint(bound(-128, R(dir[i] * 16), 127)))
+	end
+	common.MSG_WriteByte(sv.datagram, count)
+	common.MSG_WriteByte(sv.datagram, color)
+	sv_main.SV_FlushBroadcastMessages()
+end
+
+--[[
+==================
+SV_StartEffect
+
+Make sure the event gets sent to all clients
+==================
+]]
+-- port: sv_main.c SV_StartEffect L671-700 @xonotic-v0.8.6
+function sv_main.SV_StartEffect(
+	org: { number },
+	modelindex: number,
+	startframe: number,
+	framecount: number,
+	framerate: number
+)
+	local sv = server.sv
+	if modelindex >= 256 or startframe >= 256 then
+		if sv.datagram.cursize > MAX_PACKETFRAGMENT - 19 then
+			return
+		end
+		common.MSG_WriteByte(sv.datagram, svc_effect2)
+		common.MSG_WriteCoord(sv.datagram, org[1], sv.protocol)
+		common.MSG_WriteCoord(sv.datagram, org[2], sv.protocol)
+		common.MSG_WriteCoord(sv.datagram, org[3], sv.protocol)
+		common.MSG_WriteShort(sv.datagram, modelindex)
+		common.MSG_WriteShort(sv.datagram, startframe)
+		common.MSG_WriteByte(sv.datagram, framecount)
+		common.MSG_WriteByte(sv.datagram, framerate)
+	else
+		if sv.datagram.cursize > MAX_PACKETFRAGMENT - 17 then
+			return
+		end
+		common.MSG_WriteByte(sv.datagram, svc_effect)
+		common.MSG_WriteCoord(sv.datagram, org[1], sv.protocol)
+		common.MSG_WriteCoord(sv.datagram, org[2], sv.protocol)
+		common.MSG_WriteCoord(sv.datagram, org[3], sv.protocol)
+		common.MSG_WriteByte(sv.datagram, modelindex)
+		common.MSG_WriteByte(sv.datagram, startframe)
+		common.MSG_WriteByte(sv.datagram, framecount)
+		common.MSG_WriteByte(sv.datagram, framerate)
+	end
+	sv_main.SV_FlushBroadcastMessages()
+end
+
+--[[
+==================
+SV_StartSound
+
+Each entity can have eight independant sound sources, like voice,
+weapon, feet, etc.
+
+Channel 0 is an auto-allocate channel, the others override anything
+already running on that entity/channel pair.
+
+An attenuation of 0 will play full volume everywhere in the level.
+Larger attenuations will drop off.  (max 4 attenuation)
+
+==================
+]]
+-- port: sv_main.c SV_StartSound L717-794 @xonotic-v0.8.6
+-- (entity: edict number; attenuation and speed are floats)
+function sv_main.SV_StartSound(
+	entity: number,
+	channel: number,
+	sample: string,
+	nvolume: number,
+	attenuation: number,
+	reliable: boolean,
+	speed: number
+)
+	local prog: any = cvar.prvm_prog_list[0] -- SVVM_prog
+	local sv = server.sv
+	local dest
+	local sound_num, field_mask, ent, speed4000
+
+	dest = if reliable then sv.reliable_datagram else sv.datagram
+
+	if nvolume < 0 or nvolume > 255 then
+		console.Con_Printf("SV_StartSound: volume = %i\n", nvolume)
+		return
+	end
+
+	if attenuation < 0 or attenuation > 4 then
+		console.Con_Printf("SV_StartSound: attenuation = %f\n", attenuation)
+		return
+	end
+
+	if not (channel >= -128 and channel <= 127) then -- !IS_CHAN(channel)
+		console.Con_Printf("SV_StartSound: channel = %i\n", channel)
+		return
+	end
+
+	channel = channel -- CHAN_ENGINE2NET(channel)
+
+	if sv.datagram.cursize > MAX_PACKETFRAGMENT - 21 then
+		return
+	end
+
+	-- find precache number for sound
+	sound_num = sv_main.SV_SoundIndex(sample, 1)
+	if sound_num == 0 then
+		return
+	end
+
+	ent = entity -- PRVM_NUM_FOR_EDICT(entity)
+
+	speed4000 = libc.toint(math.floor(R(R(speed * 4000.0) + 0.5)))
+	field_mask = 0
+	if nvolume ~= DEFAULT_SOUND_PACKET_VOLUME then
+		field_mask = bit32.bor(field_mask, SND_VOLUME)
+	end
+	if attenuation ~= DEFAULT_SOUND_PACKET_ATTENUATION then
+		field_mask = bit32.bor(field_mask, SND_ATTENUATION)
+	end
+	if speed4000 ~= 0 and speed4000 ~= 4000 then
+		field_mask = bit32.bor(field_mask, SND_SPEEDUSHORT4000)
+	end
+	if ent >= 8192 or channel < 0 or channel > 7 then
+		field_mask = bit32.bor(field_mask, SND_LARGEENTITY)
+	end
+	if sound_num >= 256 then
+		field_mask = bit32.bor(field_mask, SND_LARGESOUND)
+	end
+
+	-- directed messages go only to the entity they are targeted on
+	common.MSG_WriteByte(dest, svc_sound)
+	common.MSG_WriteByte(dest, field_mask)
+	if bit32.band(field_mask, SND_VOLUME) ~= 0 then
+		common.MSG_WriteByte(dest, nvolume)
+	end
+	if bit32.band(field_mask, SND_ATTENUATION) ~= 0 then
+		common.MSG_WriteByte(dest, libc.toint(R(attenuation * 64)))
+	end
+	if bit32.band(field_mask, SND_SPEEDUSHORT4000) ~= 0 then
+		common.MSG_WriteShort(dest, speed4000)
+	end
+	if bit32.band(field_mask, SND_LARGEENTITY) ~= 0 then
+		common.MSG_WriteShort(dest, ent)
+		common.MSG_WriteChar(dest, channel)
+	else
+		common.MSG_WriteShort(dest, bit32.bor(bit32.lshift(ent, 3), channel))
+	end
+	if bit32.band(field_mask, SND_LARGESOUND) ~= 0 or sv.protocol == P.NEHAHRABJP2 then
+		common.MSG_WriteShort(dest, sound_num)
+	else
+		common.MSG_WriteByte(dest, sound_num)
+	end
+	for i = 0, 2 do
+		-- origin[i] + 0.5 * (mins[i] + maxs[i]): float sum, double product and sum, passed as the float parameter
+		common.MSG_WriteCoord(
+			dest,
+			R(
+				getvi(prog, entity, "origin", i)
+					+ 0.5 * R(getvi(prog, entity, "mins", i) + getvi(prog, entity, "maxs", i))
+			),
+			sv.protocol
+		)
+	end
+
+	-- TODO do we have to do anything here when dest is &sv.reliable_datagram?
+	if not reliable then
+		sv_main.SV_FlushBroadcastMessages()
+	end
+end
+
+--[[
+==================
+SV_StartPointSound
+
+Nearly the same logic as SV_StartSound, except an origin
+instead of an entity is provided and channel is omitted.
+
+The entity sent to the client is 0 (world) and the channel
+is 0 (CHAN_AUTO).  SND_LARGEENTITY will never occur in this
+function, therefore the check for it is omitted.
+
+==================
+]]
+-- port: sv_main.c SV_StartPointSound L809-862 @xonotic-v0.8.6
+-- engine quirk kept: speed4000 is (int)(speed * 40.0f) here (SV_StartSound uses 4000), so a speed of 1 is sent
+-- as 40
+function sv_main.SV_StartPointSound(
+	origin: { number },
+	sample: string,
+	nvolume: number,
+	attenuation: number,
+	speed: number
+)
+	local sv = server.sv
+	local sound_num, field_mask, speed4000
+
+	if nvolume < 0 or nvolume > 255 then
+		console.Con_Printf("SV_StartPointSound: volume = %i\n", nvolume)
+		return
+	end
+
+	if attenuation < 0 or attenuation > 4 then
+		console.Con_Printf("SV_StartPointSound: attenuation = %f\n", attenuation)
+		return
+	end
+
+	if sv.datagram.cursize > MAX_PACKETFRAGMENT - 21 then
+		return
+	end
+
+	-- find precache number for sound
+	sound_num = sv_main.SV_SoundIndex(sample, 1)
+	if sound_num == 0 then
+		return
+	end
+
+	speed4000 = libc.toint(R(speed * 40.0))
+	field_mask = 0
+	if nvolume ~= DEFAULT_SOUND_PACKET_VOLUME then
+		field_mask = bit32.bor(field_mask, SND_VOLUME)
+	end
+	if attenuation ~= DEFAULT_SOUND_PACKET_ATTENUATION then
+		field_mask = bit32.bor(field_mask, SND_ATTENUATION)
+	end
+	if sound_num >= 256 then
+		field_mask = bit32.bor(field_mask, SND_LARGESOUND)
+	end
+	if speed4000 ~= 0 and speed4000 ~= 4000 then
+		field_mask = bit32.bor(field_mask, SND_SPEEDUSHORT4000)
+	end
+
+	-- directed messages go only to the entity they are targeted on
+	common.MSG_WriteByte(sv.datagram, svc_sound)
+	common.MSG_WriteByte(sv.datagram, field_mask)
+	if bit32.band(field_mask, SND_VOLUME) ~= 0 then
+		common.MSG_WriteByte(sv.datagram, nvolume)
+	end
+	if bit32.band(field_mask, SND_ATTENUATION) ~= 0 then
+		common.MSG_WriteByte(sv.datagram, libc.toint(R(attenuation * 64)))
+	end
+	if bit32.band(field_mask, SND_SPEEDUSHORT4000) ~= 0 then
+		common.MSG_WriteShort(sv.datagram, speed4000)
+	end
+	-- Always write entnum 0 for the world entity
+	common.MSG_WriteShort(sv.datagram, 0) -- (0<<3) | 0
+	if bit32.band(field_mask, SND_LARGESOUND) ~= 0 then
+		common.MSG_WriteShort(sv.datagram, sound_num)
+	else
+		common.MSG_WriteByte(sv.datagram, sound_num)
+	end
+	for i = 1, 3 do
+		common.MSG_WriteCoord(sv.datagram, origin[i], sv.protocol)
+	end
+	sv_main.SV_FlushBroadcastMessages()
+end
+
+--[[
+================
+SV_ConnectClient
+
+Initializes a client_t for a new net connection.  This will only be called
+once for a player each game, not once for each level change.
+================
+]]
+-- port: sv_main.c SV_ConnectClient L1069-1141 @xonotic-v0.8.6
+-- (netconnection: nil for a bot, the only kind that connects until M6-NET)
+function sv_main.SV_ConnectClient(clientnum: number, netconnection: any)
+	local prog: any = cvar.prvm_prog_list[0] -- SVVM_prog
+	local sv = server.sv :: any
+	local c = client(clientnum)
+
+	-- set up the client_t
+	if sv.loadgame then
+		local backupparms = table.clone(c.spawn_parms)
+		ClearClient(c)
+		c.spawn_parms = backupparms
+	else
+		ClearClient(c)
+	end
+	c.active = true
+	c.netconnection = netconnection
+
+	console.Con_DPrintf("Client %s connected\n", if c.netconnection then c.netconnection.address else "botclient")
+
+	if c.netconnection and c.netconnection.crypto and c.netconnection.crypto.authenticated then
+		notPorted("SV_ConnectClient crypto message of an authenticated connection (crypto.c, M6-NET)")
+	end
+
+	c.name.str = string.sub("unconnected", 1, MAX_SCOREBOARDNAME - 1)
+	c.old_name.str = string.sub("unconnected", 1, MAX_SCOREBOARDNAME - 1)
+	c.prespawned = false
+	c.spawned = false
+	c.begun = false
+	c.edict = clientnum + 1 -- PRVM_EDICT_NUM(clientnum+1)
+	if c.netconnection then
+		c.netconnection.message.allowoverflow = true -- we can catch it
+	end
+	-- prepare the unreliable message buffer
+	c.unreliablemsg.data = buffer.create(NET_MAXMESSAGE)
+	c.unreliablemsg.maxsize = NET_MAXMESSAGE
+	-- updated by receiving "rate" command from client, this is also the default if not using a DP client
+	c.rate = 1000000000
+	c.connecttime = prvm_edict.realtime
+
+	if not sv.loadgame then
+		-- call the progs to get default spawn parms for the new client
+		-- set self to world to intentionally cause errors with broken SetNewParms code in some mods
+		SET_GF(prog, "time", sv.time)
+		SET_GI(prog, "self", 0)
+		prvm_edict.ExecuteProgram(prog, serverfunction(prog, "SetNewParms"), "QC function SetNewParms is missing")
+		local parm1 = prvm_cmds.GlobalOfs(prog, "parm1")
+		for i = 0, NUM_SPAWN_PARMS - 1 do
+			c.spawn_parms[i] = buffer.readf32(prog.globals, (parm1 + i) * 4)
+		end
+
+		-- set up the entity for this client (including .colormap, .team, etc)
+		prvm_edict.PRVM_ED_ClearEdict(prog, c.edict)
+	end
+
+	-- don't call SendServerinfo for a fresh botclient because its fields have
+	-- not been set up by the qc yet
+	if c.netconnection then
+		notPorted("SV_SendServerinfo (sv_main.c L880-1059, M6-NET) in SV_ConnectClient")
+	else
+		c.prespawned = true
+		c.spawned = true
+		c.begun = true
+	end
+end
+
+--[[
+=============
+SV_CleanupEnts
+
+=============
+]]
+-- port: sv_main.c SV_CleanupEnts L1974-1983 @xonotic-v0.8.6
+local function SV_CleanupEnts()
+	local prog: any = cvar.prvm_prog_list[0] -- SVVM_prog
+	local o = prvm_edict.FieldOfs(prog, "effects")
+	if o < 0 then
+		return
+	end
+	local f, n = prog.edictsfields, prog.entityfields
+	for e = 1, prog.num_edicts - 1 do
+		local a = (e * n + o) * 4
+		local v = buffer.readf32(f, a)
+		if v ~= 0 then -- ((int)0 & ~EF_MUZZLEFLASH) == 0: the store would not change a zero
+			buffer.writef32(f, a, andnot(v, EF_MUZZLEFLASH))
+		end
+	end
+end
+
+-- port: sv_main.c SV_FlushBroadcastMessages L2266-2280 @xonotic-v0.8.6
+function sv_main.SV_FlushBroadcastMessages()
+	local sv = server.sv
+	local svs = host_cmd.svs :: any
+	if sv.datagram.cursize <= 0 then
+		return
+	end
+	for i = 0, svs.maxclients - 1 do
+		local c = client(i)
+		if
+			not c.begun
+			or not c.netconnection
+			or c.unreliablemsg.cursize + sv.datagram.cursize > c.unreliablemsg.maxsize
+			or c.unreliablemsg_splitpoints >= NET_MAXMESSAGE / 16
+		then
+			continue
+		end
+		common.SZ_Write(c.unreliablemsg, buffer.readstring(sv.datagram.data, 0, sv.datagram.cursize))
+		c.unreliablemsg_splitpoint[c.unreliablemsg_splitpoints] = c.unreliablemsg.cursize
+		c.unreliablemsg_splitpoints += 1
+	end
+	common.SZ_Clear(sv.datagram)
+end
+
+--[[
+=======================
+SV_UpdateToReliableMessages
+=======================
+]]
+-- port: sv_main.c SV_UpdateToReliableMessages L2491-2595 @xonotic-v0.8.6
+local function SV_UpdateToReliableMessages()
+	local prog: any = cvar.prvm_prog_list[0] -- SVVM_prog
+	local sv = server.sv
+	local svs = host_cmd.svs :: any
+	local name, model, skin
+	local clientcamera
+	local host = HOST() -- host.c (SV_BroadcastPrintf)
+
+	-- check for changes to be sent over the reliable streams
+	for i = 0, svs.maxclients - 1 do
+		local host_client = client(i)
+		server.host_client = host_client
+		-- update the host_client fields we care about according to the entity fields
+		host_client.edict = i + 1
+		local ed = host_client.edict
+
+		-- DP_SV_CLIENTNAME
+		local nn = geti(prog, ed, "netname")
+		name = prvm_edict.PRVM_GetString(prog, nn)
+		-- always point the string back at host_client->name to keep it safe
+		--strlcpy (host_client->name, name, sizeof (host_client->name));
+		if notSameString(prog, nn, host_client.name) then -- prevent buffer overlap SIGABRT on Mac OSX
+			host_client.name.str = string.sub(libc.cstr(name), 1, MAX_SCOREBOARDNAME - 1)
+		end
+		seti(prog, ed, "netname", prvm_edict.PRVM_SetEngineString(prog, host_client.name))
+		if host_client.old_name.str ~= host_client.name.str then
+			if host_client.begun then
+				host.SV_BroadcastPrintf("%s ^7changed name to %s\n", host_client.old_name.str, host_client.name.str)
+			end
+			host_client.old_name.str = string.sub(host_client.name.str, 1, MAX_SCOREBOARDNAME - 1)
+			-- send notification to all clients
+			common.MSG_WriteByte(sv.reliable_datagram, svc_updatename)
+			common.MSG_WriteByte(sv.reliable_datagram, i)
+			common.MSG_WriteString(sv.reliable_datagram, host_client.name.str)
+			if host_client.sv_demo_file ~= nil then
+				notPorted("SV_WriteNetnameIntoDemo (sv_demo.c) in SV_UpdateToReliableMessages")
+			end
+		end
+
+		-- DP_SV_CLIENTCOLORS
+		host_client.colors = libc.toint(getf(prog, ed, "clientcolors"))
+		if host_client.old_colors ~= host_client.colors then
+			host_client.old_colors = host_client.colors
+			-- send notification to all clients
+			common.MSG_WriteByte(sv.reliable_datagram, svc_updatecolors)
+			common.MSG_WriteByte(sv.reliable_datagram, i)
+			common.MSG_WriteByte(sv.reliable_datagram, host_client.colors)
+		end
+
+		-- NEXUIZ_PLAYERMODEL
+		local pm = geti(prog, ed, "playermodel")
+		model = prvm_edict.PRVM_GetString(prog, pm)
+		-- always point the string back at host_client->name to keep it safe
+		--strlcpy (host_client->playermodel, model, sizeof (host_client->playermodel));
+		if notSameString(prog, pm, host_client.playermodel) then -- prevent buffer overlap SIGABRT on Mac OSX
+			host_client.playermodel.str = string.sub(libc.cstr(model), 1, server.MAX_QPATH - 1)
+		end
+		seti(prog, ed, "playermodel", prvm_edict.PRVM_SetEngineString(prog, host_client.playermodel))
+
+		-- NEXUIZ_PLAYERSKIN
+		local ps = geti(prog, ed, "playerskin")
+		skin = prvm_edict.PRVM_GetString(prog, ps)
+		-- always point the string back at host_client->name to keep it safe
+		--strlcpy (host_client->playerskin, skin, sizeof (host_client->playerskin));
+		if notSameString(prog, ps, host_client.playerskin) then -- prevent buffer overlap SIGABRT on Mac OSX
+			host_client.playerskin.str = string.sub(libc.cstr(skin), 1, server.MAX_QPATH - 1)
+		end
+		seti(prog, ed, "playerskin", prvm_edict.PRVM_SetEngineString(prog, host_client.playerskin))
+
+		-- TODO: add an extension name for this [1/17/2008 Black]
+		clientcamera = geti(prog, ed, "clientcamera")
+		if clientcamera > 0 then
+			local oldclientcamera = host_client.clientcamera
+			if clientcamera >= prog.max_edicts or prog.ed_free[clientcamera] then
+				clientcamera = ed -- PRVM_NUM_FOR_EDICT(host_client->edict)
+			end
+			host_client.clientcamera = clientcamera
+
+			if oldclientcamera ~= host_client.clientcamera and host_client.netconnection then
+				common.MSG_WriteByte(host_client.netconnection.message, svc_setview)
+				common.MSG_WriteShort(host_client.netconnection.message, host_client.clientcamera)
+			end
+		end
+
+		-- frags
+		host_client.frags = libc.toint(getf(prog, ed, "frags"))
+		-- if(IS_OLDNEXUIZ_DERIVED(gamemode)) if(!host_client->begun && host_client->netconnection) frags = -666;
+		-- (common.h L308: GAME_NEXUIZ or GAME_VORETOURNAMENT only, false for GAME_XONOTIC)
+		if host_client.old_frags ~= host_client.frags then
+			host_client.old_frags = host_client.frags
+			-- send notification to all clients
+			common.MSG_WriteByte(sv.reliable_datagram, svc_updatefrags)
+			common.MSG_WriteByte(sv.reliable_datagram, i)
+			common.MSG_WriteShort(sv.reliable_datagram, host_client.frags)
+		end
+	end
+	server.host_client = {} -- (C leaves host_client at svs.clients + svs.maxclients, one past the last client)
+
+	for j = 0, svs.maxclients - 1 do
+		local c = client(j)
+		if c.netconnection and (c.begun or c.clientconnectcalled) then -- also send MSG_ALL to people who are past ClientConnect, but not spawned yet
+			common.SZ_Write(
+				c.netconnection.message,
+				buffer.readstring(sv.reliable_datagram.data, 0, sv.reliable_datagram.cursize)
+			)
+		end
+	end
+
+	common.SZ_Clear(sv.reliable_datagram)
+end
+
+--[[
+=======================
+SV_SendClientMessages
+=======================
+]]
+-- port: sv_main.c SV_SendClientMessages L2603-2640 @xonotic-v0.8.6
+function sv_main.SV_SendClientMessages()
+	local sv = server.sv
+	local svs = host_cmd.svs :: any
+	local prepared = false
+
+	if sv.protocol == P.QUAKEWORLD then
+		error("SV_SendClientMessages: no quakeworld support\n", 0) -- Sys_Error
+	end
+
+	sv_main.SV_FlushBroadcastMessages()
+
+	-- update frags, names, etc
+	SV_UpdateToReliableMessages()
+
+	-- build individual updates
+	for i = 0, svs.maxclients - 1 do
+		local host_client = client(i)
+		server.host_client = host_client
+		if not host_client.active then
+			continue
+		end
+		if not host_client.netconnection then
+			continue
+		end
+
+		if host_client.netconnection.message.overflowed then
+			HOST().SV_DropClient(true) -- if the message couldn't send, kick off
+			continue
+		end
+
+		if not prepared then
+			prepared = true
+			-- only prepare entities once per frame
+			notPorted("SV_PrepareEntitiesForSending (sv_main.c L1471-1490, M6-NET) in SV_SendClientMessages")
+		end
+		notPorted("SV_SendClientDatagram (sv_main.c L2320-2484, M6-NET) in SV_SendClientMessages")
+	end
+	server.host_client = {} -- (one past the last client)
+
+	-- clear muzzle flashes
+	SV_CleanupEnts()
+end
+
+-- MUST match effectnameindex_t in client.h (sv_main.c L210-247)
+local standardeffectnames = {
+	"",
+	"TE_GUNSHOT",
+	"TE_GUNSHOTQUAD",
+	"TE_SPIKE",
+	"TE_SPIKEQUAD",
+	"TE_SUPERSPIKE",
+	"TE_SUPERSPIKEQUAD",
+	"TE_WIZSPIKE",
+	"TE_KNIGHTSPIKE",
+	"TE_EXPLOSION",
+	"TE_EXPLOSIONQUAD",
+	"TE_TAREXPLOSION",
+	"TE_TELEPORT",
+	"TE_LAVASPLASH",
+	"TE_SMALLFLASH",
+	"TE_FLAMEJET",
+	"EF_FLAME",
+	"TE_BLOOD",
+	"TE_SPARK",
+	"TE_PLASMABURN",
+	"TE_TEI_G3",
+	"TE_TEI_SMOKE",
+	"TE_TEI_BIGEXPLOSION",
+	"TE_TEI_PLASMAHIT",
+	"EF_STARDUST",
+	"TR_ROCKET",
+	"TR_GRENADE",
+	"TR_BLOOD",
+	"TR_WIZSPIKE",
+	"TR_SLIGHTBLOOD",
+	"TR_KNIGHTSPIKE",
+	"TR_VORESPIKE",
+	"TR_NEHAHRASMOKE",
+	"TR_NEXUIZPLASMA",
+	"TR_GLOWTRAIL",
+	"SVC_PARTICLE",
+}
+local MAX_PARTICLEEFFECTNAME = 4096 -- quakedef.h L169
+
+--[[
+================
+SV_ParticleEffectIndex
+
+================
+]]
+-- port: sv_main.c SV_ParticleEffectIndex L3004-3087 @xonotic-v0.8.6
+-- (sv.particleeffectname[i]: char[MAX_QPATH], C index i at [i]; a missing entry is the empty string)
+function sv_main.SV_ParticleEffectIndex(name: string): number
+	local sv = server.sv
+	local argc, linenumber, effectnameindex
+	local filedata
+	local text
+	local argv: { string } = {}
+	local filename
+	local names = sv.particleeffectname
+	if not sv.particleeffectnamesloaded then
+		sv.particleeffectnamesloaded = true
+		table.clear(names)
+		for i = 0, #standardeffectnames - 1 do -- EFFECT_TOTAL
+			names[i] = string.sub(standardeffectnames[i + 1], 1, server.MAX_QPATH - 1)
+		end
+		local filepass = 0
+		while true do
+			if filepass == 0 then
+				filename = "effectinfo.txt"
+			elseif filepass == 1 then
+				filename =
+					string.sub(string.format("%s_effectinfo.txt", sv.worldnamenoextension), 1, server.MAX_QPATH - 1)
+			else
+				break
+			end
+			filepass += 1
+			filedata = fs.FS_LoadFile(filename, true)
+			if not filedata then
+				continue
+			end
+			local s = libc.cstr(filedata :: string) -- (the loaded file is NUL terminated)
+			text = 1 -- textstart
+			linenumber = 1
+			while true do
+				argc = 0
+				while true do
+					local ok
+					ok, text = common.COM_ParseToken_Simple(s, text, true, false, true)
+					if not ok or common.com_token == "\n" then
+						break
+					end
+					if argc < 16 then
+						argv[argc] = string.sub(common.com_token, 1, 1023) -- strlcpy(argv[argc], com_token, 1024)
+						argc += 1
+					end
+				end
+				if common.com_token == "" then
+					break -- if the loop exited and it's not a \n, it's EOF
+				end
+				if argc >= 1 and argv[0] == "effect" then
+					if argc == 2 then
+						effectnameindex = 1
+						while effectnameindex < MAX_PARTICLEEFFECTNAME do
+							local cur = names[effectnameindex]
+							if cur and cur ~= "" then
+								if cur == argv[1] then
+									break
+								end
+							else
+								names[effectnameindex] = string.sub(argv[1], 1, server.MAX_QPATH - 1)
+								break
+							end
+							effectnameindex += 1
+						end
+						-- if we run out of names, abort
+						if effectnameindex == MAX_PARTICLEEFFECTNAME then
+							console.Con_Printf("%s:%i: too many effects!\n", filename, linenumber)
+							break
+						end
+					end
+				end
+				linenumber += 1
+			end
+			-- Mem_Free(filedata)
+		end
+	end
+	-- search for the name
+	effectnameindex = 1
+	while effectnameindex < MAX_PARTICLEEFFECTNAME and (names[effectnameindex] or "") ~= "" do
+		if names[effectnameindex] == name then
+			return effectnameindex
+		end
+		effectnameindex += 1
+	end
+	-- return 0 if we couldn't find it
+	return 0
+end
+
+--[[
+================
+SV_SaveSpawnparms
+
+Grabs the current state of each client for saving across the
+transition to another level
+================
+]]
+-- port: sv_main.c SV_SaveSpawnparms L3243-3262 @xonotic-v0.8.6
+function sv_main.SV_SaveSpawnparms()
+	local prog: any = cvar.prvm_prog_list[0] -- SVVM_prog
+	local svs = host_cmd.svs :: any
+
+	svs.serverflags = libc.toint(buffer.readf32(prog.globals, prvm_cmds.GlobalOfs(prog, "serverflags") * 4))
+
+	for i = 0, svs.maxclients - 1 do
+		local host_client = client(i)
+		server.host_client = host_client
+		if not host_client.active then
+			continue
+		end
+
+		-- call the progs to get default spawn parms for the new client
+		SET_GF(prog, "time", server.sv.time)
+		SET_GI(prog, "self", host_client.edict)
+		prvm_edict.ExecuteProgram(prog, serverfunction(prog, "SetChangeParms"), "QC function SetChangeParms is missing")
+		local parm1 = prvm_cmds.GlobalOfs(prog, "parm1")
+		for j = 0, NUM_SPAWN_PARMS - 1 do
+			host_client.spawn_parms[j] = buffer.readf32(prog.globals, (parm1 + j) * 4)
+		end
+	end
+	server.host_client = {} -- (one past the last client)
 end
 
 return sv_main

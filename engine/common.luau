@@ -388,12 +388,18 @@ function common.InfoString_SetValue(buffer: string, bufferlength: number, key: s
 	return head .. string.sub(rest, 1, bufferlength - pos - 1) -- just remove the key from the text
 end
 
+local utf8lib_mod: any = nil
+
 -- COM_ToLowerString / COM_ToUpperString share one body; upper selects the direction.
 local function caseString(input: string, size_out: number, upper: boolean): string
 	if size_out == 0 then
 		return ""
 	end
-	local utf8lib = require("./utf8lib")
+	-- (required on first use and kept: a require() call resolves the path every time in Lune, about 0.5 ms)
+	if not utf8lib_mod then
+		utf8lib_mod = require("./utf8lib")
+	end
+	local utf8lib = utf8lib_mod
 	local out = {}
 	local i = 1
 	if utf8lib.enabled() then

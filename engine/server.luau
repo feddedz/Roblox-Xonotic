@@ -47,6 +47,9 @@ export type Server = {
 	worldmodel: any, -- dp_model_t * (nil = NULL)
 	models: { [number]: any }, -- dp_model_t *models[MAX_MODELS], C index i at [i]
 	writeentitiestoclient_msg: common.SizeBuf?, -- sizebuf_t * of the entity message being built (server.h L153; nil = NULL)
+	particleeffectnamesloaded: boolean, -- qboolean (server.h L144)
+	particleeffectname: { [number]: string }, -- char [MAX_PARTICLEEFFECTNAME][MAX_QPATH] (server.h L145), C index i at [i]
+	loadgame: boolean, -- qboolean loadgame (server.h L85): client spawn parms come from a saved game
 	-- port support: the address of a char array of this struct as an engine string reference (see CStrRef)
 	stringrefs: { [string]: { str: string } },
 }
@@ -76,6 +79,9 @@ function server.New(): Server
 		worldmodel = nil,
 		models = {},
 		writeentitiestoclient_msg = nil,
+		particleeffectnamesloaded = false,
+		particleeffectname = {},
+		loadgame = false,
 		stringrefs = {},
 	}
 end

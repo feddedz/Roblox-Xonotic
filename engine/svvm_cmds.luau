@@ -24,6 +24,59 @@ local prvm_cmds = require("./prvm_cmds")
 local prvm_edict = require("./prvm_edict")
 local PORTED: { [string]: (prog: any) -> () } = table.clone(prvm_cmds.BUILTINS)
 
+-- Modules that require this one (sv_phys -> sv_main -> svvm_cmds, host, sv_move) or that are needed on use only
+-- are required on first use and kept: Lune resolves the path on every require() call (about 0.5 ms), so a
+-- require inside a builtin cost more than the builtin (port support, no effect on results).
+local lazymods: { [string]: any } = {}
+local function SVPHYS(): any
+	local m = lazymods.sv_phys
+	if not m then
+		m = require("./sv_phys")
+		lazymods.sv_phys = m
+	end
+	return m
+end
+local function SVMAIN(): any
+	local m = lazymods.sv_main
+	if not m then
+		m = require("./sv_main")
+		lazymods.sv_main = m
+	end
+	return m
+end
+local function SVMOVE(): any
+	local m = lazymods.sv_move
+	if not m then
+		m = require("./sv_move")
+		lazymods.sv_move = m
+	end
+	return m
+end
+local function HOST(): any
+	local m = lazymods.host
+	if not m then
+		m = require("./host")
+		lazymods.host = m
+	end
+	return m
+end
+local function MATRIXLIB(): any
+	local m = lazymods.matrixlib
+	if not m then
+		m = require("./matrixlib")
+		lazymods.matrixlib = m
+	end
+	return m
+end
+local function MODELALIAS(): any
+	local m = lazymods.model_alias
+	if not m then
+		m = require("./model_alias")
+		lazymods.model_alias = m
+	end
+	return m
+end
+
 -- port: svvm_cmds.c VM_SV_copyentity L1748-1778 @xonotic-v0.8.6
 local function VM_SV_copyentity(prog: any)
 	if prog.argc ~= 2 then
@@ -59,7 +112,7 @@ local function VM_SV_copyentity(prog: any)
 	then
 		return
 	end
-	require("./sv_phys").SV_LinkEdict(out) -- required here: sv_phys -> sv_main -> svvm_cmds
+	SVPHYS().SV_LinkEdict(out) -- required here: sv_phys -> sv_main -> svvm_cmds
 end
 PORTED.VM_SV_copyentity = VM_SV_copyentity
 local server = require("./server")
@@ -177,8 +230,10 @@ PORTED.VM_SV_ambientsound = function(prog: any)
 	else
 		common.MSG_WriteByte(sv.signon, soundnum)
 	end
-	common.MSG_WriteByte(sv.signon, libc.toint(vol * 255))
-	common.MSG_WriteByte(sv.signon, libc.toint(attenuation * 64))
+	-- (int)(vol*255), (int)(attenuation*64): float products, then truncated
+	local fround = require("./_port/f32").round
+	common.MSG_WriteByte(sv.signon, libc.toint(fround(vol * 255)))
+	common.MSG_WriteByte(sv.signon, libc.toint(fround(attenuation * 64)))
 end
 
 -- port: svvm_cmds.c VM_SV_lightstyle L1214-1246 @xonotic-v0.8.6 (no clients connect yet, M6-NET)
@@ -333,7 +388,7 @@ local function VM_SV_setorigin(prog: any)
 	if marks and marks[e] == PRVM_EDICT_MARK_WAIT_FOR_SETORIGIN then
 		marks[e] = PRVM_EDICT_MARK_SETORIGIN_CAUGHT
 	end
-	require("./sv_phys").SV_LinkEdict(e)
+	SVPHYS().SV_LinkEdict(e)
 end
 PORTED.VM_SV_setorigin = VM_SV_setorigin
 
@@ -351,7 +406,7 @@ local function SetMinMaxSize(prog: any, e: number, min: { number }, max: { numbe
 	SET_EV(prog, e, "maxs", max)
 	SET_EV(prog, e, "size", { R(max[1] - min[1]), R(max[2] - min[2]), R(max[3] - min[3]) })
 
-	require("./sv_phys").SV_LinkEdict(e)
+	SVPHYS().SV_LinkEdict(e)
 end
 svvm_cmds.SetMinMaxSize = SetMinMaxSize
 
@@ -386,7 +441,7 @@ local quakemins, quakemaxs = { -16, -16, -16 }, { 16, 16, 16 }
 local vec3_origin = { 0, 0, 0 }
 -- port: svvm_cmds.c VM_SV_setmodel L324-358 @xonotic-v0.8.6
 local function VM_SV_setmodel(prog: any)
-	local sv_main = require("./sv_main") :: any
+	local sv_main = SVMAIN() :: any
 	local mod
 	local i
 
@@ -427,7 +482,7 @@ PORTED.VM_SV_setmodel = VM_SV_setmodel
 -- port: svvm_cmds.c VM_SV_precache_model L1058-1063 @xonotic-v0.8.6
 local function VM_SV_precache_model(prog: any)
 	SAFEPARMCOUNT(prog, 1, "VM_SV_precache_model")
-	require("./sv_main").SV_ModelIndex(G_STRING(prog, OFS_PARM0), 2)
+	SVMAIN().SV_ModelIndex(G_STRING(prog, OFS_PARM0), 2)
 	buffer.writei32(prog.globals, OFS_RETURN * 4, G_INT(prog, OFS_PARM0))
 end
 PORTED.VM_SV_precache_model = VM_SV_precache_model
@@ -442,7 +497,7 @@ end
 -- #333 void(entity e, float mdlindex) setmodelindex (EXT_CSQC)
 -- port: svvm_cmds.c VM_SV_setmodelindex L2733-2777 @xonotic-v0.8.6
 local function VM_SV_setmodelindex(prog: any)
-	local sv_main = require("./sv_main") :: any
+	local sv_main = SVMAIN() :: any
 	local mod
 	local i
 	SAFEPARMCOUNT(prog, 2, "VM_SV_setmodelindex")
@@ -538,7 +593,7 @@ local function VM_SV_traceline(prog: any)
 		)
 	end
 
-	local sv_phys = require("./sv_phys")
+	local sv_phys = SVPHYS()
 	local trace = sv_phys.SV_TraceLine(
 		v1,
 		v2,
@@ -589,7 +644,7 @@ local function VM_SV_tracebox(prog: any)
 		)
 	end
 
-	local sv_phys = require("./sv_phys")
+	local sv_phys = SVPHYS()
 	local trace = sv_phys.SV_TraceBox(
 		v1,
 		m1,
@@ -634,7 +689,7 @@ local function VM_SV_findradius(prog: any)
 	local r1 = R(radius + 1)
 	local mins = { R(org[1] - r1), R(org[2] - r1), R(org[3] - r1) }
 	local maxs = { R(org[1] + r1), R(org[2] + r1), R(org[3] + r1) }
-	local numtouchedicts = require("./sv_phys").SV_EntitiesInBox(mins, maxs, MAX_EDICTS, touchedicts)
+	local numtouchedicts = SVPHYS().SV_EntitiesInBox(mins, maxs, MAX_EDICTS, touchedicts)
 	if numtouchedicts > MAX_EDICTS then
 		-- this never happens
 		console.Con_Printf("SV_EntitiesInBox returned %i edicts, max was %i\n", numtouchedicts, MAX_EDICTS)
@@ -680,13 +735,13 @@ PORTED.VM_SV_findradius = VM_SV_findradius
 -- sv_phys.SV_NudgeOutOfSolid: droptofloor calls it when sv_gameplayfix_droptofloorstartsolid_nudgetocorrect is
 -- set (default 1, Xonotic keeps it). (sv_phys is required here, not at the top: it requires sv_main.)
 local function SV_NudgeOutOfSolid(ent: number)
-	local sv_phys: any = require("./sv_phys")
+	local sv_phys: any = SVPHYS()
 	sv_phys.SV_NudgeOutOfSolid(ent)
 end
 
 -- port: svvm_cmds.c VM_SV_droptofloor L1130-1205 @xonotic-v0.8.6
 local function VM_SV_droptofloor(prog: any)
-	local sv_phys = require("./sv_phys")
+	local sv_phys = SVPHYS()
 	-- allow 2 parameters because the id1 defs.qc had an incorrect prototype
 	SAFEPARMCOUNTRANGE(prog, 0, 2, "VM_SV_droptofloor")
 
@@ -818,11 +873,7 @@ svvm_cmds.Mod_Q1BSP_NativeContentsFromSuperContents = Mod_Q1BSP_NativeContentsFr
 local function VM_SV_pointcontents(prog: any)
 	SAFEPARMCOUNT(prog, 1, "VM_SV_pointcontents")
 	local point = G_VECTOR(prog, OFS_PARM0)
-	SET_G_FLOAT(
-		prog,
-		OFS_RETURN,
-		Mod_Q1BSP_NativeContentsFromSuperContents(require("./sv_phys").SV_PointSuperContents(point))
-	)
+	SET_G_FLOAT(prog, OFS_RETURN, Mod_Q1BSP_NativeContentsFromSuperContents(SVPHYS().SV_PointSuperContents(point)))
 end
 PORTED.VM_SV_pointcontents = VM_SV_pointcontents
 
@@ -875,7 +926,7 @@ local function VM_SV_walkmove(prog: any)
 	local oldf = prog.xfunction
 	local oldself = buffer.readi32(prog.globals, GlobalOfs(prog, "self") * 4)
 
-	SET_G_FLOAT(prog, OFS_RETURN, if require("./sv_move").SV_movestep(ent, move, true, false, settrace) then 1 else 0)
+	SET_G_FLOAT(prog, OFS_RETURN, if SVMOVE().SV_movestep(ent, move, true, false, settrace) then 1 else 0)
 
 	-- restore program state
 	prog.xfunction = oldf
@@ -891,7 +942,7 @@ VM_SV_checkbottom
 -- port: svvm_cmds.c VM_SV_checkbottom L1253-1257 @xonotic-v0.8.6
 local function VM_SV_checkbottom(prog: any)
 	SAFEPARMCOUNT(prog, 1, "VM_SV_checkbottom")
-	SET_G_FLOAT(prog, OFS_RETURN, if require("./sv_move").SV_CheckBottom(G_INT(prog, OFS_PARM0)) then 1 else 0)
+	SET_G_FLOAT(prog, OFS_RETURN, if SVMOVE().SV_CheckBottom(G_INT(prog, OFS_PARM0)) then 1 else 0)
 end
 PORTED.VM_SV_checkbottom = VM_SV_checkbottom
 
@@ -908,7 +959,7 @@ local function VM_SV_tracetoss(prog: any)
 	end
 	local ignore = G_INT(prog, OFS_PARM1)
 
-	local trace = require("./sv_phys").SV_Trace_Toss(prog, ent, ignore)
+	local trace = SVPHYS().SV_Trace_Toss(prog, ent, ignore)
 
 	prvm_cmds.VM_SetTraceGlobals(prog, trace)
 end
@@ -916,7 +967,7 @@ PORTED.VM_SV_tracetoss = VM_SV_tracetoss
 
 -- #67 movetogoal: sv_move.c VM_SV_MoveToGoal (engine/sv_move.luau)
 PORTED.VM_SV_MoveToGoal = function(prog: any)
-	require("./sv_move").VM_SV_MoveToGoal(prog)
+	SVMOVE().VM_SV_MoveToGoal(prog)
 end
 
 local notported: { [string]: boolean } = {}
@@ -1100,9 +1151,7 @@ PORTED.VM_SV_WritePicture = VM_SV_WritePicture
 -- result the C function gives for a model with no bone and no tag of that name (it then prints the "could not
 -- find it" developer message, as C does).
 local function Mod_Alias_GetTagIndexForName(model: any, skin: number, tagname: string): number
-	local ok, model_alias = pcall(function(): any
-		return (require :: any)("./model_alias")
-	end)
+	local ok, model_alias = pcall(MODELALIAS)
 	local fn = if ok and type(model_alias) == "table" then model_alias.Mod_Alias_GetTagIndexForName else nil
 	if not fn then
 		NOT_YET_PORTED("Mod_Alias_GetTagIndexForName (model_alias.c) in VM_SV_setattachment: tag index 0")
@@ -1133,7 +1182,7 @@ local function VM_SV_setattachment(prog: any)
 	tagindex = 0
 
 	if tagentity ~= 0 and tagname ~= "" then
-		model = require("./sv_main").SV_GetModelFromEdict(tagentity) -- sv_main requires this module
+		model = SVMAIN().SV_GetModelFromEdict(tagentity) -- sv_main requires this module
 		if model then
 			-- (int)skin converted to the unsigned int parameter
 			tagindex = Mod_Alias_GetTagIndexForName(model, toint(EF(prog, tagentity, "skin")) % 4294967296, tagname)
@@ -1174,7 +1223,7 @@ local function SV_GetTagIndex(prog: any, e: number, tagname: string): number
 	end
 
 	return Mod_Alias_GetTagIndexForName(
-		require("./sv_main").SV_GetModelByIndex(i),
+		SVMAIN().SV_GetModelByIndex(i),
 		toint(EF(prog, e, "skin")) % 4294967296,
 		tagname
 	)
@@ -1198,7 +1247,7 @@ local function VM_SV_gettagindex(prog: any)
 	end
 
 	local tag_index = 0
-	if not require("./sv_main").SV_GetModelFromEdict(ent) then
+	if not SVMAIN().SV_GetModelFromEdict(ent) then
 		console.Con_DPrintf("VM_SV_gettagindex(entity #%i): null or non-precached model\n", ent)
 	else
 		tag_index = SV_GetTagIndex(prog, ent, tag_name)
@@ -1216,7 +1265,7 @@ PORTED.VM_SV_gettagindex = VM_SV_gettagindex
 -- port: svvm_cmds.c VM_SV_frameforname L3158-3175 @xonotic-v0.8.6
 local function VM_SV_frameforname(prog: any)
 	local modelindex = toint(G_FLOAT(prog, OFS_PARM0))
-	local model = require("./sv_main").SV_GetModelByIndex(modelindex)
+	local model = SVMAIN().SV_GetModelByIndex(modelindex)
 	local name = string.lower(G_STRING(prog, OFS_PARM1))
 	SET_G_FLOAT(prog, OFS_RETURN, -1)
 	if not model or not model.animscenes then
@@ -1235,7 +1284,7 @@ PORTED.VM_SV_frameforname = VM_SV_frameforname
 -- port: svvm_cmds.c VM_SV_frameduration L3178-3188 @xonotic-v0.8.6
 local function VM_SV_frameduration(prog: any)
 	local modelindex = toint(G_FLOAT(prog, OFS_PARM0))
-	local model = require("./sv_main").SV_GetModelByIndex(modelindex)
+	local model = SVMAIN().SV_GetModelByIndex(modelindex)
 	local framenum = toint(G_FLOAT(prog, OFS_PARM1))
 	SET_G_FLOAT(prog, OFS_RETURN, 0)
 	if not model or not model.animscenes or framenum < 0 or framenum >= model.numframes then
@@ -1275,7 +1324,7 @@ PORTED.VM_SV_setpause = VM_SV_setpause
 -- (out: a matrixlib matrix4x4_t; the Matrix4x4_CreateFromQuakeEntity parameters are doubles: the float values
 -- are passed exactly, the float products are rounded first)
 function svvm_cmds.SV_GetEntityMatrix(prog: any, ent: number, out: any, viewmatrix: boolean)
-	local matrixlib = require("./matrixlib")
+	local matrixlib = MATRIXLIB()
 	local scale
 	local pitchsign = 1
 
@@ -1301,7 +1350,7 @@ function svvm_cmds.SV_GetEntityMatrix(prog: any, ent: number, out: any, viewmatr
 			R(scale * cl_viewmodel_scale)
 		)
 	else
-		pitchsign = require("./sv_phys").SV_GetPitchSign(prog, ent) -- sv_phys requires this module
+		pitchsign = SVPHYS().SV_GetPitchSign(prog, ent) -- sv_phys requires this module
 		local origin, angles = EV(prog, ent, "origin"), EV(prog, ent, "angles")
 		matrixlib.Matrix4x4_CreateFromQuakeEntity(
 			out,
@@ -1315,6 +1364,800 @@ function svvm_cmds.SV_GetEntityMatrix(prog: any, ent: number, out: any, viewmatr
 		)
 	end
 end
+
+--[[
+===============================================================================
+
+	Client builtins (sprint, centerprint, stuffcmd, setspawnparms, setcolor, clientcommand, dropclient,
+	spawnclient, clienttype), the sound / effect builtins and gettaginfo. host_client is server.host_client;
+	svs.clients[i] is client i (0-based, engine/sv_main.luau). sv_main / host are required on use (sv_main requires
+	this module). A bot has no netconnection: the C returns before writing to it, as here.
+
+===============================================================================
+]]
+local cmdmod = require("./cmd")
+local VM_STRINGTEMP_LENGTH = 16384 -- prvm_cmds.h (MAX_INPUTLINE)
+local svc_print, svc_centerprint = 8, 26 -- protocol.h L196, L223
+local svc_trailparticles, svc_pointparticles, svc_pointparticles1 = 60, 61, 62 -- protocol.h L254-256
+-- sound.h L37-41
+local CHANNELFLAG_RELIABLE, CHANNELFLAG_FORCELOOP, CHANNELFLAG_PAUSED, CHANNELFLAG_FULLVOLUME = 1, 2, 8, 16
+local NUM_SPAWN_PARMS = 16 -- server.h L185
+
+local function svs_clients(): any -- svs (host_cmd.svs) with its clients table
+	local svs = host_cmd.svs :: any
+	svs.clients = svs.clients or {}
+	return svs
+end
+-- svs.clients[i].active (a slot not created yet is zeroed memory)
+local function client_active(svs: any, i: number): boolean
+	local c = svs.clients[i]
+	return c ~= nil and c.active == true
+end
+-- svs.clients + i (created zeroed on first use, see engine/sv_main.luau)
+local function svs_client(i: number): any
+	return SVMAIN().client(i)
+end
+
+--[[
+=================
+VM_SV_sprint
+
+single print to a specific client
+
+sprint(clientent, value)
+=================
+]]
+-- port: svvm_cmds.c VM_SV_sprint L369-399 @xonotic-v0.8.6
+local function VM_SV_sprint(prog: any)
+	local c
+	local entnum
+	local s
+	local svs = svs_clients()
+
+	SAFEPARMCOUNTRANGE(prog, 2, 8, "VM_SV_sprint")
+
+	s = prvm_cmds.VM_VarString(prog, 1, VM_STRINGTEMP_LENGTH)
+
+	entnum = G_INT(prog, OFS_PARM0) -- PRVM_G_EDICTNUM
+	-- LordHavoc: div0 requested that sprintto world  operate like print
+	if entnum == 0 then
+		console.Con_Print(s)
+		return
+	end
+
+	if entnum < 1 or entnum > svs.maxclients or not client_active(svs, entnum - 1) then
+		prvm_cmds.VM_Warning(prog, "tried to centerprint to a non-client\n")
+		return
+	end
+
+	c = svs.clients[entnum - 1]
+	if not c.netconnection then
+		return
+	end
+
+	common.MSG_WriteChar(c.netconnection.message, svc_print)
+	common.MSG_WriteString(c.netconnection.message, s)
+end
+PORTED.VM_SV_sprint = VM_SV_sprint
+
+--[[
+=================
+VM_SV_centerprint
+
+single print to a specific client
+
+centerprint(clientent, value)
+=================
+]]
+-- port: svvm_cmds.c VM_SV_centerprint L411-434 @xonotic-v0.8.6
+local function VM_SV_centerprint(prog: any)
+	local c
+	local entnum
+	local s
+	local svs = svs_clients()
+
+	SAFEPARMCOUNTRANGE(prog, 2, 8, "VM_SV_centerprint")
+
+	entnum = G_INT(prog, OFS_PARM0) -- PRVM_G_EDICTNUM
+
+	if entnum < 1 or entnum > svs.maxclients or not client_active(svs, entnum - 1) then
+		prvm_cmds.VM_Warning(prog, "tried to centerprint to a non-client\n")
+		return
+	end
+
+	c = svs.clients[entnum - 1]
+	if not c.netconnection then
+		return
+	end
+
+	s = prvm_cmds.VM_VarString(prog, 1, VM_STRINGTEMP_LENGTH)
+	common.MSG_WriteChar(c.netconnection.message, svc_centerprint)
+	common.MSG_WriteString(c.netconnection.message, s)
+end
+PORTED.VM_SV_centerprint = VM_SV_centerprint
+
+--[[
+=================
+VM_SV_particle
+
+particle(origin, color, count)
+=================
+]]
+-- port: svvm_cmds.c VM_SV_particle L443-456 @xonotic-v0.8.6
+local function VM_SV_particle(prog: any)
+	local org, dir
+	local color
+	local count
+
+	SAFEPARMCOUNT(prog, 4, "VM_SV_particle")
+
+	org = G_VECTOR(prog, OFS_PARM0)
+	dir = G_VECTOR(prog, OFS_PARM1)
+	color = toint(G_FLOAT(prog, OFS_PARM2))
+	count = toint(G_FLOAT(prog, OFS_PARM3))
+	SVMAIN().SV_StartParticle(org, dir, color, count)
+end
+PORTED.VM_SV_particle = VM_SV_particle
+
+--[[
+=================
+VM_SV_sound
+
+Each entity can have eight independant sound sources, like voice,
+weapon, feet, etc.
+
+Channel 0 is an auto-allocate channel, the others override anything
+already running on that entity/channel pair.
+
+An attenuation of 0 will play full volume everywhere in the level.
+Larger attenuations will drop off.
+
+=================
+]]
+-- port: svvm_cmds.c VM_SV_sound L522-586 @xonotic-v0.8.6
+local function VM_SV_sound(prog: any)
+	local sample
+	local channel
+	local entity
+	local nvolume
+	local flags
+	local attenuation
+	local pitchchange
+
+	SAFEPARMCOUNTRANGE(prog, 4, 7, "VM_SV_sound")
+
+	entity = G_INT(prog, OFS_PARM0) -- PRVM_G_EDICT
+	channel = toint(G_FLOAT(prog, OFS_PARM1))
+	sample = G_STRING(prog, OFS_PARM2)
+	nvolume = toint(R(G_FLOAT(prog, OFS_PARM3) * 255))
+	if prog.argc < 5 then
+		console.Con_DPrintf("VM_SV_sound: given only 4 parameters, expected 5, assuming attenuation = ATTN_NORMAL\n")
+		attenuation = 1
+	else
+		attenuation = G_FLOAT(prog, OFS_PARM4)
+	end
+	if prog.argc < 6 then
+		pitchchange = 0
+	else
+		pitchchange = R(G_FLOAT(prog, OFS_PARM5) * R(0.01))
+	end
+
+	if prog.argc < 7 then
+		flags = 0
+		if channel >= 8 and channel <= 15 then -- weird QW feature
+			flags = bit32.bor(flags, CHANNELFLAG_RELIABLE)
+			channel -= 8
+		end
+	else
+		-- LordHavoc: we only let the qc set certain flags, others are off-limits
+		flags = bit32.band(
+			toint(G_FLOAT(prog, OFS_PARM0 + 6 * 3)),
+			bit32.bor(CHANNELFLAG_RELIABLE, CHANNELFLAG_FORCELOOP, CHANNELFLAG_PAUSED, CHANNELFLAG_FULLVOLUME)
+		)
+	end
+
+	if nvolume < 0 or nvolume > 255 then
+		prvm_cmds.VM_Warning(prog, "SV_StartSound: volume must be in range 0-1\n")
+		return
+	end
+
+	if attenuation < 0 or attenuation > 4 then
+		prvm_cmds.VM_Warning(prog, "SV_StartSound: attenuation must be in range 0-4\n")
+		return
+	end
+
+	channel = channel -- CHAN_USER2ENGINE(channel)
+
+	if not (channel >= -128 and channel <= 127) then -- !IS_CHAN(channel)
+		prvm_cmds.VM_Warning(prog, "SV_StartSound: channel must be in range 0-127\n")
+		return
+	end
+
+	SVMAIN().SV_StartSound(
+		entity,
+		channel,
+		sample,
+		nvolume,
+		attenuation,
+		bit32.band(flags, CHANNELFLAG_RELIABLE) ~= 0,
+		pitchchange
+	)
+end
+PORTED.VM_SV_sound = VM_SV_sound
+
+--[[
+=================
+VM_SV_pointsound
+
+Follows the same logic as VM_SV_sound, except instead of
+an entity, an origin for the sound is provided, and channel
+is omitted (since no entity is being tracked).
+
+=================
+]]
+-- port: svvm_cmds.c VM_SV_pointsound L598-627 @xonotic-v0.8.6
+local function VM_SV_pointsound(prog: any)
+	local sample
+	local nvolume
+	local attenuation
+	local pitchchange
+	local org
+
+	SAFEPARMCOUNTRANGE(prog, 4, 5, "VM_SV_pointsound")
+
+	org = G_VECTOR(prog, OFS_PARM0)
+	sample = G_STRING(prog, OFS_PARM1)
+	nvolume = toint(R(G_FLOAT(prog, OFS_PARM2) * 255))
+	attenuation = G_FLOAT(prog, OFS_PARM3)
+	pitchchange = if prog.argc < 5 then 0 else R(G_FLOAT(prog, OFS_PARM4) * R(0.01))
+
+	if nvolume < 0 or nvolume > 255 then
+		prvm_cmds.VM_Warning(prog, "SV_StartPointSound: volume must be in range 0-1\n")
+		return
+	end
+
+	if attenuation < 0 or attenuation > 4 then
+		prvm_cmds.VM_Warning(prog, "SV_StartPointSound: attenuation must be in range 0-4\n")
+		return
+	end
+
+	SVMAIN().SV_StartPointSound(org, sample, nvolume, attenuation, pitchchange)
+end
+PORTED.VM_SV_pointsound = VM_SV_pointsound
+
+--[[
+=================
+VM_SV_checkpvs
+
+Checks if an entity is in a point's PVS.
+Should be fast but can be inexact.
+
+float checkpvs(vector viewpos, entity viewee) = #240;
+=================
+]]
+-- port: svvm_cmds.c VM_SV_checkpvs L882-940 @xonotic-v0.8.6 (the #if 1 branch: the viewpos leaf PVS)
+local function VM_SV_checkpvs(prog: any)
+	local viewpos, absmin, absmax
+	local viewee
+	local sv = server.sv
+
+	SAFEPARMCOUNT(prog, 2, "VM_SV_checkpvs")
+	viewpos = G_VECTOR(prog, OFS_PARM0)
+	viewee = G_INT(prog, OFS_PARM1) -- PRVM_G_EDICT
+
+	if prog.ed_free[viewee] then
+		prvm_cmds.VM_Warning(prog, "checkpvs: can not check free entity\n")
+		SET_G_FLOAT(prog, OFS_RETURN, 4)
+		return
+	end
+
+	if not sv.worldmodel or not sv.worldmodel.brush.GetPVS or not sv.worldmodel.brush.BoxTouchingPVS then
+		-- no PVS support on this worldmodel... darn
+		SET_G_FLOAT(prog, OFS_RETURN, 3)
+		return
+	end
+	local pvs, pvsofs = sv.worldmodel.brush.GetPVS(sv.worldmodel, viewpos)
+	if not pvs then
+		-- viewpos isn't in any PVS... darn
+		SET_G_FLOAT(prog, OFS_RETURN, 2)
+		return
+	end
+	absmin = EV(prog, viewee, "absmin")
+	absmax = EV(prog, viewee, "absmax")
+	SET_G_FLOAT(prog, OFS_RETURN, sv.worldmodel.brush.BoxTouchingPVS(sv.worldmodel, pvs, pvsofs, absmin, absmax))
+end
+PORTED.VM_SV_checkpvs = VM_SV_checkpvs
+
+--[[
+=================
+VM_SV_stuffcmd
+
+Sends text over to the client's execution buffer
+
+stuffcmd (clientent, value, ...)
+=================
+]]
+-- port: svvm_cmds.c VM_SV_stuffcmd L952-973 @xonotic-v0.8.6
+local function VM_SV_stuffcmd(prog: any)
+	local entnum
+	local old
+	local s
+	local svs = svs_clients()
+
+	SAFEPARMCOUNTRANGE(prog, 2, 8, "VM_SV_stuffcmd")
+
+	entnum = G_INT(prog, OFS_PARM0) -- PRVM_G_EDICTNUM
+	if entnum < 1 or entnum > svs.maxclients or not client_active(svs, entnum - 1) then
+		prvm_cmds.VM_Warning(prog, "Can't stuffcmd to a non-client\n")
+		return
+	end
+
+	s = prvm_cmds.VM_VarString(prog, 1, VM_STRINGTEMP_LENGTH)
+
+	old = server.host_client
+	server.host_client = svs.clients[entnum - 1]
+	HOST().Host_ClientCommands("%s", s)
+	server.host_client = old
+end
+PORTED.VM_SV_stuffcmd = VM_SV_stuffcmd
+
+--[[
+==============
+VM_SV_setspawnparms
+==============
+]]
+-- port: svvm_cmds.c VM_SV_setspawnparms L1579-1599 @xonotic-v0.8.6
+local function VM_SV_setspawnparms(prog: any)
+	local ent
+	local i
+	local c
+	local svs = svs_clients()
+
+	SAFEPARMCOUNT(prog, 1, "VM_SV_setspawnparms")
+
+	ent = G_INT(prog, OFS_PARM0) -- PRVM_G_EDICT
+	i = ent -- PRVM_NUM_FOR_EDICT(ent)
+	if i < 1 or i > svs.maxclients or not client_active(svs, i - 1) then
+		console.Con_Print("tried to setspawnparms on a non-client\n")
+		return
+	end
+
+	-- copy spawn parms out of the client_t
+	c = svs.clients[i - 1]
+	local parm1 = GlobalOfs(prog, "parm1")
+	for j = 0, NUM_SPAWN_PARMS - 1 do
+		buffer.writef32(prog.globals, (parm1 + j) * 4, c.spawn_parms[j] or 0)
+	end
+end
+PORTED.VM_SV_setspawnparms = VM_SV_setspawnparms
+
+--[[
+=================
+VM_SV_setcolor
+
+sets the color of a client and broadcasts the update to all connected clients
+
+setcolor(clientent, value)
+=================
+]]
+-- port: svvm_cmds.c VM_SV_setcolor L1790-1820 @xonotic-v0.8.6
+local function VM_SV_setcolor(prog: any)
+	local c
+	local entnum, i
+	local svs = svs_clients()
+
+	SAFEPARMCOUNT(prog, 2, "VM_SV_setcolor")
+	entnum = G_INT(prog, OFS_PARM0) -- PRVM_G_EDICTNUM
+	i = toint(G_FLOAT(prog, OFS_PARM1))
+
+	if entnum < 1 or entnum > svs.maxclients or not client_active(svs, entnum - 1) then
+		console.Con_Print("tried to setcolor a non-client\n")
+		return
+	end
+
+	c = svs.clients[entnum - 1]
+	if c.edict then
+		SET_EF(prog, c.edict, "clientcolors", i)
+		SET_EF(prog, c.edict, "team", bit32.band(i, 15) + 1)
+	end
+	c.colors = i
+	if c.old_colors ~= c.colors then
+		c.old_colors = c.colors
+		-- send notification to all clients
+		local sv = server.sv
+		common.MSG_WriteByte(sv.reliable_datagram, 17) -- svc_updatecolors
+		common.MSG_WriteByte(sv.reliable_datagram, entnum - 1) -- client - svs.clients
+		common.MSG_WriteByte(sv.reliable_datagram, c.colors)
+	end
+end
+PORTED.VM_SV_setcolor = VM_SV_setcolor
+
+--void(entity e, string s) clientcommand = #440; // executes a command string as if it came from the specified client
+--this function originally written by KrimZon, made shorter by LordHavoc
+-- port: svvm_cmds.c VM_SV_clientcommand L2333-2351 @xonotic-v0.8.6
+local function VM_SV_clientcommand(prog: any)
+	local temp_client
+	local i
+	local svs = svs_clients()
+	SAFEPARMCOUNT(prog, 2, "VM_SV_clientcommand")
+
+	--find client for this entity
+	i = G_INT(prog, OFS_PARM0) - 1 -- PRVM_NUM_FOR_EDICT(PRVM_G_EDICT(OFS_PARM0)) - 1
+	if i < 0 or i >= svs.maxclients or not client_active(svs, i) then
+		console.Con_Print("PF_clientcommand: entity is not a client\n")
+		return
+	end
+
+	temp_client = server.host_client
+	server.host_client = svs.clients[i]
+	local cmd = cmdmod
+	cmd.Cmd_ExecuteString(G_STRING(prog, OFS_PARM1), cmd.src_client, true)
+	server.host_client = temp_client
+end
+PORTED.VM_SV_clientcommand = VM_SV_clientcommand
+
+-- port: matrixlib.c Matrix4x4_ToVectors L941-970 @xonotic-v0.8.6 (#else branch; matrixlib.luau lacks it)
+local function Matrix4x4_ToVectors(m: any, vx: { number }, vy: { number }, vz: { number }, t: { number })
+	local a = m.m
+	vx[1], vx[2], vx[3] = a[1][1], a[2][1], a[3][1]
+	vy[1], vy[2], vy[3] = a[1][2], a[2][2], a[3][2]
+	vz[1], vz[2], vz[3] = a[1][3], a[2][3], a[3][3]
+	t[1], t[2], t[3] = a[1][4], a[2][4], a[3][4]
+end
+
+local function mcopy(out: any, in_: any) -- *out = *in (matrix4x4_t assignment)
+	for r = 1, 4 do
+		local o, i = out.m[r], in_.m[r]
+		o[1], o[2], o[3], o[4] = i[1], i[2], i[3], i[4]
+	end
+end
+
+-- the three frame blend calls of the tag functions, on ent's priv.server data (engine/prvm_cmds.luau)
+local function UpdateFrameBlend(prog: any, ent: number, model: any): (any, any)
+	local framegroupblend, frameblend, skeleton = prvm_cmds.EdictFrameBlend(prog, ent)
+	prvm_cmds.VM_GenerateFrameGroupBlend(prog, framegroupblend, ent)
+	prvm_cmds.VM_FrameBlendFromFrameGroupBlend(frameblend, framegroupblend, model, server.sv.time)
+	prvm_cmds.VM_UpdateEdictSkeleton(prog, ent, model, frameblend)
+	return frameblend, skeleton
+end
+
+-- port: svvm_cmds.c SV_GetExtendedTagInfo L2410-2430 @xonotic-v0.8.6
+-- (returns r, *parentindex, *tagname; tag_localmatrix written in place)
+local function SV_GetExtendedTagInfo(
+	prog: any,
+	e: number,
+	tagindex: number,
+	tag_localmatrix: any
+): (number, number, string?)
+	local r
+	local model
+	local parentindex, tagname = 0, nil
+
+	-- *tagname = NULL; *parentindex = 0;
+	MATRIXLIB().Matrix4x4_CreateIdentity(tag_localmatrix)
+
+	model = if tagindex >= 0 then SVMAIN().SV_GetModelFromEdict(e) else nil
+	if tagindex >= 0 and model and (model.num_bones or 0) ~= 0 then
+		local _, frameblend, skeleton = prvm_cmds.EdictFrameBlend(prog, e)
+		local pi, tn
+		r, pi, tn = MODELALIAS().Mod_Alias_GetExtendedTagInfoForIndex(
+			model,
+			toint(EF(prog, e, "skin")),
+			frameblend,
+			skeleton,
+			tagindex - 1,
+			tag_localmatrix
+		)
+		if pi ~= nil then
+			parentindex = pi
+		end
+		if tn ~= nil then
+			tagname = tn
+		end
+
+		if r == 0 then -- success?
+			parentindex += 1
+		end
+
+		return r, parentindex, tagname
+	end
+
+	return 1, parentindex, tagname
+end
+
+-- port: svvm_cmds.c SV_GetEntityLocalTagMatrix L2450-2462 @xonotic-v0.8.6
+local function SV_GetEntityLocalTagMatrix(prog: any, ent: number, tagindex: number, out: any): number
+	local model
+	model = if tagindex >= 0 then SVMAIN().SV_GetModelFromEdict(ent) else nil
+	if tagindex >= 0 and model and model.animscenes then
+		local frameblend, skeleton = UpdateFrameBlend(prog, ent, model)
+		return MODELALIAS().Mod_Alias_GetTagMatrix(model, frameblend, skeleton, tagindex, out)
+	end
+	mcopy(out, MATRIXLIB().identitymatrix)
+	return 0
+end
+
+-- Warnings/errors code:
+-- 0 - normal (everything all-right)
+-- 1 - world entity
+-- 2 - free entity
+-- 3 - null or non-precached model
+-- 4 - no tags with requested index
+-- 5 - runaway loop at attachment chain
+-- port: svvm_cmds.c SV_GetTagMatrix L2474-2557 @xonotic-v0.8.6
+local function SV_GetTagMatrix(prog: any, out: any, ent: number, tagindex: number): number
+	local matrixlib = MATRIXLIB()
+	local ret
+	local modelindex, attachloop
+	local entitymatrix, tagmatrix, attachmatrix = matrixlib.new(), matrixlib.new(), matrixlib.new()
+	local model
+
+	mcopy(out, matrixlib.identitymatrix) -- warnings and errors return identical matrix
+
+	if ent == 0 then
+		return 1
+	end
+	if prog.ed_free[ent] then
+		return 2
+	end
+
+	modelindex = toint(EF(prog, ent, "modelindex"))
+	if modelindex <= 0 or modelindex >= server.MAX_MODELS then
+		return 3
+	end
+
+	model = SVMAIN().SV_GetModelByIndex(modelindex)
+
+	UpdateFrameBlend(prog, ent, model)
+
+	mcopy(tagmatrix, matrixlib.identitymatrix)
+	-- DP_GFX_QUAKE3MODELTAGS, scan all chain and stop on unattached entity
+	attachloop = 0
+	while true do
+		if attachloop >= 256 then -- prevent runaway looping
+			return 5
+		end
+		-- apply transformation by child's tagindex on parent entity and then
+		-- by parent entity itself
+		ret = SV_GetEntityLocalTagMatrix(prog, ent, tagindex - 1, attachmatrix)
+		if ret ~= 0 and attachloop == 0 then
+			return ret
+		end
+		svvm_cmds.SV_GetEntityMatrix(prog, ent, entitymatrix, false)
+		matrixlib.Matrix4x4_Concat(tagmatrix, attachmatrix, out)
+		matrixlib.Matrix4x4_Concat(out, entitymatrix, tagmatrix)
+		-- next iteration we process the parent entity
+		local tag_entity = buffer.readi32(prog.edictsfields, EOFS(prog, ent, "tag_entity"))
+		if tag_entity ~= 0 then
+			tagindex = toint(EF(prog, ent, "tag_index"))
+			ent = tag_entity -- PRVM_EDICT_NUM(PRVM_serveredictedict(ent, tag_entity))
+		else
+			break
+		end
+		attachloop += 1
+	end
+
+	-- RENDER_VIEWMODEL magic
+	local viewmodelforclient = buffer.readi32(prog.edictsfields, EOFS(prog, ent, "viewmodelforclient"))
+	if viewmodelforclient ~= 0 then
+		mcopy(tagmatrix, out)
+		ent = viewmodelforclient
+
+		svvm_cmds.SV_GetEntityMatrix(prog, ent, entitymatrix, true)
+		matrixlib.Matrix4x4_Concat(out, entitymatrix, tagmatrix)
+
+		--[[
+		// Cl_bob, ported from rendering code
+		(the C keeps this block commented out: no view bob on the server)
+		]]
+	end
+	return 0
+end
+
+local function SET_GV(prog: any, g: string, x: number, y: number, z: number) -- PRVM_serverglobalvector(g) = v
+	local o = GlobalOfs(prog, g)
+	if o >= 0 then
+		buffer.writef32(prog.globals, o * 4, x)
+		buffer.writef32(prog.globals, o * 4 + 4, y)
+		buffer.writef32(prog.globals, o * 4 + 8, z)
+	end
+end
+
+--vector(entity ent, float tagindex) gettaginfo;
+-- port: svvm_cmds.c VM_SV_gettaginfo L2597-2652 @xonotic-v0.8.6
+local function VM_SV_gettaginfo(prog: any)
+	local matrixlib = MATRIXLIB()
+	local e
+	local tagindex
+	local tag_matrix = matrixlib.new()
+	local tag_localmatrix = matrixlib.new()
+	local parentindex
+	local tagname
+	local returncode
+	local forward, left, up, origin = { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }
+	local model
+
+	SAFEPARMCOUNT(prog, 2, "VM_SV_gettaginfo")
+
+	e = G_INT(prog, OFS_PARM0) -- PRVM_G_EDICT
+	tagindex = toint(G_FLOAT(prog, OFS_PARM1))
+
+	returncode = SV_GetTagMatrix(prog, tag_matrix, e, tagindex)
+	Matrix4x4_ToVectors(tag_matrix, forward, left, up, origin)
+	SET_GV(prog, "v_forward", forward[1], forward[2], forward[3])
+	SET_GV(prog, "v_right", -left[1], -left[2], -left[3])
+	SET_GV(prog, "v_up", up[1], up[2], up[3])
+	buffer.writef32(prog.globals, OFS_RETURN * 4, origin[1])
+	buffer.writef32(prog.globals, OFS_RETURN * 4 + 4, origin[2])
+	buffer.writef32(prog.globals, OFS_RETURN * 4 + 8, origin[3])
+	model = SVMAIN().SV_GetModelFromEdict(e)
+	UpdateFrameBlend(prog, e, model)
+	local _
+	_, parentindex, tagname = SV_GetExtendedTagInfo(prog, e, tagindex, tag_localmatrix)
+	Matrix4x4_ToVectors(tag_localmatrix, forward, left, up, origin)
+
+	local gp = GlobalOfs(prog, "gettaginfo_parent")
+	if gp >= 0 then
+		buffer.writef32(prog.globals, gp * 4, parentindex)
+	end
+	local gn = GlobalOfs(prog, "gettaginfo_name")
+	if gn >= 0 then
+		buffer.writei32(prog.globals, gn * 4, if tagname then prvm_edict.PRVM_SetTempString(prog, tagname) else 0)
+	end
+	SET_GV(prog, "gettaginfo_forward", forward[1], forward[2], forward[3])
+	SET_GV(prog, "gettaginfo_right", -left[1], -left[2], -left[3])
+	SET_GV(prog, "gettaginfo_up", up[1], up[2], up[3])
+	SET_GV(prog, "gettaginfo_offset", origin[1], origin[2], origin[3])
+
+	if returncode == 1 then
+		prvm_cmds.VM_Warning(prog, "gettagindex: can't affect world entity\n")
+	elseif returncode == 2 then
+		prvm_cmds.VM_Warning(prog, "gettagindex: can't affect free entity\n")
+	elseif returncode == 3 then
+		console.Con_DPrintf("SV_GetTagMatrix(entity #%i): null or non-precached model\n", e)
+	elseif returncode == 4 then
+		console.Con_DPrintf("SV_GetTagMatrix(entity #%i): model has no tag with requested index %i\n", e, tagindex)
+	elseif returncode == 5 then
+		console.Con_DPrintf("SV_GetTagMatrix(entity #%i): runaway loop at attachment chain\n", e)
+	end
+end
+PORTED.VM_SV_gettaginfo = VM_SV_gettaginfo
+
+--void(entity clent) dropclient (DP_SV_DROPCLIENT)
+-- port: svvm_cmds.c VM_SV_dropclient L2655-2675 @xonotic-v0.8.6
+local function VM_SV_dropclient(prog: any)
+	local clientnum
+	local oldhostclient
+	local svs = svs_clients()
+	SAFEPARMCOUNT(prog, 1, "VM_SV_dropclient")
+	clientnum = G_INT(prog, OFS_PARM0) - 1 -- PRVM_G_EDICTNUM(OFS_PARM0) - 1
+	if clientnum < 0 or clientnum >= svs.maxclients then
+		prvm_cmds.VM_Warning(prog, "dropclient: not a client\n")
+		return
+	end
+	if not client_active(svs, clientnum) then
+		prvm_cmds.VM_Warning(prog, "dropclient: that client slot is not connected\n")
+		return
+	end
+	oldhostclient = server.host_client
+	server.host_client = svs.clients[clientnum]
+	HOST().SV_DropClient(false)
+	server.host_client = oldhostclient
+end
+PORTED.VM_SV_dropclient = VM_SV_dropclient
+
+--entity() spawnclient (DP_SV_BOTCLIENT)
+-- port: svvm_cmds.c VM_SV_spawnclient L2678-2699 @xonotic-v0.8.6
+-- (prog->xfunction->builtinsprofile += 2 / += 100: profiling counters, not ported)
+local function VM_SV_spawnclient(prog: any)
+	local ed
+	local svs = svs_clients()
+	SAFEPARMCOUNT(prog, 0, "VM_SV_spawnclient")
+	ed = 0 -- prog->edicts
+	for i = 0, svs.maxclients - 1 do
+		if not client_active(svs, i) then
+			SVMAIN().SV_ConnectClient(i, nil)
+			-- this has to be set or else ClientDisconnect won't be called
+			-- we assume the qc will call ClientConnect...
+			svs_client(i).clientconnectcalled = true
+			ed = i + 1 -- PRVM_EDICT_NUM(i + 1)
+			break
+		end
+	end
+	RETURN_EDICT(prog, ed)
+end
+PORTED.VM_SV_spawnclient = VM_SV_spawnclient
+
+--float(entity clent) clienttype (DP_SV_BOTCLIENT)
+-- port: svvm_cmds.c VM_SV_clienttype L2702-2715 @xonotic-v0.8.6
+local function VM_SV_clienttype(prog: any)
+	local clientnum
+	local svs = svs_clients()
+	SAFEPARMCOUNT(prog, 1, "VM_SV_clienttype")
+	clientnum = G_INT(prog, OFS_PARM0) - 1 -- PRVM_G_EDICTNUM(OFS_PARM0) - 1
+	if clientnum < 0 or clientnum >= svs.maxclients then
+		SET_G_FLOAT(prog, OFS_RETURN, 3)
+	elseif not client_active(svs, clientnum) then
+		SET_G_FLOAT(prog, OFS_RETURN, 0)
+	elseif svs.clients[clientnum].netconnection then
+		SET_G_FLOAT(prog, OFS_RETURN, 1)
+	else
+		SET_G_FLOAT(prog, OFS_RETURN, 2)
+	end
+end
+PORTED.VM_SV_clienttype = VM_SV_clienttype
+
+--#335 float(string effectname) particleeffectnum (EXT_CSQC)
+-- port: svvm_cmds.c VM_SV_particleeffectnum L2803-2811 @xonotic-v0.8.6
+local function VM_SV_particleeffectnum(prog: any)
+	local i
+	SAFEPARMCOUNT(prog, 1, "VM_SV_particleeffectnum")
+	i = SVMAIN().SV_ParticleEffectIndex(G_STRING(prog, OFS_PARM0))
+	if i == 0 then
+		i = -1
+	end
+	SET_G_FLOAT(prog, OFS_RETURN, i)
+end
+PORTED.VM_SV_particleeffectnum = VM_SV_particleeffectnum
+
+-- #336 void(entity ent, float effectnum, vector start, vector end) trailparticles (EXT_CSQC)
+-- port: svvm_cmds.c VM_SV_trailparticles L2814-2830 @xonotic-v0.8.6
+-- engine quirk kept: the `< 0` test reads PARM0 (the entity) as a float, not the effect number
+local function VM_SV_trailparticles(prog: any)
+	local sv = server.sv
+	local start, end_
+	SAFEPARMCOUNT(prog, 4, "VM_SV_trailparticles")
+
+	if toint(G_FLOAT(prog, OFS_PARM0)) < 0 then
+		return
+	end
+
+	common.MSG_WriteByte(sv.datagram, svc_trailparticles)
+	common.MSG_WriteShort(sv.datagram, G_INT(prog, OFS_PARM0)) -- PRVM_G_EDICTNUM
+	common.MSG_WriteShort(sv.datagram, toint(G_FLOAT(prog, OFS_PARM1)))
+	start = G_VECTOR(prog, OFS_PARM2)
+	end_ = G_VECTOR(prog, OFS_PARM3)
+	common.MSG_WriteVector(sv.datagram, start, sv.protocol)
+	common.MSG_WriteVector(sv.datagram, end_, sv.protocol)
+	SVMAIN().SV_FlushBroadcastMessages()
+end
+PORTED.VM_SV_trailparticles = VM_SV_trailparticles
+
+--#337 void(float effectnum, vector origin, vector dir, float count) pointparticles (EXT_CSQC)
+-- port: svvm_cmds.c VM_SV_pointparticles L2833-2864 @xonotic-v0.8.6
+local function VM_SV_pointparticles(prog: any)
+	local sv = server.sv
+	local effectnum, count
+	local org, vel
+	SAFEPARMCOUNTRANGE(prog, 4, 8, "VM_SV_pointparticles")
+
+	if toint(G_FLOAT(prog, OFS_PARM0)) < 0 then
+		return
+	end
+
+	effectnum = toint(G_FLOAT(prog, OFS_PARM0))
+	org = G_VECTOR(prog, OFS_PARM1)
+	vel = G_VECTOR(prog, OFS_PARM2)
+	count = toint(G_FLOAT(prog, OFS_PARM3))
+	count = if count >= 0 then (if count < 65535 then count else 65535) else 0 -- bound(0, count, 65535)
+	-- VectorLength2(vel): float products and sums
+	if count == 1 and R(R(R(vel[1] * vel[1]) + R(vel[2] * vel[2])) + R(vel[3] * vel[3])) == 0 then
+		-- 1+2+12=15 bytes
+		common.MSG_WriteByte(sv.datagram, svc_pointparticles1)
+		common.MSG_WriteShort(sv.datagram, effectnum)
+		common.MSG_WriteVector(sv.datagram, org, sv.protocol)
+	else
+		-- 1+2+12+12+2=29 bytes
+		common.MSG_WriteByte(sv.datagram, svc_pointparticles)
+		common.MSG_WriteShort(sv.datagram, effectnum)
+		common.MSG_WriteVector(sv.datagram, org, sv.protocol)
+		common.MSG_WriteVector(sv.datagram, vel, sv.protocol)
+		common.MSG_WriteShort(sv.datagram, count)
+	end
+
+	SVMAIN().SV_FlushBroadcastMessages()
+end
+PORTED.VM_SV_pointparticles = VM_SV_pointparticles
 
 svvm_cmds.PORTED = PORTED
 

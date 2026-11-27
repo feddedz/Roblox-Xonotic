@@ -1053,14 +1053,23 @@ prvm_edict.sv_time = function(): number
 end
 
 -- prog->ExecuteProgram (SVVM_ExecuteProgram for the server): compiled code if installed, else the interpreter
+-- (the two modules require this one: required on first use and kept, as a require() call resolves the path
+-- every time in Lune, about 0.5 ms)
+local qcrt_mod: any, prvm_exec_mod: any = nil, nil
 function prvm_edict.ExecuteProgram(prog: Prog, fnum: number, errormessage: string)
 	local p = prog :: any
 	if p.ExecuteProgram then
 		p.ExecuteProgram(prog, fnum, errormessage)
 	elseif p.aot and (p.aot[fnum] or p.aot_load) then
-		(require :: any)("./_port/qcrt").ExecuteProgram(prog, fnum, errormessage)
+		if not qcrt_mod then
+			qcrt_mod = (require :: any)("./_port/qcrt")
+		end
+		qcrt_mod.ExecuteProgram(prog, fnum, errormessage)
 	else
-		(require :: any)("./prvm_exec").PRVM_ExecuteProgram(prog, fnum, errormessage)
+		if not prvm_exec_mod then
+			prvm_exec_mod = (require :: any)("./prvm_exec")
+		end
+		prvm_exec_mod.PRVM_ExecuteProgram(prog, fnum, errormessage)
 	end
 end
 

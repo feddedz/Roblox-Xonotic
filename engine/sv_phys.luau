@@ -35,9 +35,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 	    one module-level table per C function, as in C (a nested call of the same function reuses it).
 	vec_t / prvm_vec_t are float (qtypes.h, PRVM_64 and VEC_64 off): every float result is rounded (D-004);
 	trace_t.fraction / endpos are double (collision.h) and expressions mixing them are evaluated in double.
-	NOT YET PORTED: VM_GenerateFrameGroupBlend / VM_FrameBlendFromFrameGroupBlend / VM_UpdateEdictSkeleton
-	(prvm_cmds.c; the frameblend / skeleton passed to the models is nil), SV_StartSound (sv_send.c),
-	SV_ClientThink (sv_user.c), World_Physics_Frame (world.c, ODE).
+	The frame blend / skeleton calls are engine/prvm_cmds.luau (per-edict data there), SV_StartSound is
+	engine/sv_main.luau (sv_main.c in 0.8.6), SV_ClientThink engine/sv_user.luau.
+	NOT YET PORTED: World_Physics_Frame (world.c, ODE).
 ]]
 local collision = require("./collision")
 local console = require("./console")
@@ -139,12 +139,15 @@ local function SET_GV(prog: any, g: string, x: number, y: number, z: number)
 	buffer.writef32(prog.globals, o + 8, z)
 end
 
--- VM_GenerateFrameGroupBlend + VM_FrameBlendFromFrameGroupBlend + VM_UpdateEdictSkeleton (prvm_cmds.c);
--- the frameblend and skeleton they fill stay nil (NULL) until they are ported
-local function frameblend_stub()
-	notPorted(
-		"VM_GenerateFrameGroupBlend / VM_FrameBlendFromFrameGroupBlend / VM_UpdateEdictSkeleton (prvm_cmds.c) in sv_phys.c"
-	)
+-- VM_GenerateFrameGroupBlend + VM_FrameBlendFromFrameGroupBlend(..., sv.time) + VM_UpdateEdictSkeleton
+-- (engine/prvm_cmds.luau) on ent's priv.server frame blend data, as the C does before each clip against an
+-- entity and in SV_LinkEdict; returns ent->priv.server->frameblend and &ent->priv.server->skeleton
+local function frameblend_update(prog: any, ent: number, model: any): (any, any)
+	local framegroupblend, frameblend, skeleton = prvm_cmds.EdictFrameBlend(prog, ent)
+	prvm_cmds.VM_GenerateFrameGroupBlend(prog, framegroupblend, ent)
+	prvm_cmds.VM_FrameBlendFromFrameGroupBlend(frameblend, framegroupblend, model, server.sv.time)
+	prvm_cmds.VM_UpdateEdictSkeleton(prog, ent, model, frameblend)
+	return frameblend, skeleton
 end
 
 -- port: sv_phys.c SV_GetPitchSign L47-63 @xonotic-v0.8.6 (gamemode is GAME_XONOTIC, not GAME_TENEBRAE)
@@ -366,15 +369,15 @@ function sv_phys.SV_TracePoint(
 			matrixlib.Matrix4x4_CreateTranslate(matrix, origin[1], origin[2], origin[3])
 		end
 		matrixlib.Matrix4x4_Invert_Simple(imatrix, matrix)
-		frameblend_stub()
+		local touchframeblend, touchskeleton = frameblend_update(prog, touch, model)
 		local touchmins = EV(prog, touch, "mins")
 		local touchmaxs = EV(prog, touch, "maxs")
 		if type == MOVE_MISSILE and bit32.band(toint(EF(prog, touch, "flags")), FL_MONSTER) ~= 0 then
 			collision.Collision_ClipToGenericEntity(
 				trace,
 				model,
-				nil,
-				nil,
+				touchframeblend,
+				touchskeleton,
 				touchmins,
 				touchmaxs,
 				bodysupercontents,
@@ -393,8 +396,8 @@ function sv_phys.SV_TracePoint(
 			collision.Collision_ClipPointToGenericEntity(
 				trace,
 				model,
-				nil,
-				nil,
+				touchframeblend,
+				touchskeleton,
 				touchmins,
 				touchmaxs,
 				bodysupercontents,
@@ -579,15 +582,15 @@ function sv_phys.SV_TraceLine(
 			matrixlib.Matrix4x4_CreateTranslate(matrix, origin[1], origin[2], origin[3])
 		end
 		matrixlib.Matrix4x4_Invert_Simple(imatrix, matrix)
-		frameblend_stub()
+		local touchframeblend, touchskeleton = frameblend_update(prog, touch, model)
 		local touchmins = EV(prog, touch, "mins")
 		local touchmaxs = EV(prog, touch, "maxs")
 		if type == MOVE_MISSILE and bit32.band(toint(EF(prog, touch, "flags")), FL_MONSTER) ~= 0 then
 			collision.Collision_ClipToGenericEntity(
 				trace,
 				model,
-				nil,
-				nil,
+				touchframeblend,
+				touchskeleton,
 				touchmins,
 				touchmaxs,
 				bodysupercontents,
@@ -606,8 +609,8 @@ function sv_phys.SV_TraceLine(
 			collision.Collision_ClipLineToGenericEntity(
 				trace,
 				model,
-				nil,
-				nil,
+				touchframeblend,
+				touchskeleton,
 				touchmins,
 				touchmaxs,
 				bodysupercontents,
@@ -833,15 +836,15 @@ function sv_phys.SV_TraceBox(
 			matrixlib.Matrix4x4_CreateTranslate(matrix, origin[1], origin[2], origin[3])
 		end
 		matrixlib.Matrix4x4_Invert_Simple(imatrix, matrix)
-		frameblend_stub()
+		local touchframeblend, touchskeleton = frameblend_update(prog, touch, model)
 		local touchmins = EV(prog, touch, "mins")
 		local touchmaxs = EV(prog, touch, "maxs")
 		if type == MOVE_MISSILE and bit32.band(toint(EF(prog, touch, "flags")), FL_MONSTER) ~= 0 then
 			collision.Collision_ClipToGenericEntity(
 				trace,
 				model,
-				nil,
-				nil,
+				touchframeblend,
+				touchskeleton,
 				touchmins,
 				touchmaxs,
 				bodysupercontents,
@@ -860,8 +863,8 @@ function sv_phys.SV_TraceBox(
 			collision.Collision_ClipToGenericEntity(
 				trace,
 				model,
-				nil,
-				nil,
+				touchframeblend,
+				touchskeleton,
 				touchmins,
 				touchmaxs,
 				bodysupercontents,
@@ -1144,7 +1147,7 @@ function sv_phys.SV_LinkEdict(ent: number)
 	end
 	local model = SV_GetModelByIndex(modelindex)
 
-	frameblend_stub()
+	frameblend_update(prog, ent, model)
 
 	-- set the abs box
 
@@ -1399,13 +1402,19 @@ local function classname(prog: any, ent: number): string -- PRVM_GetString(prog,
 	return prvm_edict.PRVM_GetString(prog, EI(prog, ent, "classname"))
 end
 
--- SV_StartSound (sv_send.c) is not ported yet
-local function SV_StartSound_stub(_ent: number, _channel: number, _sample: string)
-	notPorted("SV_StartSound (sv_send.c) in sv_phys.c")
+-- SV_StartSound(ent, channel, sample, 255, 1, false, 1.0f) (sv_main.c, engine/sv_main.luau); sample is a
+-- cvar's string (cvarstr gives the cvar_t string reference, or the default text when the cvar is missing)
+local function SV_StartSound_cvar(ent: number, channel: number, sample: any)
+	local s = if type(sample) == "table" then sample.str else sample
+	sv_main.SV_StartSound(ent, channel, s, 255, 1, false, 1.0)
 end
--- SV_ClientThink (sv_user.c) is not ported yet
-local function SV_ClientThink_stub()
-	notPorted("SV_ClientThink (sv_user.c) in sv_phys.c")
+-- SV_ClientThink (sv_user.c, engine/sv_user.luau; required on first use and kept: sv_user requires this module)
+local sv_user_mod: any = nil
+local function SV_ClientThink()
+	if not sv_user_mod then
+		sv_user_mod = require("./sv_user")
+	end
+	sv_user_mod.SV_ClientThink()
 end
 
 -- port: mathlib.c AngleVectorsFLU L498-550 @xonotic-v0.8.6 (belongs in engine/mathlib.luau, which lacks it;
@@ -2363,7 +2372,8 @@ function sv_phys.SV_PushMove(pusher: number, movetime: number)
 	else -- MOVETYPE_PUSH
 		numcheckentities = sv_phys.SV_EntitiesInBox(mins, maxs, MAX_EDICTS, checkentities)
 	end
-	-- Collision_ClipToGenericEntity of check against the pusher's final position (frameblend / skeleton: nil)
+	-- Collision_ClipToGenericEntity of check against the pusher's final position (with the pusher's
+	-- priv.server frameblend / skeleton as they are: the C does not regenerate them here)
 	local function cliptopusher(check: number, checkcontents: number): collision.trace_t
 		local trace = collision.newtrace()
 		local pushermins = EV(prog, pusher, "mins")
@@ -2371,12 +2381,12 @@ function sv_phys.SV_PushMove(pusher: number, movetime: number)
 		local checkorigin = EV(prog, check, "origin")
 		local checkmins = EV(prog, check, "mins")
 		local checkmaxs = EV(prog, check, "maxs")
-		frameblend_stub()
+		local _, pusherframeblend, pusherskeleton = prvm_cmds.EdictFrameBlend(prog, pusher)
 		collision.Collision_ClipToGenericEntity(
 			trace,
 			pushermodel,
-			nil,
-			nil,
+			pusherframeblend,
+			pusherskeleton,
 			pushermins,
 			pushermaxs,
 			SUPERCONTENTS_BODY,
@@ -3169,7 +3179,7 @@ function sv_phys.SV_CheckWaterTransition(ent: number)
 		-- reaches SV_StartSound
 		local wt = EF(prog, ent, "watertype")
 		if (wt == CONTENTS_WATER or wt == CONTENTS_SLIME) ~= (cont == CONTENTS_WATER or cont == CONTENTS_SLIME) then
-			SV_StartSound_stub(ent, 0, cvarstr("sv_sound_watersplash", "misc/h2ohit1.wav"))
+			SV_StartSound_cvar(ent, 0, cvarstr("sv_sound_watersplash", "misc/h2ohit1.wav"))
 		end
 	end
 
@@ -3445,7 +3455,7 @@ function sv_phys.SV_Physics_Step(ent: number)
 				else
 					-- Check for Engine Landing Sound
 					-- (engine quirk kept: sv_sound_land.string is never NULL, an empty cvar still reaches SV_StartSound)
-					SV_StartSound_stub(ent, 0, cvarstr("sv_sound_land", "demon/dland2.wav"))
+					SV_StartSound_cvar(ent, 0, cvarstr("sv_sound_land", "demon/dland2.wav"))
 				end
 			end
 			forceupdate[ent] = true
@@ -3605,7 +3615,7 @@ function sv_phys.SV_Physics_ClientMove()
 
 	-- call player physics, this needs the proper frametime
 	SET_GF(prog, "frametime", sv.frametime)
-	SV_ClientThink_stub()
+	SV_ClientThink()
 
 	-- call standard client pre-think, with frametime = 0
 	SET_GF(prog, "time", sv.time)
@@ -3653,7 +3663,7 @@ function sv_phys.SV_Physics_ClientEntity_PreThink(ent: number)
 
 	-- don't run physics here if running asynchronously
 	if (host_client.clmovement_inputtimeout or 0) <= 0 then
-		SV_ClientThink_stub()
+		SV_ClientThink()
 		--host_client->cmd.time = max(host_client->cmd.time, sv.time);
 	end
 

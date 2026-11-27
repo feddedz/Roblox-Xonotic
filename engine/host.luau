@@ -11,7 +11,10 @@ Copyright (C) 1996-1997 Id Software, Inc. (DarkPlaces host.c; GPLv2 or later, se
 	Engine commands that are not ported yet are registered as stubs that log `NOT YET PORTED: command <name>`
 	when run, so command/alias/cvar lookup order is the same as in DarkPlaces.
 	Each static `cvar_t` is available as host.cv.<C variable name> (e.g. host.cv.sv_gravity).
-	NOT YET PORTED: the frame loop (Host_Main), Host_Error, Host_Shutdown, Memory_Init_Commands' reading of
+	Also: SV_ClientPrint(f), SV_BroadcastPrint(f), Host_ClientCommands, SV_DropClient, Host_TimingReport and one
+	iteration of the Host_Main loop for a dedicated server (host.Host_Main_Frame(elapsed), see there for the parts
+	left out).
+	NOT YET PORTED: Host_Error, Host_Shutdown, Host_ShutdownServer, Memory_Init_Commands' reading of
 	/proc/meminfo (sys_memsize_* keep their registered defaults: machine-dependent in DarkPlaces too),
 	`-dedicated N` / other command-line options except -noconfig.
 ]]
@@ -22,6 +25,13 @@ local defs = require("./_port/sv_init_defs")
 local host_cmd = require("./host_cmd")
 local model_brush = require("./model_brush") -- installs the brush loader hooks of model_shared
 local model_shared = require("./model_shared")
+local common = require("./common")
+local console = require("./console")
+local libc = require("./_port/libc")
+local prvm_cmds = require("./prvm_cmds")
+local prvm_edict = require("./prvm_edict")
+local server = require("./server")
+local R = require("./_port/f32").round
 
 local host = {}
 
@@ -96,6 +106,578 @@ function host.Host_Init_Dedicated(opts: { com_argv: { string }?, maxclients: num
 		cmd.Cbuf_AddText("exec default.cfg\nexec config.cfg\nexec autoexec.cfg\nstuffcmds\n")
 		cmd.Cbuf_Execute()
 	end
+	-- (Host_Main then sets realtime = 0 and host_dirtytime = Sys_DirtyTime(): see host.Host_Main_Frame)
+	host.realtime = 0
+	host.host_dirtytime = 0
+	host.cl_timer = 0
+	host.sv_timer = 0
+	prvm_edict.realtime = 0
+	cmd.realtime = 0
+end
+
+--[[
+===============================================================================
+
+	Client messages, dropping a client and the server part of the frame loop (host.c L351-574, L654-1077).
+	host_client is server.host_client (a client_t table of host_cmd.svs.clients, see engine/sv_main.luau).
+	A client's netconnection is nil for a bot; the network parts run only with one (M6-NET).
+
+===============================================================================
+]]
+
+local MAX_INPUTLINE = 16384 -- quakedef.h L128
+
+-- sv_main / sv_phys require this module's users: required on first use and kept (a require() call resolves the
+-- path every time in Lune, about 0.5 ms)
+local lazymods: { [string]: any } = {}
+local function SVMAIN(): any
+	local m = lazymods.sv_main
+	if not m then
+		m = require("./sv_main")
+		lazymods.sv_main = m
+	end
+	return m
+end
+local function SVPHYS(): any
+	local m = lazymods.sv_phys
+	if not m then
+		m = require("./sv_phys")
+		lazymods.sv_phys = m
+	end
+	return m
+end
+
+local warned: { [string]: boolean } = {}
+local function notPorted(what: string)
+	if not warned[what] then
+		warned[what] = true
+		print("NOT YET PORTED: " .. what)
+	end
+end
+
+--[[
+=================
+SV_ClientPrint
+
+Sends text across to be displayed
+FIXME: make this just a stuffed echo?
+=================
+]]
+-- port: host.c SV_ClientPrint L359-366 @xonotic-v0.8.6
+function host.SV_ClientPrint(msg: string)
+	local host_client = server.host_client
+	if host_client.netconnection then
+		common.MSG_WriteByte(host_client.netconnection.message, 8) -- svc_print
+		common.MSG_WriteString(host_client.netconnection.message, msg)
+	end
+end
+
+--[[
+=================
+SV_ClientPrintf
+
+Sends text across to be displayed
+FIXME: make this just a stuffed echo?
+=================
+]]
+-- port: host.c SV_ClientPrintf L376-386 @xonotic-v0.8.6
+function host.SV_ClientPrintf(fmt: string, ...: any)
+	host.SV_ClientPrint(libc.snprintf(MAX_INPUTLINE, fmt, ...))
+end
+
+--[[
+=================
+SV_BroadcastPrint
+
+Sends text to all active clients
+=================
+]]
+-- port: host.c SV_BroadcastPrint L395-411 @xonotic-v0.8.6
+function host.SV_BroadcastPrint(msg: string)
+	local svs = host.svs :: any
+	for i = 0, svs.maxclients - 1 do
+		local c = svs.clients and svs.clients[i]
+		if c and c.active and c.netconnection then
+			common.MSG_WriteByte(c.netconnection.message, 8) -- svc_print
+			common.MSG_WriteString(c.netconnection.message, msg)
+		end
+	end
+
+	if host.cv.sv_echobprint.integer ~= 0 and cvar.cls_state_dedicated then
+		console.Con_Print(msg)
+	end
+end
+
+--[[
+=================
+SV_BroadcastPrintf
+
+Sends text to all active clients
+=================
+]]
+-- port: host.c SV_BroadcastPrintf L420-430 @xonotic-v0.8.6
+function host.SV_BroadcastPrintf(fmt: string, ...: any)
+	host.SV_BroadcastPrint(libc.snprintf(MAX_INPUTLINE, fmt, ...))
+end
+
+--[[
+=================
+Host_ClientCommands
+
+Send text over to the client to be executed
+=================
+]]
+-- port: host.c Host_ClientCommands L439-453 @xonotic-v0.8.6
+function host.Host_ClientCommands(fmt: string, ...: any)
+	local host_client = server.host_client
+	if not host_client.netconnection then
+		return
+	end
+
+	local s = libc.snprintf(MAX_INPUTLINE, fmt, ...)
+
+	common.MSG_WriteByte(host_client.netconnection.message, 9) -- svc_stufftext
+	common.MSG_WriteString(host_client.netconnection.message, s)
+end
+
+-- host_client - svs.clients (the 0-based slot of the client_t table)
+local function clientindex(c: any): number
+	local svs = host.svs :: any
+	for i = 0, svs.maxclients - 1 do
+		if svs.clients and svs.clients[i] == c then
+			return i
+		end
+	end
+	error("SV_DropClient: host_client is not a client slot", 0)
+end
+
+--[[
+=====================
+SV_DropClient
+
+Called when the player is getting totally kicked off the host
+if (crash = true), don't bother sending signofs
+=====================
+]]
+-- port: host.c SV_DropClient L463-574 @xonotic-v0.8.6
+function host.SV_DropClient(crash: boolean)
+	local prog: any = cvar.prvm_prog_list[0] -- SVVM_prog
+	local sv = server.sv :: any
+	local svs = host.svs :: any
+	local host_client = server.host_client
+	local sv_main = SVMAIN()
+	local i
+	console.Con_Printf('Client "%s" dropped\n', host_client.name.str)
+
+	-- SV_StopDemoRecording(host_client) (sv_demo.c: returns at once without a demo file)
+	if host_client.sv_demo_file ~= nil then
+		notPorted("SV_StopDemoRecording (sv_demo.c) in SV_DropClient")
+	end
+
+	-- make sure edict is not corrupt (from a level change for example)
+	host_client.edict = clientindex(host_client) + 1
+
+	if host_client.netconnection then
+		-- tell the client to be gone
+		if not crash then
+			-- LordHavoc: no opportunity for resending, so use unreliable 3 times
+			notPorted("NetConn_SendUnreliableMessage of svc_disconnect (netconn.c, M6-NET) in SV_DropClient")
+		end
+	end
+
+	-- call qc ClientDisconnect function
+	-- LordHavoc: don't call QC if server is dead (avoids recursive
+	-- Host_Error in some mods when they run out of edicts)
+	if host_client.clientconnectcalled and sv.active and host_client.edict then
+		-- call the prog function for removing a client
+		-- this will set the body to a dead frame, among other things
+		local selfofs = prvm_cmds.GlobalOfs(prog, "self")
+		local saveSelf = buffer.readi32(prog.globals, selfofs * 4)
+		host_client.clientconnectcalled = false
+		buffer.writef32(prog.globals, prvm_cmds.GlobalOfs(prog, "time") * 4, sv.time)
+		buffer.writei32(prog.globals, selfofs * 4, host_client.edict)
+		local _, fnum = prvm_edict.PRVM_ED_FindFunction(prog, "ClientDisconnect")
+		prvm_edict.ExecuteProgram(prog, fnum or 0, "QC function ClientDisconnect is missing")
+		buffer.writei32(prog.globals, selfofs * 4, saveSelf)
+	end
+
+	if host_client.netconnection then
+		-- break the net connection
+		notPorted("NetConn_Close (netconn.c, M6-NET) in SV_DropClient")
+		host_client.netconnection = nil
+	end
+
+	-- if a download is active, close it
+	if host_client.download_file then
+		console.Con_DPrintf("Download of %s aborted when %s dropped\n", host_client.download_name, host_client.name.str)
+		notPorted("FS_Close of a client download (M6-NET) in SV_DropClient")
+		host_client.download_file = nil
+		host_client.download_name = ""
+		host_client.download_expectedposition = 0
+		host_client.download_started = false
+	end
+
+	-- remove leaving player from scoreboard
+	host_client.name.str = ""
+	host_client.colors = 0
+	host_client.frags = 0
+	-- send notification to all clients
+	-- get number of client manually just to make sure we get it right...
+	i = clientindex(host_client)
+	common.MSG_WriteByte(sv.reliable_datagram, sv_main.svc_updatename)
+	common.MSG_WriteByte(sv.reliable_datagram, i)
+	common.MSG_WriteString(sv.reliable_datagram, host_client.name.str)
+	common.MSG_WriteByte(sv.reliable_datagram, sv_main.svc_updatecolors)
+	common.MSG_WriteByte(sv.reliable_datagram, i)
+	common.MSG_WriteByte(sv.reliable_datagram, host_client.colors)
+	common.MSG_WriteByte(sv.reliable_datagram, sv_main.svc_updatefrags)
+	common.MSG_WriteByte(sv.reliable_datagram, i)
+	common.MSG_WriteShort(sv.reliable_datagram, host_client.frags)
+
+	-- free the client now
+	-- (EntityFrame*_FreeDatabase: the entity databases are not held yet, M6-NET)
+
+	if sv.active then
+		-- clear a fields that matter to DP_SV_CLIENTNAME and DP_SV_CLIENTCOLORS, and also frags
+		prvm_edict.PRVM_ED_ClearEdict(prog, host_client.edict)
+	end
+
+	-- clear the client struct (this sets active to false)
+	sv_main.ClearClient(host_client)
+
+	-- update server listing on the master because player count changed
+	-- (which the master uses for filtering empty/full servers)
+	notPorted("NetConn_Heartbeat (netconn.c, M6-NET) in SV_DropClient")
+
+	if sv.loadgame then
+		i = 0
+		while i < svs.maxclients do
+			local c = svs.clients[i]
+			if c and c.active and not c.spawned then
+				break
+			end
+			i += 1
+		end
+		if i == svs.maxclients then
+			console.Con_Printf("Loaded game, everyone rejoined - unpausing\n")
+			sv.paused = false
+			sv.loadgame = false -- we're basically done with loading now
+		end
+	end
+end
+
+--[[
+==================
+Host_TimeReport
+
+Returns a time report string, for example for
+==================
+]]
+-- port: host.c Host_TimingReport L654-657 @xonotic-v0.8.6
+function host.Host_TimingReport(buflen: number): string
+	local svs = host.svs :: any
+	return libc.snprintf(
+		buflen,
+		"%.1f%% CPU, %.2f%% lost, offset avg %.1fms, max %.1fms, sdev %.1fms",
+		(svs.perf_cpuload or 0) * 100,
+		(svs.perf_lost or 0) * 100,
+		(svs.perf_offset_avg or 0) * 1000,
+		(svs.perf_offset_max or 0) * 1000,
+		(svs.perf_offset_sdev or 0) * 1000
+	)
+end
+
+-- Host_Main state that lives across loop iterations (host.c L669-682 locals, `double realtime` and
+-- host_dirtytime globals). Host_Init_Dedicated resets them (Host_Main: realtime = 0).
+host.realtime = 0
+host.host_dirtytime = 0
+host.cl_timer = 0
+host.sv_timer = 0
+
+local function clearperf(svs: any)
+	svs.perf_acc_realtime = 0
+	svs.perf_acc_sleeptime = 0
+	svs.perf_acc_lost = 0
+	svs.perf_acc_offset = 0
+	svs.perf_acc_offset_squared = 0
+	svs.perf_acc_offset_max = 0
+	svs.perf_acc_offset_samples = 0
+end
+
+--[[
+==================
+Host_Frame
+
+Runs all active servers
+==================
+]]
+-- port: host.c Host_Main L667-1077 @xonotic-v0.8.6
+--[[
+	One iteration of the Host_Main loop on a dedicated server (cls.state == ca_dedicated, svs.threaded false):
+	`elapsed` is the real time in seconds since the previous call (Sys_DirtyTime() - host_dirtytime in C). The
+	host (the Roblox server's Heartbeat, or a test) calls it repeatedly. Returns true when the iteration ran to
+	the end, false when C would sleep (`wait >= 1`) and `continue`: the time until the next call is that sleep.
+	Left out (OS / client / network parts, each listed):
+	  * Host_Init and setjmp(host_abortframe) / SCR_ClearLoadingScreen (a Host_Error raises a Luau error here);
+	  * Key_EventQueue_Unblock, SndSys_SendKeyEvents, Sys_SendKeyEvents (input), Host_GetConsoleCommands
+	    (Sys_ConsoleInput: there is no stdin console; the host can Cbuf_AddText), Log_DestBuffer_Flush (log file);
+	  * NetConn_UpdateSockets, NetConn_ServerFrame (reads client packets and checks client timeouts),
+	    NetConn_Heartbeat, Curl_Run: network (M6-NET), logged once;
+	  * CL_VM_PreventInformationLeaks (csqc, returns at once without a loaded csqc: a dedicated server has none);
+	  * the sleep: Sys_Sleep / NetConn_SleepMicroseconds and the perf_acc_sleeptime it measures (the caller's
+	    wait between calls is the sleep), so perf_cpuload counts no sleep;
+	  * every client operation (cls.state == ca_dedicated skips them), R_TimeReport, Mem_CheckSentinelsGlobal.
+	Sys_DirtyTime() inside the iteration (the offset statistics and the 0.1 s abort time of the server frame loop)
+	is prvm_cmds.Sys_DirtyTime(), measured from the start of the call.
+]]
+function host.Host_Main_Frame(elapsed: number): boolean
+	local svs = host.svs :: any
+	local sv = server.sv :: any
+	local Sys_DirtyTime = prvm_cmds.Sys_DirtyTime
+	local iterstart = Sys_DirtyTime() -- (C: dirtytime, sampled at the start of the iteration)
+	local olddirtytime, dirtytime, deltacleantime
+	local wait
+	local playing
+
+	olddirtytime = host.host_dirtytime
+	dirtytime = olddirtytime + elapsed
+	deltacleantime = dirtytime - olddirtytime
+	if deltacleantime < 0 then
+		-- warn if it's significant
+		if deltacleantime < -0.01 then
+			console.Con_Printf(
+				"Host_Mingled: time stepped backwards (went from %f to %f, difference %f)\n",
+				olddirtytime,
+				dirtytime,
+				deltacleantime
+			)
+		end
+		deltacleantime = 0
+	elseif deltacleantime >= 1800 then
+		console.Con_Printf(
+			"Host_Mingled: time stepped forward (went from %f to %f, difference %f)\n",
+			olddirtytime,
+			dirtytime,
+			deltacleantime
+		)
+		deltacleantime = 0
+	end
+	host.realtime += deltacleantime
+	host.host_dirtytime = dirtytime
+	-- (the modules that read realtime)
+	prvm_edict.realtime = host.realtime
+	cmd.realtime = host.realtime
+
+	host.cl_timer += deltacleantime
+	host.sv_timer += deltacleantime
+
+	-- if (!svs.threaded)
+	do
+		if svs.perf_acc_realtime == nil then
+			clearperf(svs)
+		end
+		svs.perf_acc_realtime += deltacleantime
+
+		-- Look for clients who have spawned
+		playing = false
+		for i = 0, svs.maxclients - 1 do
+			local c = svs.clients and svs.clients[i]
+			if c and c.begun then
+				if c.netconnection then
+					playing = true
+				end
+			end
+		end
+		if sv.time < 10 then
+			-- don't accumulate time for the first 10 seconds of a match
+			-- so things can settle
+			clearperf(svs)
+		elseif svs.perf_acc_realtime > 5 then
+			svs.perf_cpuload = 1 - svs.perf_acc_sleeptime / svs.perf_acc_realtime
+			svs.perf_lost = svs.perf_acc_lost / svs.perf_acc_realtime
+			if svs.perf_acc_offset_samples > 0 then
+				svs.perf_offset_max = svs.perf_acc_offset_max
+				svs.perf_offset_avg = svs.perf_acc_offset / svs.perf_acc_offset_samples
+				svs.perf_offset_sdev = math.sqrt(
+					svs.perf_acc_offset_squared / svs.perf_acc_offset_samples
+						- svs.perf_offset_avg * svs.perf_offset_avg
+				)
+			end
+			if svs.perf_lost > 0 and host.cv.developer_extra.integer ~= 0 then
+				if playing then -- only complain if anyone is looking
+					console.Con_DPrintf("Server can't keep up: %s\n", host.Host_TimingReport(1024))
+				end
+			end
+			clearperf(svs)
+		end
+	end
+
+	if host.cv.slowmo.value < 0.00001 and host.cv.slowmo.value ~= 0 then
+		cvar.Cvar_SetValue("slowmo", 0)
+	end
+	if host.cv.host_framerate.value < 0.00001 and host.cv.host_framerate.value ~= 0 then
+		cvar.Cvar_SetValue("host_framerate", 0)
+	end
+
+	-- keep the random time dependent, but not when playing demos/benchmarking
+	if host.cv.sv_random_seed.string.str == "" then -- (!cls.demoplayback: a dedicated server plays no demo)
+		libc.rand()
+	end
+
+	-- get new key events (Key_EventQueue_Unblock, SndSys_SendKeyEvents, Sys_SendKeyEvents: no input here)
+
+	-- NetConn_UpdateSockets(); Log_DestBuffer_Flush();
+
+	-- receive packets on each main loop iteration, as the main loop may
+	-- be undersleeping due to select() detecting a new packet
+	if sv.active then
+		notPorted("NetConn_ServerFrame (netconn.c: client packets, connection timeouts, M6-NET) in Host_Main")
+	end
+
+	-- Curl_Run();
+
+	-- check for commands typed to the host (Host_GetConsoleCommands: no stdin console)
+
+	-- when a server is running we only execute console commands on server frames
+	-- (this mainly allows frikbot .way config files to work properly by staying in sync with the server qc)
+	-- otherwise we execute them on client frames
+	if if sv.active then host.sv_timer > 0 else host.cl_timer > 0 then
+		-- process console commands
+		-- CL_VM_PreventInformationLeaks(); (no csqc on a dedicated server)
+		cmd.Cbuf_Frame()
+	end
+
+	-- if the accumulators haven't become positive yet, wait a while
+	wait = host.sv_timer * -1000000.0 -- (cls.state == ca_dedicated)
+
+	if wait >= 1 then -- (!cls.timedemo)
+		-- (Sys_Sleep((int)wait): the caller waits until its next call)
+		return false
+	end
+
+	-- limit the frametime steps to no more than 100ms each
+	if host.cl_timer > 0.1 then
+		host.cl_timer = 0.1
+	end
+	if host.sv_timer > 0.1 then
+		svs.perf_acc_lost += (host.sv_timer - 0.1)
+		host.sv_timer = 0.1
+	end
+
+	--	R_TimeReport("---");
+
+	--------------------
+	--
+	-- server operations
+	--
+	--------------------
+
+	-- limit the frametime steps to no more than 100ms each
+	if sv.active and host.sv_timer > 0 then
+		-- execute one or more server frames, with an upper limit on how much
+		-- execution time to spend on server frames to avoid freezing the game if
+		-- the server is overloaded, this execution time limit means the game will
+		-- slow down if the server is taking too long.
+		local framecount, framelimit = 0, 1
+		local advancetime, aborttime = 0, 0
+		local offset
+		local prog: any = cvar.prvm_prog_list[0] -- SVVM_prog
+
+		-- run the world state
+		-- don't allow simulation to run too fast or too slow or logic glitches can occur
+
+		-- stop running server frames if the wall time reaches this value
+		if host.cv.sys_ticrate.value <= 0 then
+			advancetime = host.sv_timer
+		-- (cl.islocalgame && !sv_fixedframeratesingleplayer.integer: a dedicated server is never a local game)
+		else
+			advancetime = host.cv.sys_ticrate.value
+			-- listen servers can run multiple server frames per client frame
+			framelimit = host.cv.cl_maxphysicsframesperserverframe.integer
+			aborttime = Sys_DirtyTime() + 0.1
+		end
+		local slowmo = host.cv.slowmo.value
+		if slowmo > 0 and slowmo < 1 then
+			advancetime = if advancetime < 0.1 / slowmo then advancetime else 0.1 / slowmo
+		else
+			advancetime = if advancetime < 0.1 then advancetime else 0.1
+		end
+
+		if advancetime > 0 then
+			-- float offset
+			offset = R(Sys_DirtyTime() - iterstart)
+			if offset < 0 or offset >= 1800 then
+				offset = 0
+			end
+			offset = R(offset + host.sv_timer)
+			svs.perf_acc_offset_samples += 1
+			svs.perf_acc_offset += offset
+			svs.perf_acc_offset_squared += R(offset * offset)
+			if svs.perf_acc_offset_max < offset then
+				svs.perf_acc_offset_max = offset
+			end
+		end
+
+		-- only advance time if not paused
+		-- the game also pauses in singleplayer when menu or console is used
+		sv.frametime = advancetime * slowmo
+		if host.cv.host_framerate.value ~= 0 then
+			sv.frametime = host.cv.host_framerate.value
+		end
+		if sv.paused then -- (|| cl.islocalgame && ...: never on a dedicated server)
+			sv.frametime = 0
+		end
+
+		local SV_Physics = SVPHYS().SV_Physics
+		while framecount < framelimit and host.sv_timer > 0 do
+			host.sv_timer -= advancetime
+
+			-- move things around and think unless paused
+			if sv.frametime ~= 0 then
+				SV_Physics()
+			end
+
+			-- if this server frame took too long, break out of the loop
+			if framelimit > 1 and Sys_DirtyTime() >= aborttime then
+				break
+			end
+			framecount += 1
+		end
+		--	R_TimeReport("serverphysics");
+
+		-- send all messages to the clients
+		SVMAIN().SV_SendClientMessages()
+
+		if sv.paused and host.realtime > sv.pausedstart and sv.pausedstart > 0 then
+			buffer.writef32(prog.globals, 4 * 4, host.realtime - sv.pausedstart) -- prog->globals.fp[OFS_PARM0]
+			buffer.writef32(prog.globals, prvm_cmds.GlobalOfs(prog, "time") * 4, sv.time)
+			local _, fnum = prvm_edict.PRVM_ED_FindFunction(prog, "SV_PausedTic")
+			prvm_edict.ExecuteProgram(prog, fnum or 0, "QC function SV_PausedTic is missing")
+		end
+
+		-- send an heartbeat if enough time has passed since the last one
+		notPorted("NetConn_Heartbeat (netconn.c, M6-NET) in Host_Main")
+		--	R_TimeReport("servernetwork");
+	end
+
+	--------------------
+	--
+	-- client operations
+	--
+	--------------------
+	-- (cls.state == ca_dedicated: none)
+
+	-- if there is some time remaining from this frame, reset the timers
+	if host.cl_timer >= 0 then
+		host.cl_timer = 0
+	end
+	if host.sv_timer >= 0 then
+		svs.perf_acc_lost += host.sv_timer
+		host.sv_timer = 0
+	end
+
+	cmd.host_framecount += 1
+	return true
 end
 
 return host
