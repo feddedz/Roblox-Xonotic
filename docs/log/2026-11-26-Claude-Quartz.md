@@ -157,11 +157,39 @@ None new. (sv.models uses the C index directly, matching model_precache; noted i
   prvm_cmds.time() hook (worldspawn formats strftime / gettime values, which shifted temp-string offsets).
 - Not checked against the C build: registry, SV_SpawnServer, getsurface*, Write*, the tag / frame builtins.
 
+## Part 6 (2026-11-27): M4-CLIENT -- a bot match runs
+- PR 15 merged. M4-CLIENT claimed on main. Branch M4-CLIENT-bots, one Opus sub-agent (interrupted by an app
+  restart, resumed from its transcript).
+- engine/sv_main.luau: SV_ConnectClient, SV_StartSound / SV_StartPointSound / SV_StartParticle /
+  SV_StartEffect (in sv_main.c in 0.8.6), SV_CleanupEnts, SV_FlushBroadcastMessages,
+  SV_UpdateToReliableMessages, SV_SendClientMessages, SV_ParticleEffectIndex, SV_SaveSpawnparms, client_t.
+  engine/host.luau: SV_ClientPrint(f), SV_BroadcastPrint(f), Host_ClientCommands, SV_DropClient, and
+  **host.Host_Main_Frame(elapsed)** = one iteration of Host_Main on a dedicated server (what the Roblox server
+  will call from Heartbeat). engine/sv_user.luau (new): SV_ClientThink, SV_ApplyClientMove.
+  engine/prvm_cmds.luau: VM_GenerateFrameGroupBlend, VM_FrameBlendFromFrameGroupBlend, VM_UpdateEdictSkeleton,
+  VM_RemoveEdictSkeleton (sv_phys.luau now passes the real frameblend / skeleton). engine/svvm_cmds.luau:
+  sprint, centerprint, particle, sound, pointsound, checkpvs, stuffcmd, setspawnparms, setcolor,
+  clientcommand, gettaginfo, dropclient, spawnclient, clienttype, particleeffectnum, trailparticles,
+  pointparticles. engine/model_brush.luau: Mod_Q1BSP_BoxTouchingPVS, Mod_Q1BSP_GetPVS.
+- **tests/integration/sv_botmatch.test.luau:** `map stormkeep`, 4 bots (serverbench.cfg cvars,
+  sv_random_seed 12345), 3,000 host frames at sys_ticrate: no QC error, no engine error, no builtin hit as
+  a stub. Bots travel about 27,000-31,000 units each, 0 of 1,137 position checks in solid or outside the
+  world, kills and deaths happen, 1,210 entities spawned / 1,469 removed. BOTMATCH_FRAMES overrides the count.
+- Speed: 18.4 ms per frame on average (median 14.6, one unexplained 1 s spike) for 4 bots on stormkeep in
+  Lune. Before: 113 ms, because Lune resolves the path on every require() call inside hot functions
+  (G-059): modules are now required once on first use. Now QC dominates (StartFrame 4.5 ms, EndFrame 2.5,
+  PlayerPreThink 1.9, SV_PlayerPhysics 1.2), then the SV_Physics_Entity loop over ~4,200 edicts (3 ms).
+- Fix: VM_SV_ambientsound rounds the float products before the int cast (svvm_cmds.c L502-503).
+- All C reference tests still pass (sv_phys_ref, sv_phys_movers_ref, sv_move_ref ...). Not checked against
+  the C build: the client / host-frame code and the new builtins; the bot match itself has no C reference
+  (M4's goal "bot match frame-diff" needs REF-DP: the same seed in the real engine, edict states per frame).
+
 ## Next step
-1. gettaginfo #452 and the skel_* builtins (model_alias exports what they need), SV_StartSound and the other
-   builtins still stubbed: run a bot match's worth of frames with `onStub` to list them.
-2. Clients: sv_user.c (SV_ClientThink, user commands, player physics hooks), SV_ConnectClient / spawn of a
-   bot or local player, the host frame loop (Host_Main / SV_Frame) -- then a player walks on the map.
-3. C reference for the registry / SV_SpawnServer / setmodel / getsurface* / Write* where feasible.
-4. Mod_PSKMODEL_Load, the SSE skeletal path, OBJ loader, Mod_Q3BSP_LoadLightmaps; tokenizer speed, BIH leaf
-   memory, cached field offsets; compress the big vectors.
+1. A first picture in Studio (M5): the loaded map + entity models drawn in Roblox from the running server
+   state (Rojo sync of engine/ + platform/, a platform VFS provider and host loop on Heartbeat). Needs
+   M1-RTVFS (game data inside Roblox), the mesh route (EditableMesh, G-021) and texture_assets.luau.
+2. Networking (M6): netconn / protocol so a real player's client connects (SV_SendServerinfo,
+   SV_WriteEntitiesToClient, csqc entities), then cl_* and CSQC for the client side.
+3. Bot match frame-diff against the real engine (REF-DP) once a reference DarkPlaces run is available.
+4. C reference for the registry / SV_SpawnServer / getsurface* / Write* / client code where feasible;
+   Mod_PSKMODEL_Load, SSE skeletal path, OBJ loader, lightmaps; frame-time work (QC AOT speed, edict loop).

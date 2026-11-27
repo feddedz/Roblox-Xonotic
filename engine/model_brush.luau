@@ -42,7 +42,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 	Textures go through model_shared.Mod_LoadTextureFromQ3Shader (scripts/*.shader through engine/fs.luau: set
 	the VFS provider before loading a map, or every texture takes the no-shader path).
 	NOT YET PORTED (each logs once when reached): Mod_Q3BSP_LoadLightmaps and the lightmap parts of
-	Mod_Q3BSP_LoadFaces (surfaces load as on a dedicated server), Mod_Q1BSP_MakePortals, Mod_Q1BSP_CreateShadowMesh, the PVS / light-point functions, the Q1 / Q2 /
+	Mod_Q3BSP_LoadFaces (surfaces load as on a dedicated server), Mod_Q1BSP_MakePortals, Mod_Q1BSP_CreateShadowMesh, the PVS functions except Mod_Q1BSP_GetPVS / Mod_Q1BSP_BoxTouchingPVS, the light-point functions, the Q1 / Q2 /
 	HL BSP and OBJ loaders, Mod_BrushInit (cvar registration: the cvars are read with their defaults).
 ]]
 local bih = require("./bih")
@@ -2012,6 +2012,96 @@ local function BoxOnPlaneSide(emins: { number }, emaxs: { number }, p: mplane_t)
 end
 model_brush.BoxOnPlaneSide = BoxOnPlaneSide
 
+--[[
+	PVS queries (model_brush.c, used by the Q1 / Q3 BSP models). A `const unsigned char *pvs` pointer into
+	data_pvsclusters (or another byte buffer) is the pair (buffer, byte offset); GetPVS returns nil for NULL.
+	model->brushq1.hulls[0].firstclipnode is 0 for a Q3 BSP (never set by Mod_Q3BSP_Load): data_nodes[1].
+]]
+local function firstclipnode(model: any): any
+	local hulls = model.brushq1 and model.brushq1.hulls
+	local first = if hulls and hulls[1] then hulls[1].firstclipnode or 0 else 0
+	return model.brush.data_nodes[first + 1]
+end
+
+-- port: model_brush.c Mod_Q1BSP_BoxTouchingPVS L246-315 @xonotic-v0.8.6 (the #if 1 branch)
+local function Mod_Q1BSP_BoxTouchingPVS(
+	model: any,
+	pvs: buffer,
+	pvsofs: number,
+	mins: { number },
+	maxs: { number }
+): number
+	local nodestackindex = 0
+	local node: any
+	local nodestack: { any } = {}
+	if (model.brush.num_pvsclusters or 0) == 0 then
+		return 1 -- true
+	end
+	node = firstclipnode(model)
+	while true do
+		if node.plane then
+			-- node - recurse down the BSP tree
+			local sides = BoxOnPlaneSide(mins, maxs, node.plane)
+			if sides < 3 then
+				if sides == 0 then
+					return -1 -- ERROR: NAN bounding box!
+				end
+				-- box is on one side of plane, take that path
+				node = node.children[sides]
+			else
+				-- box crosses plane, take one path and remember the other
+				if nodestackindex < 1024 then
+					nodestackindex += 1
+					nodestack[nodestackindex] = node.children[1]
+				end
+				node = node.children[2]
+			end
+			continue
+		else
+			-- leaf - check cluster bit
+			local clusterindex = node.clusterindex
+			-- CHECKPVSBIT(pvs, clusterindex)
+			if
+				clusterindex >= 0
+				and bit32.band(
+						buffer.readu8(pvs, pvsofs + bit32.rshift(clusterindex, 3)),
+						bit32.lshift(1, bit32.band(clusterindex, 7))
+					)
+					~= 0
+			then
+				-- it is visible, return immediately with the news
+				return 1 -- true
+			end
+		end
+		-- nothing to see here, try another path we didn't take earlier
+		if nodestackindex == 0 then
+			break
+		end
+		node = nodestack[nodestackindex]
+		nodestackindex -= 1
+	end
+	-- it is not visible
+	return 0 -- false
+end
+model_brush.Mod_Q1BSP_BoxTouchingPVS = Mod_Q1BSP_BoxTouchingPVS
+
+-- port: model_brush.c Mod_Q1BSP_GetPVS L3767-3777 @xonotic-v0.8.6 (returns buffer, offset or nil)
+local function Mod_Q1BSP_GetPVS(model: any, p: { number }): (buffer?, number)
+	local node = firstclipnode(model)
+	while node.plane do
+		local plane = node.plane
+		local n = plane.normal
+		local d = if plane.type < 3 then p[plane.type + 1] else R(R(R(p[1] * n[1]) + R(p[2] * n[2])) + R(p[3] * n[3]))
+		node = node.children[if d < plane.dist then 2 else 1]
+	end
+	if node.clusterindex >= 0 then
+		return model.brush.data_pvsclusters, node.clusterindex * model.brush.num_pvsclusterbytes
+	else
+		return nil, 0
+	end
+end
+model_brush.Mod_Q1BSP_GetPVS = Mod_Q1BSP_GetPVS
+
 -- port: model_brush.c Mod_Q3BSP_TraceLineOfSight_RecursiveNodeCheck L6800-6860 @xonotic-v0.8.6
 -- (p1, p2, endpos are double[3]: no float rounding)
 local function Mod_Q3BSP_TraceLineOfSight_RecursiveNodeCheck(
@@ -3843,7 +3933,10 @@ local function Mod_Q3BSP_Load(mod: dp_model_t, data: string)
 	mod.PointSuperContents = Mod_Q3BSP_PointSuperContents
 	mod.TraceLineAgainstSurfaces = Mod_CollisionBIH_TraceLine
 	mod.brush.TraceLineOfSight = Mod_Q3BSP_TraceLineOfSight
-	-- mod->brush.GetPVS ... mod->DrawLight (function pointers): PVS, light point and drawing are NOT YET PORTED
+	mod.brush.GetPVS = Mod_Q1BSP_GetPVS
+	mod.brush.BoxTouchingPVS = Mod_Q1BSP_BoxTouchingPVS
+	-- mod->brush.FatPVS, BoxTouchingLeafPVS, BoxTouchingVisibleLeafs, FindBoxClusters, LightPoint,
+	-- FindNonSolidLocation, PointInLeaf, mod->Draw ... DrawLight (function pointers): NOT YET PORTED (nil)
 	mod.brush.SuperContentsFromNativeContents = Mod_Q3BSP_SuperContentsFromNativeContents
 	mod.brush.NativeContentsFromSuperContents = Mod_Q3BSP_NativeContentsFromSuperContents
 

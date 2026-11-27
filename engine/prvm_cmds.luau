@@ -73,6 +73,252 @@ function prvm_cmds.VM_CheckEmptyString(prog: any, s: string)
 	end
 end
 
+--[[
+	Frame blends and edict skeletons (prvm_cmds.c L61-231). The per-edict private data they fill
+	(ed->priv.server->framegroupblend[MAX_FRAMEGROUPBLENDS], frameblend[MAX_FRAMEBLENDS], skeleton) is held per prog:
+	prog.ed_framegroupblend[e] = 4 x { frame, lerp, start } (C element i at [i + 1]), prog.ed_frameblend[e] = the
+	frameblend_t array of engine/model_alias.luau (8 x { subframe, lerp }), prog.ed_skeleton[e] = skeleton_t
+	{ model, relativetransforms } (relativetransforms nil = NULL). prvm_cmds.EdictFrameBlend returns the three of
+	an edict (created zeroed on first use, as the zeroed priv memory). prog.skeletons[i] (0-based, nil = NULL) are
+	the skeleton objects of the skel_* builtins.
+]]
+local MAX_FRAMEGROUPBLENDS = 4 -- protocol.h L349
+local MAX_FRAMEBLENDS = MAX_FRAMEGROUPBLENDS * 2 -- client.h L480
+local MAX_EDICTS = 32768 -- quakedef.h
+
+-- port support: the priv.server frame blend data of edict e (see above)
+function prvm_cmds.EdictFrameBlend(prog: any, e: number): (any, any, any)
+	local fgbs = prog.ed_framegroupblend
+	if not fgbs then
+		fgbs = {}
+		prog.ed_framegroupblend = fgbs
+		prog.ed_frameblend = {}
+		prog.ed_skeleton = {}
+	end
+	local fgb = fgbs[e]
+	if not fgb then
+		fgb = table.create(MAX_FRAMEGROUPBLENDS)
+		for i = 1, MAX_FRAMEGROUPBLENDS do
+			fgb[i] = { frame = 0, lerp = 0, start = 0 }
+		end
+		fgbs[e] = fgb
+		local fb = table.create(MAX_FRAMEBLENDS)
+		for i = 1, MAX_FRAMEBLENDS do
+			fb[i] = { subframe = 0, lerp = 0 }
+		end
+		prog.ed_frameblend[e] = fb
+		prog.ed_skeleton[e] = { model = nil, relativetransforms = nil }
+	end
+	return fgb, prog.ed_frameblend[e], prog.ed_skeleton[e]
+end
+
+-- PRVM_gameedictfloat(ed, name) (0 when the progs lack the field)
+local function edfloat(prog: any, base: number, name: string): number
+	local o = prvm_edict.FieldOfs(prog, name)
+	if o < 0 then
+		return 0
+	end
+	return buffer.readf32(prog.edictsfields, (base + o) * 4)
+end
+
+-- port: prvm_cmds.c VM_GenerateFrameGroupBlend L61-85 @xonotic-v0.8.6
+function prvm_cmds.VM_GenerateFrameGroupBlend(prog: any, framegroupblend: any, ed: number)
+	local R = f32.round
+	local base = ed * prog.entityfields
+	-- self.frame is the interpolation target (new frame)
+	-- self.frame1time is the animation base time for the interpolation target
+	-- self.frame2 is the interpolation start (previous frame)
+	-- self.frame2time is the animation base time for the interpolation start
+	-- self.lerpfrac is the interpolation strength for self.frame2
+	-- self.lerpfrac3 is the interpolation strength for self.frame3
+	-- self.lerpfrac4 is the interpolation strength for self.frame4
+	-- pitch angle on a player model where the animator set up 5 sets of
+	-- animations and the csqc simply lerps between sets)
+	framegroupblend[1].frame = libc.toint(edfloat(prog, base, "frame"))
+	framegroupblend[2].frame = libc.toint(edfloat(prog, base, "frame2"))
+	framegroupblend[3].frame = libc.toint(edfloat(prog, base, "frame3"))
+	framegroupblend[4].frame = libc.toint(edfloat(prog, base, "frame4"))
+	framegroupblend[1].start = edfloat(prog, base, "frame1time") -- (double start = float field: exact)
+	framegroupblend[2].start = edfloat(prog, base, "frame2time")
+	framegroupblend[3].start = edfloat(prog, base, "frame3time")
+	framegroupblend[4].start = edfloat(prog, base, "frame4time")
+	framegroupblend[2].lerp = edfloat(prog, base, "lerpfrac")
+	framegroupblend[3].lerp = edfloat(prog, base, "lerpfrac3")
+	framegroupblend[4].lerp = edfloat(prog, base, "lerpfrac4")
+	-- assume that the (missing) lerpfrac1 is whatever remains after lerpfrac2+lerpfrac3+lerpfrac4 are summed
+	framegroupblend[1].lerp = R(R(R(1 - framegroupblend[2].lerp) - framegroupblend[3].lerp) - framegroupblend[4].lerp)
+end
+
+-- r_lerpmodels / r_lerpsprites (gl_rmain.c) are registered by the renderer only: on a dedicated server the
+-- static cvar_t was never registered and its .integer is 0 (Cvar_RegisterVariable parses the default string),
+-- so nolerp is true there. Engine behaviour kept: a dedicated server never blends between frames here.
+local function cvar_integer_unregistered0(name: string): number
+	local c = cvar.Cvar_FindVar(name)
+	return if c then c.integer else 0
+end
+
+-- LordHavoc: quite tempting to break apart this function to reuse the
+--            duplicated code, but I suspect it is better for performance
+--            this way
+-- port: prvm_cmds.c VM_FrameBlendFromFrameGroupBlend L90-189 @xonotic-v0.8.6
+-- (curtime is a double; blend[i].lerp is a float: each += is rounded)
+function prvm_cmds.VM_FrameBlendFromFrameGroupBlend(frameblend: any, framegroupblend: any, model: any, curtime: number)
+	local R = f32.round
+	local sub2, numframes, f
+	local isfirstframegroup = true
+	local nolerp
+	local sublerp, lerp, d
+	local scene
+	local blend = frameblend
+
+	for i = 1, MAX_FRAMEBLENDS do
+		blend[i].subframe = 0
+		blend[i].lerp = 0
+	end
+
+	-- rpolzer: Not testing isanimated here - a model might have
+	-- "animations" that move no vertices (but only bones), thus rendering
+	-- may assume it's not animated while processing can't.
+	if not model then
+		blend[1].lerp = 1
+		return
+	end
+
+	nolerp = if model.type == "mod_sprite"
+		then cvar_integer_unregistered0("r_lerpsprites") == 0
+		else cvar_integer_unregistered0("r_lerpmodels") == 0
+	numframes = model.numframes or 0
+	for k = 1, MAX_FRAMEGROUPBLENDS do
+		local g = framegroupblend[k]
+		f = g.frame
+		if f < 0 or f >= numframes then -- (unsigned int)f >= (unsigned int)numframes
+			if cvar_integer_unregistered0("developer_extra") ~= 0 then
+				console.Con_DPrintf("VM_FrameBlendFromFrameGroupBlend: no such frame %d in model %s\n", f, model.name)
+			end
+			f = 0
+		end
+		lerp = g.lerp
+		d = lerp
+		if lerp <= 0 then
+			continue
+		end
+		if nolerp then
+			if isfirstframegroup then
+				lerp = 1
+				d = 1
+				isfirstframegroup = false
+			else
+				continue
+			end
+		end
+		if model.animscenes then
+			scene = model.animscenes[f + 1]
+			f = scene.firstframe
+			if scene.framecount > 1 then
+				-- this code path is only used on .zym models and torches
+				sublerp = scene.framerate * (curtime - g.start)
+				f = libc.toint(math.floor(sublerp))
+				sublerp -= f
+				sub2 = f + 1
+				if sublerp < (1.0 / 65536.0) then
+					sublerp = 0
+				end
+				if sublerp > R(65535.0 / 65536.0) then
+					sublerp = 1
+				end
+				if nolerp then
+					sublerp = 0
+				end
+				if scene.loop then
+					-- (C % truncates toward zero)
+					f = math.sign(f) * (math.abs(f) % scene.framecount)
+					sub2 = math.sign(sub2) * (math.abs(sub2) % scene.framecount)
+				end
+				-- bound(0, x, framecount - 1)
+				f = (if f < 0 then 0 elseif f > scene.framecount - 1 then scene.framecount - 1 else f)
+					+ scene.firstframe
+				sub2 = (if sub2 < 0 then 0 elseif sub2 > scene.framecount - 1 then scene.framecount - 1 else sub2)
+					+ scene.firstframe
+				d = sublerp * lerp
+				-- two framelerps produced from one animation
+				if d > 0 then
+					for i = 1, MAX_FRAMEBLENDS do
+						if blend[i].lerp <= 0 or blend[i].subframe == sub2 then
+							blend[i].subframe = sub2
+							blend[i].lerp = R(blend[i].lerp + d)
+							break
+						end
+					end
+				end
+				d = (1 - sublerp) * lerp
+			end
+		end
+		if d > 0 then
+			for i = 1, MAX_FRAMEBLENDS do
+				if blend[i].lerp <= 0 or blend[i].subframe == f then
+					blend[i].subframe = f
+					blend[i].lerp = R(blend[i].lerp + d)
+					break
+				end
+			end
+		end
+	end
+end
+
+-- port: prvm_cmds.c VM_UpdateEdictSkeleton L191-224 @xonotic-v0.8.6
+function prvm_cmds.VM_UpdateEdictSkeleton(prog: any, ed: number, edmodel: any, _frameblend: any)
+	local _, _, edskeleton = prvm_cmds.EdictFrameBlend(prog, ed)
+	if edskeleton.model ~= edmodel then
+		prvm_cmds.VM_RemoveEdictSkeleton(prog, ed)
+		edskeleton.model = edmodel
+	end
+	if not edskeleton.model or (edskeleton.model.num_bones or 0) == 0 then
+		-- Mem_Free(relativetransforms)
+		edskeleton.relativetransforms = nil
+		return
+	end
+
+	do
+		local skeletonindex = -1
+		local skeleton
+		skeletonindex = libc.toint(edfloat(prog, ed * prog.entityfields, "skeletonindex")) - 1
+		skeleton = if skeletonindex >= 0
+				and skeletonindex < MAX_EDICTS
+				and prog.skeletons
+			then prog.skeletons[skeletonindex]
+			else nil
+		if skeleton and skeleton.model.num_bones == edskeleton.model.num_bones then
+			-- custom skeleton controlled by the game (FTE_CSQC_SKELETONOBJECTS)
+			if not edskeleton.relativetransforms then
+				edskeleton.relativetransforms = table.create(edskeleton.model.num_bones)
+				for i = 1, edskeleton.model.num_bones do
+					edskeleton.relativetransforms[i] = matrixlib.new()
+				end
+			end
+			-- memcpy(relativetransforms, skeleton->relativetransforms, num_bones * sizeof(matrix4x4_t))
+			for i = 1, edskeleton.model.num_bones do
+				local src, dst = skeleton.relativetransforms[i], edskeleton.relativetransforms[i]
+				for k = 1, 4 do
+					for j = 1, 4 do
+						dst.m[k][j] = src.m[k][j]
+					end
+				end
+			end
+		else
+			-- Mem_Free(relativetransforms)
+			edskeleton.relativetransforms = nil
+		end
+	end
+end
+
+-- port: prvm_cmds.c VM_RemoveEdictSkeleton L226-231 @xonotic-v0.8.6
+function prvm_cmds.VM_RemoveEdictSkeleton(prog: any, ed: number)
+	local _, _, edskeleton = prvm_cmds.EdictFrameBlend(prog, ed)
+	-- Mem_Free(relativetransforms); memset(&skeleton, 0, sizeof(skeleton))
+	edskeleton.relativetransforms = nil
+	edskeleton.model = nil
+end
+
 -- port: prvm_cmds.c VM_VarString L239-253 @xonotic-v0.8.6
 function prvm_cmds.VM_VarString(prog: any, first: number, outlength: number): string
 	local parts = {}
@@ -2556,9 +2802,8 @@ function prvm_cmds.VM_callfunction(prog: any)
 		prog.argc -= 1
 		local exec = prog.ExecuteProgram
 		if not exec then
-			exec = if prog.aot and (prog.aot[fnum] or prog.aot_load)
-				then require("./_port/qcrt").ExecuteProgram
-				else require("./prvm_exec").PRVM_ExecuteProgram
+			-- prvm_edict.ExecuteProgram dispatches like this (and keeps the two modules)
+			exec = prvm_edict.ExecuteProgram
 		end
 		exec(prog, fnum, "")
 		prog.argc += 1
@@ -2997,10 +3242,15 @@ local function vec3at(b: buffer, i: number): { number }
 	return { readf32(b, 12 * i), readf32(b, 12 * i + 4), readf32(b, 12 * i + 8) }
 end
 
+local lazy_sv_main: any, lazy_svvm_cmds: any = nil, nil
+
 -- port: prvm_cmds.c getmodel L6832-6840 @xonotic-v0.8.6
 local function getmodel(prog: any, ed: number): any
 	if prog == cvar.prvm_prog_list[0] then -- SVVM_prog
-		return require("./sv_main").SV_GetModelFromEdict(ed) -- sv_main -> svvm_cmds -> this module
+		if not lazy_sv_main then
+			lazy_sv_main = require("./sv_main") -- sv_main -> svvm_cmds -> this module (kept: require() is slow)
+		end
+		return lazy_sv_main.SV_GetModelFromEdict(ed)
 	elseif prog == cvar.prvm_prog_list[1] then -- CLVM_prog
 		NOT_YET_PORTED("CL_GetModelFromEdict (cl_main.c) in prvm_cmds.c getmodel")
 		return nil
@@ -3072,7 +3322,10 @@ end
 -- port: prvm_cmds.c getmatrix L6927-6935 @xonotic-v0.8.6
 local function getmatrix(prog: any, ed: number, out: any)
 	if prog == cvar.prvm_prog_list[0] then -- SVVM_prog
-		require("./svvm_cmds").SV_GetEntityMatrix(prog, ed, out, false) -- svvm_cmds requires this module
+		if not lazy_svvm_cmds then
+			lazy_svvm_cmds = require("./svvm_cmds") -- svvm_cmds requires this module (kept: require() is slow)
+		end
+		lazy_svvm_cmds.SV_GetEntityMatrix(prog, ed, out, false)
 	elseif prog == cvar.prvm_prog_list[1] then -- CLVM_prog
 		NOT_YET_PORTED("CL_GetEntityMatrix (csprogs.c) in prvm_cmds.c getmatrix")
 		matrixlib.Matrix4x4_CreateIdentity(out) -- (port support: the C would fill it from the client entity)

@@ -1,4 +1,5 @@
 # Session log index (newest first)
+2026-11-27 Claude-Quartz M4-CLIENT — a bot match runs: `map stormkeep`, 4 bots, 3,000 host frames (Host_Main_Frame), no QC error, no stub builtin hit; SV_ConnectClient / SV_DropClient / SV_StartSound, sv_user.c, frame blends, 17 more builtins → docs/log/2026-11-26-Claude-Quartz.md
 2026-11-27 Claude-Quartz M4-SPAWN + M4-ALIAS — alias / sprite model loaders (536 models load; C fixtures identical), getsurface* / Write* / tag builtins; stormkeep starts with the real QC, init frames complete, 300 physics frames run → docs/log/2026-11-26-Claude-Quartz.md
 2026-11-26 Claude-Quartz PORT-LIBM (done) + M4-SPAWN(partial) — glibc-exact sin / cos / atan2 / pow ... in pure Luau (36,631 vectors identical); model registry + SV_SpawnServer: stormkeep spawns with the real QC, stops at the getsurface* stubs in the first init frame → docs/log/2026-11-26-Claude-Quartz.md
 2026-11-26 Claude-Quartz M4-PHYS — sv_phys.c movers / SV_Physics, sv_move.c and the world builtins are bit-identical to the C build (13,678 + 50,400 checks; one error-text fix); G-058 host sin / cos vs glibc, task PORT-LIBM → docs/log/2026-11-26-Claude-Quartz.md

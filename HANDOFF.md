@@ -36,7 +36,7 @@ Every section except §MAP and §DIFFS stays under ~60 lines; detail lives in `d
 - **M2-RUNNER done** (stormkeep entities load, first StartFrame spawns them; world builtins wait on M3).
   ~170 builtins ported; server state (engine/server.luau), SZ/MSG writes, mathlib bit-exact.
 - **M2-AOT-SHIP (claimed, Claude-Anvil):** lazy chunk loading + background preload; Q-014 (startup 17.7 s).
-- **Tests:** 36 Lune files, all pass (with game data and the locally compiled QuakeC); StyLua/Selene clean; check_port_lines 0 wrong.
+- **Tests:** 37 Lune files, all pass (with game data and the locally compiled QuakeC); StyLua/Selene clean; check_port_lines 0 wrong.
 - **Stale claims:** M3-BSPLOAD and REF-DP branches have only claim commits from 2026-11-20 — owner to reassign.
 - **Local + Studio (2026-11-25):** the owner cannot use cloud sessions; work happens on the owner's Windows PC.
   Toolchain there: `rokit install` (shims in %USERPROFILE%/.rokit/bin; stylua, selene, lune 14/14, rojo pass).
@@ -72,11 +72,12 @@ Every section except §MAP and §DIFFS stays under ~60 lines; detail lives in `d
 - **PORT-LIBM done:** engine/_port/libm.luau = glibc 2.43 (FMA build) sin / cos / tan / asin / acos / atan /
   atan2 / pow / log in pure Luau, 36,631 vectors identical; no host math.* transcendental call is left in
   engine/ -- **never call math.sin / cos / ... or `^` in engine code, use libm** (G-058).
-- **M4-SPAWN (claimed, Claude-Quartz):** model registry, SV_SpawnServer, `map` command, setmodel / precache,
-  getsurface*, Write*, setattachment, gettagindex, frameduration. **stormkeep and space-elevator start with
-  the compiled QuakeC, the QC init frames complete and 300 SV_Physics frames run** (compile the QC locally:
-  `python tools/qcaot/compile.py work/vfs-high/progs.dat game/generated/progs`). Not checked against the C
-  build. Next: gettaginfo / skel_*, SV_StartSound, then clients (sv_user.c) and the host frame loop.
+- **M4-SPAWN / M4-CLIENT: a bot match runs.** `map stormkeep` with 4 bots runs 3,000 host frames through
+  host.Host_Main_Frame with the compiled QuakeC: no QC error, no builtin hit as a stub, bots move and fight
+  (tests/integration/sv_botmatch.test.luau; compile the QC locally: `python tools/qcaot/compile.py
+  work/vfs-high/progs.dat game/generated/progs`). About 18 ms per frame in Lune. Client slots exist only for
+  bots (no netconnection: M6-NET). Not checked against the C build (needs REF-DP for a frame-diff).
+  Next: first picture in Studio (M5) / networking (M6). Log: docs/log/2026-11-26-Claude-Quartz.md (part 6).
 - **M4-ALIAS done (except PSK, SSE path, OBJ):** engine/model_alias.luau + engine/model_sprite.luau load all
   536 alias / sprite models of the release (independent decoder: 12,685 checks; C build on fixture models:
   1,101 lines identical). Log: docs/log/2026-11-26-Claude-Quartz.md (part 5).
@@ -564,4 +565,5 @@ One line each; **details and sources: `docs/gotchas.md`** (add to both). Roblox 
 - **G-052** (read 2026-11-25) Open Cloud can archive assets: `POST /assets/v1/assets/{id}:archive` (no body, scope asset:write, beta) → `"state": "Archived"` (gone from the website, not usable in experiences); `...:restore` undoes it. `GET /assets/v1/assets/{id}?readMask=moderationResult,state` shows both states; GETs are rate-limited (429 with x-ratelimit-reset; ~4,100 reads ≈ 20 min). A 1x1 grey JPEG was Rejected while 1x1 colour swatches were Approved: moderation of tiny images is not predictable. **Tried: only Audio can be archived; Image answers 400 "not an archivable asset type" → dashboard only.** tools/upload/check_assets.py, archive_assets.py.
 - **G-057** (2026-11-25) Trace port notes. (a) A C generator may `#include "model_brush.c"` itself to call its static functions (tools/testgen/trace_vectors.c); it must then define `loadmodel` and `developer_extra`, and set cvar `.integer` / `.value` by hand (they are 0 until Cvar_RegisterVariable). (b) The same holds in the port: collision.cv / model_brush.cv are 0 until Collision_Init / Mod_BrushInit run (host.luau calls them; tests call them after cvar.reset()). (c) Collision_BoundingBoxOfBrushTraceSegment uses min() for maxs too (engine bug, kept). (d) A degenerate triangle sets the triangle brush's numplanes to 0 and it is still traced (edge planes only), and numplanes stays 0 for the following triangles of a mesh until a good one sets it back to 5 (kept). (e) C's min(a,b)/max(a,b) macros return b on ties (-0 vs 0), math.min/max return the first: harmless where a +-1 follows, check it if a sign-of-zero mismatch ever shows up.
 - **G-058** (2026-11-26) Luau's math.sin / math.cos call the host C library: on Windows they differ from glibc by one ulp for about 3 % of inputs (277 cos / 315 sin of 9,761 yaws in tests/vectors/svmove.tsv). No float result of walkmove / SV_StepDirection changed in the vectors, but it can, and Roblox servers and clients run different C libraries. Fixed 2026-11-26 by engine/_port/libm.luau (glibc 2.43, FMA build; task PORT-LIBM): engine code must call libm.sin / cos / tan / asin / acos / atan / atan2 / pow / log, never math.* or `^`. Also: string.format of non-finite numbers is host-specific ("-nan(ind)" on Windows) -- use libc.format1.
+- **G-059** (2026-11-27) In Lune every `require()` call resolves its path again (0.5-0.8 ms): a `require` inside a hot function (needed where modules would form a load loop) made a server frame take 113 ms instead of 18. Keep the module in an upvalue after the first call (`local m; local function M() m = m or require(...) return m end`). Roblox caches ModuleScript requires, but keep the pattern anyway.
 <!-- /§GOTCHAS -->
