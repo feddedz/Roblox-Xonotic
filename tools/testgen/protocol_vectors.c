@@ -556,6 +556,7 @@ static void pm_e5_run(int nframes, int maxedicts, int npop, protocolversion_t pr
 	entityframe5_database_t *d;
 	int fr, i, numstates, maxsize, pre, ret, need_empty, viewent;
 	unsigned int movesequence;
+	int quiet = npop < 10; // few entities that rarely change: frames with nothing to send
 	host_client = pm_clients + 0;
 	memset(host_client->stats, 0, sizeof(host_client->stats));
 	memset(host_client->statsdeltabits, 0, sizeof(host_client->statsdeltabits));
@@ -591,12 +592,12 @@ static void pm_e5_run(int nframes, int maxedicts, int npop, protocolversion_t pr
 		{
 			if (pm_alive[i])
 			{
-				if (pm_chance(4))
+				if (pm_chance(quiet ? 0 : 4))
 				{
 					pm_alive[i] = 0;
 					printf("EK\t%d\n", i);
 				}
-				else if (pm_chance(30))
+				else if (pm_chance(quiet ? 3 : 20))
 				{
 					int f, nf = 1 + (int)(pm_rnd() % 3);
 					for (f = 0; f < nf; f++)
@@ -604,16 +605,16 @@ static void pm_e5_run(int nframes, int maxedicts, int npop, protocolversion_t pr
 					pm_e5_setstate(i);
 				}
 			}
-			else if (pm_chance(npop > 100 ? 2 : 1))
+			else if (pm_chance(quiet ? 0 : (npop > 100 ? 2 : 1)))
 			{
 				pm_alive[i] = 1;
 				pm_randstate(&pm_pop[i], i, tagfar ? maxedicts + 300 : prog->max_edicts);
 				pm_e5_setstate(i);
 			}
-			if (pm_chance(1))
+			if (pm_chance(quiet ? 0 : 1))
 				pm_setsendentity(i, pm_chance(70) ? 0 : 1 + (int)(pm_rnd() % 100));
 		}
-		if (pm_chance(30))
+		if (pm_chance(quiet ? 8 : 30))
 		{
 			int k, nk = 1 + (int)(pm_rnd() % 8);
 			printf("US");
@@ -778,6 +779,7 @@ int main(void)
 	pm_e5_run(60, 200, 50, PROTOCOL_DARKPLACES5, 60, 20, 1);
 	pm_e5_run(80, 256, 90, PROTOCOL_DARKPLACES7, 60, 20, 1); // tags past maxedicts: Priority expands the database
 	pm_e5_run(30, 300, 250, PROTOCOL_QUAKE, 80, 10, 0);
+	pm_e5_run(80, 256, 6, PROTOCOL_DARKPLACES7, 90, 5, 0);
 
 	pm_writestats(150);
 	printf("END\n");
