@@ -28,6 +28,7 @@ export type Server = {
 	active: boolean,
 	state: number,
 	paused: boolean, -- server.h L82
+	pausedstart: number, -- double pausedstart (server.h L83)
 	time: number,
 	frametime: number, -- double frametime (server.h L92)
 	protocol: number,
@@ -45,6 +46,7 @@ export type Server = {
 	world: world.world_t, -- collision culling data
 	worldmodel: any, -- dp_model_t * (nil = NULL)
 	models: { [number]: any }, -- dp_model_t *models[MAX_MODELS], C index i at [i]
+	writeentitiestoclient_msg: common.SizeBuf?, -- sizebuf_t * of the entity message being built (server.h L153; nil = NULL)
 	-- port support: the address of a char array of this struct as an engine string reference (see CStrRef)
 	stringrefs: { [string]: { str: string } },
 }
@@ -55,6 +57,7 @@ function server.New(): Server
 		active = false,
 		state = server.ss_dead,
 		paused = false,
+		pausedstart = 0,
 		time = 0,
 		frametime = 0,
 		protocol = common.PROTOCOL.DARKPLACES7,
@@ -72,6 +75,7 @@ function server.New(): Server
 		world = world.new(),
 		worldmodel = nil,
 		models = {},
+		writeentitiestoclient_msg = nil,
 		stringrefs = {},
 	}
 end

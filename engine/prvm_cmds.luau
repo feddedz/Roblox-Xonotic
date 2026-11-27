@@ -6,6 +6,8 @@
 	Port of prvm_cmds.c @xonotic-v0.8.6. PARTIAL: the cvar builtins and their helpers. Builtins are
 	registered by C name in svvm_cmds.PORTED (server); csqc/menu tables later.
 	Globals: OFS_RETURN = 1, OFS_PARM0 = 4, parameter i at 4 + 3*i (pr_comp.h), 4-byte slots.
+	Also ported: the surface builtins (getsurface* #434-#439, #486, #628, #629 with getmodel, animatemodel for
+	unanimated models, the applytransform helpers, clippointtosurface) and uri_get #513 (no-libcurl path).
 	NOT YET PORTED: everything else in prvm_cmds.c (stubs in engine/svvm_cmds.luau log it).
 ]]
 local cvar = require("./cvar")
@@ -23,6 +25,7 @@ local mdfour = require("./mdfour")
 local sha256 = require("./_port/sha256")
 local mathlib = require("./mathlib")
 local host_cmd = require("./host_cmd")
+local matrixlib = require("./matrixlib")
 
 local prvm_cmds = {}
 
@@ -1269,11 +1272,16 @@ function prvm_cmds.VM_random(prog: any)
 	SET_G_FLOAT(prog, OFS_RETURN, prvm_cmds.lhrandom(0, 1))
 end
 
+-- time(NULL) (port support: a replaceable hook like Sys_DirtyTime; tests pin the wall clock with it)
+prvm_cmds.time = function(): number
+	return os.time()
+end
+
 -- port: prvm_cmds.c VM_strftime L922-959 @xonotic-v0.8.6
 function prvm_cmds.VM_strftime(prog: any)
 	SAFEPARMCOUNTRANGE(prog, 2, 8, "VM_strftime")
 	local fmt = prvm_cmds.VM_VarString(prog, 1, VM_STRINGTEMP_LENGTH)
-	local t = os.time()
+	local t = prvm_cmds.time()
 	local tm = if G_FLOAT(prog, OFS_PARM0) ~= 0 then libc.localtime(t) else libc.gmtime(t)
 	SET_G_INT(prog, OFS_RETURN, prvm_edict.PRVM_SetTempString(prog, libc.strftime(fmt, tm, VM_STRINGTEMP_LENGTH)))
 end
@@ -2964,6 +2972,737 @@ function prvm_cmds.VM_SetTraceGlobals(prog: any, trace: any)
 	)
 end
 
+--[[
+	surface querying (prvm_cmds.c L6830-7260)
+
+	Models are the dp_model_t tables of engine/model_brush.luau: data_surfaces is 1-based (C surface i at
+	[i + 1]); surfmesh float arrays are f32 buffers (float k at byte 4 * k), data_element3i an i32 buffer.
+	A `float *` into such an array (animatemodel_cache->data_vertex3f, ...) is the buffer. Edicts are numbers
+	(0 = the world). vec_t is float: every float operation is rounded (D-004); int -> float conversions too.
+	prog->animatemodel_cache is prog.animatemodel_cache (nil = NULL). VM_Cmd_Reset (which calls
+	animatemodel_reset) is not ported; a new prog table starts without a cache, as the memset prog does in C.
+]]
+local readf32, readi32 = buffer.readf32, buffer.readi32
+
+local notported_surface: { [string]: boolean } = {}
+local function NOT_YET_PORTED(what: string)
+	if not notported_surface[what] then
+		notported_surface[what] = true
+		print("NOT YET PORTED: " .. what)
+	end
+end
+
+-- float[3] at element `i` (C: array + 3 * i) of an f32 buffer, as a new vec3
+local function vec3at(b: buffer, i: number): { number }
+	return { readf32(b, 12 * i), readf32(b, 12 * i + 4), readf32(b, 12 * i + 8) }
+end
+
+-- port: prvm_cmds.c getmodel L6832-6840 @xonotic-v0.8.6
+local function getmodel(prog: any, ed: number): any
+	if prog == cvar.prvm_prog_list[0] then -- SVVM_prog
+		return require("./sv_main").SV_GetModelFromEdict(ed) -- sv_main -> svvm_cmds -> this module
+	elseif prog == cvar.prvm_prog_list[1] then -- CLVM_prog
+		NOT_YET_PORTED("CL_GetModelFromEdict (cl_main.c) in prvm_cmds.c getmodel")
+		return nil
+	else
+		return nil
+	end
+end
+
+-- struct animatemodel_cache (prvm_cmds.c L6842-6857): model, frameblend[MAX_FRAMEBLENDS], skeleton_p, skeleton,
+-- data_vertex3f / svector3f / tvector3f / normal3f, max_vertices, buf_vertex3f / svector3f / tvector3f / normal3f
+local function new_animatemodel_cache(): any
+	return {
+		model = nil,
+		frameblend = nil,
+		skeleton_p = nil,
+		skeleton = nil,
+		data_vertex3f = nil,
+		data_svector3f = nil,
+		data_tvector3f = nil,
+		data_normal3f = nil,
+		max_vertices = 0,
+		buf_vertex3f = nil,
+		buf_svector3f = nil,
+		buf_tvector3f = nil,
+		buf_normal3f = nil,
+	}
+end
+
+-- port: prvm_cmds.c animatemodel_reset L6859-6868 @xonotic-v0.8.6
+-- (C frees the cache without setting prog->animatemodel_cache to NULL: its only caller, VM_Cmd_Reset, runs in
+-- PRVM_Prog_Reset just before memset(prog, 0); the nil here is that memset)
+function prvm_cmds.animatemodel_reset(prog: any)
+	if not prog.animatemodel_cache then
+		return
+	end
+	-- Mem_Free of the four buffers and of the cache
+	prog.animatemodel_cache = nil
+end
+
+-- port: prvm_cmds.c animatemodel L6870-6925 @xonotic-v0.8.6
+-- Ported: the cache allocation and the path of models without vertex animation (brush models: the cache points
+-- at the model's own arrays). NOT YET PORTED: the animated path (alias models with surfmesh.isanimated and
+-- AnimateVertices: VM_GenerateFrameGroupBlend, VM_FrameBlendFromFrameGroupBlend, the skeleton check,
+-- VM_UpdateEdictSkeleton and model->AnimateVertices into the cache buffers, model_alias.c). Until it is ported it
+-- logs once and leaves the cache on the model's unanimated base arrays (the C would fill the buffers with the
+-- vertices of the entity's current frame blend).
+local function animatemodel(prog: any, model: any, _ed: number)
+	local animatemodel_cache
+	if not prog.animatemodel_cache then
+		prog.animatemodel_cache = new_animatemodel_cache() -- Mem_Alloc + memset 0
+	end
+	animatemodel_cache = prog.animatemodel_cache
+	if not (model.surfmesh.isanimated and model.AnimateVertices) then
+		animatemodel_cache.data_vertex3f = model.surfmesh.data_vertex3f
+		animatemodel_cache.data_svector3f = model.surfmesh.data_svector3f
+		animatemodel_cache.data_tvector3f = model.surfmesh.data_tvector3f
+		animatemodel_cache.data_normal3f = model.surfmesh.data_normal3f
+		return
+	end
+	NOT_YET_PORTED(
+		"prvm_cmds.c animatemodel L6890-6924 (animated models: frame blend, skeleton, AnimateVertices); the unanimated base vertices are used"
+	)
+	animatemodel_cache.data_vertex3f = model.surfmesh.data_vertex3f
+	animatemodel_cache.data_svector3f = model.surfmesh.data_svector3f
+	animatemodel_cache.data_tvector3f = model.surfmesh.data_tvector3f
+	animatemodel_cache.data_normal3f = model.surfmesh.data_normal3f
+end
+
+-- port: prvm_cmds.c getmatrix L6927-6935 @xonotic-v0.8.6
+local function getmatrix(prog: any, ed: number, out: any)
+	if prog == cvar.prvm_prog_list[0] then -- SVVM_prog
+		require("./svvm_cmds").SV_GetEntityMatrix(prog, ed, out, false) -- svvm_cmds requires this module
+	elseif prog == cvar.prvm_prog_list[1] then -- CLVM_prog
+		NOT_YET_PORTED("CL_GetEntityMatrix (csprogs.c) in prvm_cmds.c getmatrix")
+		matrixlib.Matrix4x4_CreateIdentity(out) -- (port support: the C would fill it from the client entity)
+	else
+		matrixlib.Matrix4x4_CreateIdentity(out) -- *out = identitymatrix
+	end
+end
+
+--[[
+	matrixlib.c helpers the surface builtins need that engine/matrixlib.luau does not have yet. They belong in
+	that module (one module per C file); they are here only because engine/matrixlib.luau is being extended by
+	the alias-model work at the same time. Move them to matrixlib.luau when that lands.
+]]
+-- Adapted from code contributed to Mesa by David Moore (Mesa 7.6 under SGI Free License B - which is MIT/X11-type)
+-- added helper for common subexpression elimination by eihrul, and other optimizations by div0
+-- port: matrixlib.c Matrix4x4_Invert_Full L147-197 @xonotic-v0.8.6 (the `#if 1` version; out must not alias in1)
+local function Matrix4x4_Invert_Full(out: any, in1: any): number
+	local det
+	local a, o = in1.m, out.m
+
+	-- note: orientation does not matter, as transpose(invert(transpose(m))) == invert(m), proof:
+	--   transpose(invert(transpose(m))) * m
+	-- = transpose(invert(transpose(m))) * transpose(transpose(m))
+	-- = transpose(transpose(m) * invert(transpose(m)))
+	-- = transpose(identity)
+	-- = identity
+
+	-- this seems to help gcc's common subexpression elimination, and also makes the code look nicer
+	local m00, m01, m02, m03 = a[1][1], a[1][2], a[1][3], a[1][4]
+	local m10, m11, m12, m13 = a[2][1], a[2][2], a[2][3], a[2][4]
+	local m20, m21, m22, m23 = a[3][1], a[3][2], a[3][3], a[3][4]
+	local m30, m31, m32, m33 = a[4][1], a[4][2], a[4][3], a[4][4]
+
+	-- (x*(p*q - r*s)): every product and difference is a float operation
+	local function d(p: number, q: number, r: number, s: number): number
+		return R(R(p * q) - R(r * s))
+	end
+	-- (x*X - y*Y + z*Z), evaluated left to right
+	local function t3(x: number, xx: number, y: number, yy: number, z: number, zz: number): number
+		return R(R(R(x * xx) - R(y * yy)) + R(z * zz))
+	end
+
+	-- calculate the adjoint
+	o[1][1] = t3(m11, d(m22, m33, m23, m32), m21, d(m12, m33, m13, m32), m31, d(m12, m23, m13, m22))
+	o[1][2] = -t3(m01, d(m22, m33, m23, m32), m21, d(m02, m33, m03, m32), m31, d(m02, m23, m03, m22))
+	o[1][3] = t3(m01, d(m12, m33, m13, m32), m11, d(m02, m33, m03, m32), m31, d(m02, m13, m03, m12))
+	o[1][4] = -t3(m01, d(m12, m23, m13, m22), m11, d(m02, m23, m03, m22), m21, d(m02, m13, m03, m12))
+	o[2][1] = -t3(m10, d(m22, m33, m23, m32), m20, d(m12, m33, m13, m32), m30, d(m12, m23, m13, m22))
+	o[2][2] = t3(m00, d(m22, m33, m23, m32), m20, d(m02, m33, m03, m32), m30, d(m02, m23, m03, m22))
+	o[2][3] = -t3(m00, d(m12, m33, m13, m32), m10, d(m02, m33, m03, m32), m30, d(m02, m13, m03, m12))
+	o[2][4] = t3(m00, d(m12, m23, m13, m22), m10, d(m02, m23, m03, m22), m20, d(m02, m13, m03, m12))
+	o[3][1] = t3(m10, d(m21, m33, m23, m31), m20, d(m11, m33, m13, m31), m30, d(m11, m23, m13, m21))
+	o[3][2] = -t3(m00, d(m21, m33, m23, m31), m20, d(m01, m33, m03, m31), m30, d(m01, m23, m03, m21))
+	o[3][3] = t3(m00, d(m11, m33, m13, m31), m10, d(m01, m33, m03, m31), m30, d(m01, m13, m03, m11))
+	o[3][4] = -t3(m00, d(m11, m23, m13, m21), m10, d(m01, m23, m03, m21), m20, d(m01, m13, m03, m11))
+	o[4][1] = -t3(m10, d(m21, m32, m22, m31), m20, d(m11, m32, m12, m31), m30, d(m11, m22, m12, m21))
+	o[4][2] = t3(m00, d(m21, m32, m22, m31), m20, d(m01, m32, m02, m31), m30, d(m01, m22, m02, m21))
+	o[4][3] = -t3(m00, d(m11, m32, m12, m31), m10, d(m01, m32, m02, m31), m30, d(m01, m12, m02, m11))
+	o[4][4] = t3(m00, d(m11, m22, m12, m21), m10, d(m01, m22, m02, m21), m20, d(m01, m12, m02, m11))
+
+	-- calculate the determinant (as inverse == 1/det * adjoint, adjoint * m == identity * det, so this calculates the det)
+	det = R(R(R(R(m00 * o[1][1]) + R(m10 * o[1][2])) + R(m20 * o[1][3])) + R(m30 * o[1][4]))
+	if det == 0.0 then
+		return 0
+	end
+
+	-- multiplications are faster than divisions, usually
+	det = R(1.0 / det)
+
+	-- manually unrolled loop to multiply all matrix elements by 1/det
+	for r = 1, 4 do
+		local row = o[r]
+		row[1] = R(row[1] * det)
+		row[2] = R(row[2] * det)
+		row[3] = R(row[3] * det)
+		row[4] = R(row[4] * det)
+	end
+
+	return 1
+end
+
+-- port: matrixlib.c Matrix4x4_Transform3x3 L1687-1698 @xonotic-v0.8.6 (#else branch; out must not alias v)
+local function Matrix4x4_Transform3x3(in_: any, v: { number }, out: { number })
+	local m = in_.m
+	local v1, v2, v3 = v[1], v[2], v[3]
+	out[1] = R(R(R(v1 * m[1][1]) + R(v2 * m[1][2])) + R(v3 * m[1][3]))
+	out[2] = R(R(R(v1 * m[2][1]) + R(v2 * m[2][2])) + R(v3 * m[2][3]))
+	out[3] = R(R(R(v1 * m[3][1]) + R(v2 * m[3][2])) + R(v3 * m[3][3]))
+end
+
+-- port: prvm_cmds.c applytransform_forward L6937-6942 @xonotic-v0.8.6
+local function applytransform_forward(prog: any, in_: { number }, ed: number, out: { number })
+	local m = matrixlib.new()
+	getmatrix(prog, ed, m)
+	matrixlib.Matrix4x4_Transform(m, in_, out)
+end
+
+-- port: prvm_cmds.c applytransform_forward_direction L6944-6949 @xonotic-v0.8.6
+local function applytransform_forward_direction(prog: any, in_: { number }, ed: number, out: { number })
+	local m = matrixlib.new()
+	getmatrix(prog, ed, m)
+	Matrix4x4_Transform3x3(m, in_, out)
+end
+
+-- port: prvm_cmds.c applytransform_inverted L6951-6957 @xonotic-v0.8.6
+-- (engine quirk kept: the inverted matrix goes through Matrix4x4_Transform3x3, so its translation is dropped;
+-- the point is only rotated / scaled back, never moved by -origin. getsurfaceclippedpoint adds the origin back
+-- afterwards, getsurfacenearpoint does not. If the inverse does not exist, n keeps the unscaled adjoint
+-- Matrix4x4_Invert_Full wrote before it returned 0, as in C.)
+local function applytransform_inverted(prog: any, in_: { number }, ed: number, out: { number })
+	local m, n = matrixlib.new(), matrixlib.new()
+	getmatrix(prog, ed, m)
+	Matrix4x4_Invert_Full(n, m)
+	Matrix4x4_Transform3x3(n, in_, out)
+end
+
+-- port: prvm_cmds.c applytransform_forward_normal L6959-6966 @xonotic-v0.8.6
+local function applytransform_forward_normal(prog: any, in_: { number }, ed: number, out: { number })
+	local m = matrixlib.new()
+	getmatrix(prog, ed, m)
+	local p1, p2, p3 = matrixlib.Matrix4x4_TransformPositivePlane(m, in_[1], in_[2], in_[3], 0)
+	out[1], out[2], out[3] = p1, p2, p3 -- VectorCopy(p, out)
+end
+
+-- TriangleNormal (mathlib.h L140-144) on float vectors: each difference, product and sum is a float op
+local function TriangleNormal(a: { number }, b: { number }, c: { number }, n: { number })
+	n[1] = R(R(R(a[2] - b[2]) * R(c[3] - b[3])) - R(R(a[3] - b[3]) * R(c[2] - b[2])))
+	n[2] = R(R(R(a[3] - b[3]) * R(c[1] - b[1])) - R(R(a[1] - b[1]) * R(c[3] - b[3])))
+	n[3] = R(R(R(a[1] - b[1]) * R(c[2] - b[2])) - R(R(a[2] - b[2]) * R(c[1] - b[1])))
+end
+
+local DotProduct = mathlib.DotProduct
+local VectorNormalize = mathlib.VectorNormalize
+
+-- port: prvm_cmds.c clippointtosurface L6968-7003 @xonotic-v0.8.6
+local function clippointtosurface(prog: any, ed: number, model: any, surface: any, p: { number }, out: { number })
+	local v: { { number } } = {}
+	local facenormal, edgenormal, sidenormal, temp = { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }
+	local offsetdist, dist, bestdist
+	animatemodel(prog, model, ed)
+	bestdist = 1000000000
+	out[1], out[2], out[3] = p[1], p[2], p[3]
+	local element3i: buffer = model.surfmesh.data_element3i
+	local vertex3f: buffer = prog.animatemodel_cache.data_vertex3f
+	local e = 12 * surface.num_firsttriangle -- byte offset of (data_element3i + 3 * num_firsttriangle)
+	for _ = 0, surface.num_triangles - 1 do
+		-- clip original point to each triangle of the surface and find the
+		-- triangle that is closest
+		v[1] = vec3at(vertex3f, readi32(element3i, e))
+		v[2] = vec3at(vertex3f, readi32(element3i, e + 4))
+		v[3] = vec3at(vertex3f, readi32(element3i, e + 8))
+		TriangleNormal(v[1], v[2], v[3], facenormal)
+		VectorNormalize(facenormal)
+		offsetdist = R(DotProduct(v[1], facenormal) - DotProduct(p, facenormal))
+		-- VectorMA(p, offsetdist, facenormal, temp)
+		temp[1] = R(p[1] + R(offsetdist * facenormal[1]))
+		temp[2] = R(p[2] + R(offsetdist * facenormal[2]))
+		temp[3] = R(p[3] + R(offsetdist * facenormal[3]))
+		local j, k = 0, 2
+		while j < 3 do
+			local vk, vj = v[k + 1], v[j + 1]
+			-- VectorSubtract(v[k], v[j], edgenormal)
+			edgenormal[1] = R(vk[1] - vj[1])
+			edgenormal[2] = R(vk[2] - vj[2])
+			edgenormal[3] = R(vk[3] - vj[3])
+			-- CrossProduct(edgenormal, facenormal, sidenormal)
+			sidenormal[1] = R(R(edgenormal[2] * facenormal[3]) - R(edgenormal[3] * facenormal[2]))
+			sidenormal[2] = R(R(edgenormal[3] * facenormal[1]) - R(edgenormal[1] * facenormal[3]))
+			sidenormal[3] = R(R(edgenormal[1] * facenormal[2]) - R(edgenormal[2] * facenormal[1]))
+			VectorNormalize(sidenormal)
+			offsetdist = R(DotProduct(vk, sidenormal) - DotProduct(temp, sidenormal))
+			if offsetdist < 0 then
+				-- VectorMA(temp, offsetdist, sidenormal, temp)
+				temp[1] = R(temp[1] + R(offsetdist * sidenormal[1]))
+				temp[2] = R(temp[2] + R(offsetdist * sidenormal[2]))
+				temp[3] = R(temp[3] + R(offsetdist * sidenormal[3]))
+			end
+			k = j
+			j += 1
+		end
+		-- VectorDistance2(temp, p)
+		local d1, d2, d3 = R(temp[1] - p[1]), R(temp[2] - p[2]), R(temp[3] - p[3])
+		dist = R(R(R(d1 * d1) + R(d2 * d2)) + R(d3 * d3))
+		if bestdist > dist then
+			bestdist = dist
+			out[1], out[2], out[3] = temp[1], temp[2], temp[3]
+		end
+		e += 12
+	end
+end
+
+-- port: prvm_cmds.c getsurface L7005-7010 @xonotic-v0.8.6
+local function getsurface(model: any, surfacenum: number): any
+	if surfacenum < 0 or surfacenum >= model.nummodelsurfaces then
+		return nil
+	end
+	return model.data_surfaces[surfacenum + model.firstmodelsurface + 1]
+end
+
+--PF_getsurfacenumpoints, // #434 float(entity e, float s) getsurfacenumpoints = #434;
+-- port: prvm_cmds.c VM_getsurfacenumpoints L7014-7028 @xonotic-v0.8.6
+function prvm_cmds.VM_getsurfacenumpoints(prog: any)
+	local model, surface
+	SAFEPARMCOUNT(prog, 2, "VM_getsurfacenumpoints")
+	-- return 0 if no such surface
+	model = getmodel(prog, G_EDICTNUM(prog, OFS_PARM0))
+	surface = if model then getsurface(model, libc.toint(G_FLOAT(prog, OFS_PARM0 + 3))) else nil
+	if not model or not surface then
+		SET_G_FLOAT(prog, OFS_RETURN, 0)
+		return
+	end
+
+	-- note: this (incorrectly) assumes it is a simple polygon
+	SET_G_FLOAT(prog, OFS_RETURN, surface.num_vertices)
+end
+
+--PF_getsurfacepoint,     // #435 vector(entity e, float s, float n) getsurfacepoint = #435;
+-- port: prvm_cmds.c VM_getsurfacepoint L7030-7049 @xonotic-v0.8.6
+function prvm_cmds.VM_getsurfacepoint(prog: any)
+	local ed, model, surface, pointnum
+	local result = { 0, 0, 0 }
+	SAFEPARMCOUNT(prog, 3, "VM_getsurfacepoint")
+	SET_G_VECTOR(prog, OFS_RETURN, { 0, 0, 0 })
+	ed = G_EDICTNUM(prog, OFS_PARM0)
+	model = getmodel(prog, ed)
+	surface = if model then getsurface(model, libc.toint(G_FLOAT(prog, OFS_PARM0 + 3))) else nil
+	if not model or not surface then
+		return
+	end
+	-- note: this (incorrectly) assumes it is a simple polygon
+	pointnum = libc.toint(G_FLOAT(prog, OFS_PARM0 + 6))
+	if pointnum < 0 or pointnum >= surface.num_vertices then
+		return
+	end
+	animatemodel(prog, model, ed)
+	applytransform_forward(
+		prog,
+		vec3at(prog.animatemodel_cache.data_vertex3f, surface.num_firstvertex + pointnum),
+		ed,
+		result
+	)
+	SET_G_VECTOR(prog, OFS_RETURN, result)
+end
+
+--PF_getsurfacepointattribute,     // #486 vector(entity e, float s, float n, float a) getsurfacepointattribute = #486;
+-- float SPA_POSITION = 0;
+-- float SPA_S_AXIS = 1;
+-- float SPA_T_AXIS = 2;
+-- float SPA_R_AXIS = 3; // same as SPA_NORMAL
+-- float SPA_TEXCOORDS0 = 4;
+-- float SPA_LIGHTMAP0_TEXCOORDS = 5;
+-- float SPA_LIGHTMAP0_COLOR = 6;
+-- port: prvm_cmds.c VM_getsurfacepointattribute L7058-7127 @xonotic-v0.8.6
+function prvm_cmds.VM_getsurfacepointattribute(prog: any)
+	local ed, model, surface, pointnum, attributetype
+	local result = { 0, 0, 0 }
+
+	SAFEPARMCOUNT(prog, 4, "VM_getsurfacepoint")
+	SET_G_VECTOR(prog, OFS_RETURN, { 0, 0, 0 })
+	ed = G_EDICTNUM(prog, OFS_PARM0)
+	model = getmodel(prog, ed)
+	surface = if model then getsurface(model, libc.toint(G_FLOAT(prog, OFS_PARM0 + 3))) else nil
+	if not model or not surface then
+		return
+	end
+	pointnum = libc.toint(G_FLOAT(prog, OFS_PARM0 + 6))
+	if pointnum < 0 or pointnum >= surface.num_vertices then
+		return
+	end
+	attributetype = libc.toint(G_FLOAT(prog, OFS_PARM0 + 9))
+
+	animatemodel(prog, model, ed)
+
+	local cache = prog.animatemodel_cache
+	local k = surface.num_firstvertex + pointnum
+	-- float SPA_POSITION = 0;
+	if attributetype == 0 then
+		applytransform_forward(prog, vec3at(cache.data_vertex3f, k), ed, result)
+		SET_G_VECTOR(prog, OFS_RETURN, result)
+	-- float SPA_S_AXIS = 1;
+	elseif attributetype == 1 then
+		applytransform_forward_direction(prog, vec3at(cache.data_svector3f, k), ed, result)
+		SET_G_VECTOR(prog, OFS_RETURN, result)
+	-- float SPA_T_AXIS = 2;
+	elseif attributetype == 2 then
+		applytransform_forward_direction(prog, vec3at(cache.data_tvector3f, k), ed, result)
+		SET_G_VECTOR(prog, OFS_RETURN, result)
+	-- float SPA_R_AXIS = 3; // same as SPA_NORMAL
+	elseif attributetype == 3 then
+		applytransform_forward_direction(prog, vec3at(cache.data_normal3f, k), ed, result)
+		SET_G_VECTOR(prog, OFS_RETURN, result)
+	-- float SPA_TEXCOORDS0 = 4;
+	elseif attributetype == 4 then
+		local texcoord: buffer = model.surfmesh.data_texcoordtexture2f
+		result[1] = readf32(texcoord, 8 * k)
+		result[2] = readf32(texcoord, 8 * k + 4)
+		result[3] = 0.0
+		SET_G_VECTOR(prog, OFS_RETURN, result)
+	-- float SPA_LIGHTMAP0_TEXCOORDS = 5;
+	elseif attributetype == 5 then
+		local texcoord: buffer = model.surfmesh.data_texcoordlightmap2f
+		result[1] = readf32(texcoord, 8 * k)
+		result[2] = readf32(texcoord, 8 * k + 4)
+		result[3] = 0.0
+		SET_G_VECTOR(prog, OFS_RETURN, result)
+	-- float SPA_LIGHTMAP0_COLOR = 6;
+	elseif attributetype == 6 then
+		-- ignore alpha for now..
+		local color: buffer = model.surfmesh.data_lightmapcolor4f
+		SET_G_VECTOR(
+			prog,
+			OFS_RETURN,
+			{ readf32(color, 16 * k), readf32(color, 16 * k + 4), readf32(color, 16 * k + 8) }
+		)
+	else
+		SET_G_VECTOR(prog, OFS_RETURN, { 0.0, 0.0, 0.0 })
+	end
+end
+
+--PF_getsurfacenormal,    // #436 vector(entity e, float s) getsurfacenormal = #436;
+-- port: prvm_cmds.c VM_getsurfacenormal L7129-7146 @xonotic-v0.8.6
+function prvm_cmds.VM_getsurfacenormal(prog: any)
+	local model, surface
+	local normal, result = { 0, 0, 0 }, { 0, 0, 0 }
+	SAFEPARMCOUNT(prog, 2, "VM_getsurfacenormal")
+	SET_G_VECTOR(prog, OFS_RETURN, { 0, 0, 0 })
+	model = getmodel(prog, G_EDICTNUM(prog, OFS_PARM0))
+	surface = if model then getsurface(model, libc.toint(G_FLOAT(prog, OFS_PARM0 + 3))) else nil
+	if not model or not surface then
+		return
+	end
+	-- note: this only returns the first triangle, so it doesn't work very
+	-- well for curved surfaces or arbitrary meshes
+	-- (engine quirk kept: "the first triangle" is the first three vertices of the surface, not its first
+	-- element triple)
+	animatemodel(prog, model, G_EDICTNUM(prog, OFS_PARM0))
+	local vertex3f: buffer = prog.animatemodel_cache.data_vertex3f
+	local fv = surface.num_firstvertex
+	TriangleNormal(vec3at(vertex3f, fv), vec3at(vertex3f, fv + 1), vec3at(vertex3f, fv + 2), normal)
+	applytransform_forward_normal(prog, normal, G_EDICTNUM(prog, OFS_PARM0), result)
+	VectorNormalize(result)
+	SET_G_VECTOR(prog, OFS_RETURN, result)
+end
+
+--PF_getsurfacetexture,   // #437 string(entity e, float s) getsurfacetexture = #437;
+-- port: prvm_cmds.c VM_getsurfacetexture L7148-7157 @xonotic-v0.8.6
+function prvm_cmds.VM_getsurfacetexture(prog: any)
+	local model, surface
+	SAFEPARMCOUNT(prog, 2, "VM_getsurfacetexture")
+	SET_G_INT(prog, OFS_RETURN, 0) -- OFS_NULL
+	model = getmodel(prog, G_EDICTNUM(prog, OFS_PARM0))
+	surface = if model then getsurface(model, libc.toint(G_FLOAT(prog, OFS_PARM0 + 3))) else nil
+	if not model or not surface then
+		return
+	end
+	SET_G_INT(prog, OFS_RETURN, prvm_edict.PRVM_SetTempString(prog, surface.texture.name))
+end
+
+--PF_getsurfacenearpoint, // #438 float(entity e, vector p) getsurfacenearpoint = #438;
+-- port: prvm_cmds.c VM_getsurfacenearpoint L7159-7207 @xonotic-v0.8.6
+function prvm_cmds.VM_getsurfacenearpoint(prog: any)
+	local surfacenum, best
+	local clipped, p = { 0, 0, 0 }, { 0, 0, 0 }
+	local dist, bestdist
+	local ed, model, surface
+	local point
+	SAFEPARMCOUNT(prog, 2, "VM_getsurfacenearpoint")
+	SET_G_FLOAT(prog, OFS_RETURN, -1)
+	ed = G_EDICTNUM(prog, OFS_PARM0)
+	point = G_VECTOR(prog, OFS_PARM0 + 3)
+
+	-- (!ed: PRVM_G_EDICT is never NULL)
+	if prog.ed_free[ed] then
+		return
+	end
+	model = getmodel(prog, ed)
+	if not model or model.num_surfaces == 0 then
+		return
+	end
+
+	animatemodel(prog, model, ed)
+
+	applytransform_inverted(prog, point, ed, p)
+	best = -1
+	bestdist = 1000000000
+	surfacenum = 0
+	while surfacenum < model.nummodelsurfaces do
+		surface = model.data_surfaces[surfacenum + model.firstmodelsurface + 1]
+		-- first see if the nearest point on the surface's box is closer than the previous match
+		for i = 1, 3 do
+			-- bound(surface->mins[i], p[i], surface->maxs[i]) - p[i]
+			local mn, mx = surface.mins[i], surface.maxs[i]
+			local b = if p[i] >= mn then (if p[i] < mx then p[i] else mx) else mn
+			clipped[i] = R(b - p[i])
+		end
+		dist = DotProduct(clipped, clipped) -- VectorLength2
+		if dist < bestdist then
+			-- it is, check the nearest point on the actual geometry
+			clippointtosurface(prog, ed, model, surface, p, clipped)
+			-- VectorSubtract(clipped, p, clipped)
+			clipped[1] = R(clipped[1] - p[1])
+			clipped[2] = R(clipped[2] - p[2])
+			clipped[3] = R(clipped[3] - p[3])
+			dist = R(dist + DotProduct(clipped, clipped))
+			if dist < bestdist then
+				-- that's closer too, store it as the best match
+				best = surfacenum
+				bestdist = dist
+			end
+		end
+		surfacenum += 1
+	end
+	SET_G_FLOAT(prog, OFS_RETURN, best)
+end
+
+--PF_getsurfaceclippedpoint, // #439 vector(entity e, float s, vector p) getsurfaceclippedpoint = #439;
+-- port: prvm_cmds.c VM_getsurfaceclippedpoint L7209-7225 @xonotic-v0.8.6
+function prvm_cmds.VM_getsurfaceclippedpoint(prog: any)
+	local ed, model, surface
+	local p, out, inp = { 0, 0, 0 }, { 0, 0, 0 }, nil
+	SAFEPARMCOUNT(prog, 3, "VM_te_getsurfaceclippedpoint")
+	SET_G_VECTOR(prog, OFS_RETURN, { 0, 0, 0 })
+	ed = G_EDICTNUM(prog, OFS_PARM0)
+	model = getmodel(prog, ed)
+	surface = if model then getsurface(model, libc.toint(G_FLOAT(prog, OFS_PARM0 + 3))) else nil
+	if not model or not surface then
+		return
+	end
+	animatemodel(prog, model, ed)
+	inp = G_VECTOR(prog, OFS_PARM0 + 6)
+	applytransform_inverted(prog, inp, ed, p)
+	clippointtosurface(prog, ed, model, surface, p, out)
+	-- VectorAdd(out, PRVM_serveredictvector(ed, origin), PRVM_G_VECTOR(OFS_RETURN))
+	local o = prvm_edict.FieldOfs(prog, "origin")
+	SET_G_VECTOR(prog, OFS_RETURN, {
+		R(out[1] + E_FLOAT(prog, ed, o)),
+		R(out[2] + E_FLOAT(prog, ed, o + 1)),
+		R(out[3] + E_FLOAT(prog, ed, o + 2)),
+	})
+end
+
+--PF_getsurfacenumtriangles, // #??? float(entity e, float s) getsurfacenumtriangles = #???;
+-- port: prvm_cmds.c VM_getsurfacenumtriangles L7228-7241 @xonotic-v0.8.6
+function prvm_cmds.VM_getsurfacenumtriangles(prog: any)
+	local model, surface
+	SAFEPARMCOUNT(prog, 2, "VM_SV_getsurfacenumtriangles")
+	-- return 0 if no such surface
+	model = getmodel(prog, G_EDICTNUM(prog, OFS_PARM0))
+	surface = if model then getsurface(model, libc.toint(G_FLOAT(prog, OFS_PARM0 + 3))) else nil
+	if not model or not surface then
+		SET_G_FLOAT(prog, OFS_RETURN, 0)
+		return
+	end
+
+	SET_G_FLOAT(prog, OFS_RETURN, surface.num_triangles)
+end
+
+--PF_getsurfacetriangle,     // #??? vector(entity e, float s, float n) getsurfacetriangle = #???;
+-- port: prvm_cmds.c VM_getsurfacetriangle L7243-7260 @xonotic-v0.8.6
+function prvm_cmds.VM_getsurfacetriangle(prog: any)
+	local d = { -1, -1, -1 }
+	local ed, model, surface, trinum
+	SAFEPARMCOUNT(prog, 3, "VM_SV_getsurfacetriangle")
+	SET_G_VECTOR(prog, OFS_RETURN, { 0, 0, 0 })
+	ed = G_EDICTNUM(prog, OFS_PARM0)
+	model = getmodel(prog, ed)
+	surface = if model then getsurface(model, libc.toint(G_FLOAT(prog, OFS_PARM0 + 3))) else nil
+	if not model or not surface then
+		return
+	end
+	trinum = libc.toint(G_FLOAT(prog, OFS_PARM0 + 6))
+	if trinum < 0 or trinum >= surface.num_triangles then
+		return
+	end
+	-- FIXME: implement rotation/scaling
+	-- VectorMA(&(data_element3i + 3 * num_firsttriangle)[trinum * 3], num_firstvertex, d, out): each int element
+	-- and the int num_firstvertex convert to float, the product and the sum are float ops (the result is the
+	-- element's vertex numbers relative to the surface's first vertex)
+	local element3i: buffer = model.surfmesh.data_element3i
+	local e = 12 * (surface.num_firsttriangle + trinum)
+	local fv = R(surface.num_firstvertex)
+	SET_G_VECTOR(prog, OFS_RETURN, {
+		R(R(readi32(element3i, e)) + R(fv * d[1])),
+		R(R(readi32(element3i, e + 4)) + R(fv * d[2])),
+		R(R(readi32(element3i, e + 8)) + R(fv * d[3])),
+	})
+end
+
+--[[
+	uri_get (prvm_cmds.c L6145-6358). This port has no libcurl (Roblox servers make no outgoing HTTP for the
+	engine; the transport is Roblox only) and no d0_blind_id keys, so both external calls take the path the C
+	takes when the library is missing:
+	  * Curl_Begin_ToMemory_POST -> Curl_Begin (libcurl.c L878-887): `if(!curl_dll || !cl_curl_enabled.integer)
+	    return false;` -- curl_dll is NULL when libcurl could not be loaded.
+	  * Crypto_SignDataDetached (crypto.c L2619-2628): pubkeys_havepriv[keyid] is false without a loaded private
+	    key, so it returns 0 (the `goto out` paths, no signature header).
+	The callback uri_to_string_callback (L6159-6193) is therefore never called.
+]]
+-- uri_to_prog_t (prvm_cmds.c L6145-6157): prog, starttime, id, buffer[MAX_INPUTLINE], posttype[128], postdata,
+-- postlen, sigdata, siglen
+
+-- port: prvm_cmds.c VM_uri_get L6197-6358 @xonotic-v0.8.6
+-- uri_get() gets content from an URL and calls a callback "uri_get_callback" with it set as string; an unique ID of the transfer is returned
+-- returns 1 on success, and then calls the callback with the ID, 0 or the HTTP status code, and the received data in a string
+function prvm_cmds.VM_uri_get(prog: any)
+	local url
+	local id
+	local ret
+	local handle
+	local posttype = nil
+	local postseparator = nil
+	local poststringbuffer = -1
+	local postkeyid = -1
+	local query_string = nil
+	local lq
+
+	local _, URI_Get_Callback = prvm_edict.PRVM_ED_FindFunction(prog, "URI_Get_Callback") -- PRVM_allfunction
+	if not URI_Get_Callback or URI_Get_Callback == 0 then
+		prog.error_cmd(string.format("uri_get called by %s without URI_Get_Callback defined", prog.name))
+	end
+
+	SAFEPARMCOUNTRANGE(prog, 2, 6, "VM_uri_get")
+
+	url = libc.cstr(G_STRING(prog, OFS_PARM0))
+	id = G_FLOAT(prog, OFS_PARM0 + 3)
+	if prog.argc >= 3 then
+		posttype = libc.cstr(G_STRING(prog, OFS_PARM0 + 6))
+	end
+	if prog.argc >= 4 then
+		postseparator = libc.cstr(G_STRING(prog, OFS_PARM0 + 9))
+	end
+	if prog.argc >= 5 then
+		poststringbuffer = libc.toint(G_FLOAT(prog, OFS_PARM0 + 12))
+	end
+	if prog.argc >= 6 then
+		postkeyid = libc.toint(G_FLOAT(prog, OFS_PARM0 + 15))
+	end
+	-- this can't be the prog's mem pool, as curl may call the callback later!
+	handle = { prog = prog, starttime = 0, id = 0, buffer = "", posttype = "", postdata = nil, postlen = 0 } :: any
+	handle.sigdata = nil :: string?
+	handle.siglen = 0
+
+	local q = string.find(url, "?", 1, true) -- strchr(url, '?')
+	if q then
+		query_string = string.sub(url, q + 1) -- ++query_string
+	end
+	lq = if query_string then #query_string else 0
+
+	handle.prog = prog
+	handle.starttime = prog.starttime
+	handle.id = id
+	if postseparator and posttype and posttype ~= "" then
+		local l = #postseparator
+		if poststringbuffer >= 0 then
+			local ltotal
+			-- "implode"
+			local stringbuffer = RecordAtIndex(prog, poststringbuffer)
+			if not stringbuffer then
+				prvm_cmds.VM_Warning(
+					prog,
+					"uri_get: invalid buffer %i used in %s\n",
+					libc.toint(G_FLOAT(prog, OFS_PARM0)),
+					prog.name
+				)
+				return
+			end
+			ltotal = 0
+			for i = 0, stringbuffer.num_strings - 1 do
+				if i > 0 then
+					ltotal += l
+				end
+				if stringbuffer.strings[i] then
+					ltotal += #libc.cstr(stringbuffer.strings[i])
+				end
+			end
+			local parts = {}
+			handle.postlen = ltotal
+			ltotal = 0
+			for i = 0, stringbuffer.num_strings - 1 do
+				if i > 0 then
+					table.insert(parts, postseparator)
+					ltotal += l
+				end
+				if stringbuffer.strings[i] then
+					local s = libc.cstr(stringbuffer.strings[i])
+					table.insert(parts, s)
+					ltotal += #s
+				end
+			end
+			handle.postdata = table.concat(parts)
+			if ltotal ~= handle.postlen then
+				prog.error_cmd(string.format("%s: string buffer content size mismatch, possible overrun", prog.name))
+			end
+		else
+			handle.postlen = l
+			handle.postdata = postseparator
+		end
+		-- handle->postdata[handle->postlen] = 0, then the query string after it
+		-- (memcpy(handle->postdata + handle->postlen + 1, query_string, lq))
+		handle.postdata = handle.postdata .. "\0" .. string.sub(query_string or "", 1, lq)
+		if postkeyid >= 0 then
+			-- POST: we sign postdata \0 query string
+			-- Crypto_SignDataDetached returns 0 (no private key loaded): sigdata stays NULL (goto out1)
+			handle.siglen = 0
+			handle.sigdata = nil
+		end
+		-- out1:
+		handle.posttype = string.sub(posttype, 1, 127) -- strlcpy(handle->posttype, posttype, sizeof(handle->posttype))
+		ret = false -- Curl_Begin_ToMemory_POST(url, handle->sigdata, 0, handle->posttype, ...): no libcurl
+	else
+		if postkeyid >= 0 and query_string then
+			-- GET: we sign JUST the query string
+			-- Crypto_SignDataDetached returns 0 (no private key loaded): sigdata stays NULL (goto out2)
+			handle.siglen = 0
+			handle.sigdata = nil
+		end
+		-- out2:
+		handle.postdata = nil
+		handle.postlen = 0
+		ret = false -- Curl_Begin_ToMemory_POST(url, handle->sigdata, 0, NULL, NULL, 0, ...): no libcurl
+	end
+	if ret then
+		SET_G_INT(prog, OFS_RETURN, 1)
+	else
+		-- Z_Free of postdata, sigdata and the handle
+		handle = nil
+		SET_G_INT(prog, OFS_RETURN, 0)
+	end
+end
+
 prvm_cmds.BUILTINS = {
 	VM_cvar = prvm_cmds.VM_cvar,
 	VM_cvar_type = prvm_cmds.VM_cvar_type,
@@ -3098,6 +3837,16 @@ prvm_cmds.BUILTINS = {
 	VM_search_end = prvm_cmds.VM_search_end,
 	VM_search_getsize = prvm_cmds.VM_search_getsize,
 	VM_search_getfilename = prvm_cmds.VM_search_getfilename,
+	VM_getsurfacenumpoints = prvm_cmds.VM_getsurfacenumpoints,
+	VM_getsurfacepoint = prvm_cmds.VM_getsurfacepoint,
+	VM_getsurfacepointattribute = prvm_cmds.VM_getsurfacepointattribute,
+	VM_getsurfacenormal = prvm_cmds.VM_getsurfacenormal,
+	VM_getsurfacetexture = prvm_cmds.VM_getsurfacetexture,
+	VM_getsurfacenearpoint = prvm_cmds.VM_getsurfacenearpoint,
+	VM_getsurfaceclippedpoint = prvm_cmds.VM_getsurfaceclippedpoint,
+	VM_getsurfacenumtriangles = prvm_cmds.VM_getsurfacenumtriangles,
+	VM_getsurfacetriangle = prvm_cmds.VM_getsurfacetriangle,
+	VM_uri_get = prvm_cmds.VM_uri_get,
 } :: { [string]: (prog: any) -> () }
 
 return prvm_cmds

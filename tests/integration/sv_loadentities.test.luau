@@ -4,12 +4,18 @@
 -- runs with the compiled QuakeC (world builtins are still stubs). Xonotic only queues them there (its
 -- SV_OnEntityPreSpawnFunction sets __spawnfunc_expecting, lib/_all.inc); the first StartFrame runs the world
 -- constructor (the real worldspawn), whose end spawns the queue (__spawnfunc_spawn_all). Needs game data.
+-- The server state is the one the C code has at that point: SV_SpawnServer (engine/sv_main.luau) runs on a
+-- cleared server up to its PRVM_ED_LoadFromFile call (sv_main.c L3518-3521; world model, submodels, area grid,
+-- precache slots, world edict, globals), which the test intercepts to load the entities itself.
 local t = require("../_lib/t")
 local lfs = require("@lune/fs")
 local console = require("../../engine/console")
 local fs = require("../../engine/fs")
 local host = require("../../engine/host")
+local host_cmd = require("../../engine/host_cmd")
+local cvar = require("../../engine/cvar")
 local sv_main = require("../../engine/sv_main")
+local svvm_cmds = require("../../engine/svvm_cmds")
 local prvm_edict = require("../../engine/prvm_edict")
 local qcrt = require("../../engine/_port/qcrt")
 local f32 = require("../../engine/_port/f32")
@@ -21,6 +27,28 @@ local function entities(path: string): string
 	assert(buffer.readstring(b, 0, 4) == "IBSP", "not a Q3 bsp")
 	local ofs, len = buffer.readi32(b, 8), buffer.readi32(b, 12)
 	return buffer.readstring(b, ofs, len)
+end
+
+-- SV_SpawnServer on a cleared server (as in a fresh process: sv zeroed), stopped where it would load the map's
+-- entities; returns the server prog and the entity text it would load
+local function spawnUntilEntities(mapname: string): (any, string)
+	local server = require("../../engine/server")
+	server.Clear()
+	host_cmd.sv_active = false
+	svvm_cmds.VM_CustomStats_Clear()
+	local real = prvm_edict.PRVM_ED_LoadFromFile
+	local STOP = {}
+	local captured = ""
+	prvm_edict.PRVM_ED_LoadFromFile = function(_prog: any, data: string)
+		captured = data
+		error(STOP)
+	end
+	local ok, err = pcall(sv_main.SV_SpawnServer, mapname)
+	prvm_edict.PRVM_ED_LoadFromFile = real
+	if ok or err ~= STOP then
+		error("SV_SpawnServer did not reach PRVM_ED_LoadFromFile: " .. tostring(err), 0)
+	end
+	return cvar.prvm_prog_list[0], captured
 end
 
 return function(ctx: t.Ctx)
@@ -35,16 +63,28 @@ return function(ctx: t.Ctx)
 	fs.SetProvider(p)
 	host.Host_Init_Dedicated()
 	local stubs: { [string]: number } = {}
-	local prog = sv_main.SV_VM_Setup(buffer.fromstring(lfs.readFile(dat)), {
+	local generated = (require :: any)("../../game/generated/progs")
+	sv_main.vm_setup_opts = {
 		onStub = function(_n: number, cname: string, _p: any)
 			stubs[cname] = (stubs[cname] or 0) + 1
 		end,
-	})
-	prog.warning = function(_m: string) end
-	(require :: any)("../../game/generated/progs").install(prog, { qcrt = qcrt, f32 = f32 })
+		install = function(pr: any)
+			pr.warning = function(_m: string) end
+			generated.install(pr, { qcrt = qcrt, f32 = f32 })
+		end,
+	}
+	local okspawn, prog, spawnents = pcall(spawnUntilEntities, "stormkeep")
+	sv_main.vm_setup_opts = nil
+	t.ok(ctx, okspawn, "SV_SpawnServer sets up the server up to the entity load: " .. tostring(prog))
+	if not okspawn then
+		fs.SetProvider(nil)
+		return
+	end
 	local ents = entities(map)
+	-- SV_SpawnServer loads sv.worldmodel->brush.entities (no maps/stormkeep.ent in the release): the lump text
+	t.ok(ctx, spawnents == string.match(ents, "^[^%z]*"), "SV_SpawnServer would load the map's entity lump")
 	local nbraces = select(2, string.gsub(ents, "\n{", ""))
-	local ok, err = pcall(prvm_edict.PRVM_ED_LoadFromFile, prog, ents)
+	local ok, err = pcall(prvm_edict.PRVM_ED_LoadFromFile, prog, spawnents)
 	local queued = prog.num_edicts
 	-- first server frame: StartFrame with self = world (sv_phys.c SV_Physics; frame loop is M4)
 	local _, sf = prvm_edict.PRVM_ED_FindFunction(prog, "StartFrame")
@@ -79,7 +119,7 @@ return function(ctx: t.Ctx)
 	)
 	t.ok(ctx, ok, "PRVM_ED_LoadFromFile completes: " .. tostring(err))
 	t.ok(ctx, queued > 50, "entities were allocated")
-	-- the first StartFrame stops in the warpzone setup today (needs getsurfacetexture / brush models, M3)
+	t.ok(ctx, ok2, "the first StartFrame completes: " .. tostring(err2))
 	t.ok(ctx, prog.num_edicts > queued, "StartFrame spawned the queued map entities")
 	local cn = prvm_edict.FieldOfs(prog, "classname")
 	t.eq(

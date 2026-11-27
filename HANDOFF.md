@@ -36,7 +36,7 @@ Every section except §MAP and §DIFFS stays under ~60 lines; detail lives in `d
 - **M2-RUNNER done** (stormkeep entities load, first StartFrame spawns them; world builtins wait on M3).
   ~170 builtins ported; server state (engine/server.luau), SZ/MSG writes, mathlib bit-exact.
 - **M2-AOT-SHIP (claimed, Claude-Anvil):** lazy chunk loading + background preload; Q-014 (startup 17.7 s).
-- **Tests:** 33 Lune files; all pass except sv_loadentities (see M4-SPAWN); StyLua/Selene clean; check_port_lines 0 wrong.
+- **Tests:** 36 Lune files, all pass (with game data and the locally compiled QuakeC); StyLua/Selene clean; check_port_lines 0 wrong.
 - **Stale claims:** M3-BSPLOAD and REF-DP branches have only claim commits from 2026-11-20 — owner to reassign.
 - **Local + Studio (2026-11-25):** the owner cannot use cloud sessions; work happens on the owner's Windows PC.
   Toolchain there: `rokit install` (shims in %USERPROFILE%/.rokit/bin; stylua, selene, lune 14/14, rojo pass).
@@ -72,12 +72,14 @@ Every section except §MAP and §DIFFS stays under ~60 lines; detail lives in `d
 - **PORT-LIBM done:** engine/_port/libm.luau = glibc 2.43 (FMA build) sin / cos / tan / asin / acos / atan /
   atan2 / pow / log in pure Luau, 36,631 vectors identical; no host math.* transcendental call is left in
   engine/ -- **never call math.sin / cos / ... or `^` in engine code, use libm** (G-058).
-- **M4-SPAWN (claimed, Claude-Quartz):** model registry (Mod_FindName / Mod_ForName), SV_SpawnServer,
-  setmodel / precache_model, `map` command. stormkeep and space-elevator spawn with the compiled QuakeC
-  (make it locally: `python tools/qcaot/compile.py work/vfs-high/progs.dat game/generated/progs`), entities
-  link, 100 physics frames run; the first QC init frame stops at the getsurface* stubs. Alias / sprite model
-  loaders are missing (models get the +-16 fallback box). tests/integration/sv_loadentities fails until it is
-  rebased onto SV_SpawnServer. Not checked against the C build. Log: docs/log/2026-11-26-Claude-Quartz.md.
+- **M4-SPAWN (claimed, Claude-Quartz):** model registry, SV_SpawnServer, `map` command, setmodel / precache,
+  getsurface*, Write*, setattachment, gettagindex, frameduration. **stormkeep and space-elevator start with
+  the compiled QuakeC, the QC init frames complete and 300 SV_Physics frames run** (compile the QC locally:
+  `python tools/qcaot/compile.py work/vfs-high/progs.dat game/generated/progs`). Not checked against the C
+  build. Next: gettaginfo / skel_*, SV_StartSound, then clients (sv_user.c) and the host frame loop.
+- **M4-ALIAS done (except PSK, SSE path, OBJ):** engine/model_alias.luau + engine/model_sprite.luau load all
+  536 alias / sprite models of the release (independent decoder: 12,685 checks; C build on fixture models:
+  1,101 lines identical). Log: docs/log/2026-11-26-Claude-Quartz.md (part 5).
 - **Branches (2026-11-25):** PRs 1, 2, 3 merged into main: start every new branch from main (D-012). Owner
   decided NOT to archive the 68 old images (archive-now.tsv is only a list).
 - **Next:** owner: heavymetal.ogg appeal (optional); M1-TEX / M5-RENDER use texture_assets.luau;

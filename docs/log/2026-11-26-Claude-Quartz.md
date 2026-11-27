@@ -130,12 +130,38 @@ None new. (sv.models uses the C index directly, matching model_precache; noted i
   SV_SpawnServer.
 - Not checked against the C build: the registry, SV_SpawnServer, the new builtins.
 
+## Part 5 (2026-11-27): alias / sprite models, surface + message builtins, QC init completes
+- PR 14 merged. Branch M4-SPAWN-init, two Opus sub-agents.
+- **M4-ALIAS:** engine/model_alias.luau (model_alias.c: skeletal helpers, tag functions, bounding boxes,
+  trace functions, skins; loaders mdl, md2, md3, zym, dpm, iqm) and engine/model_sprite.luau (spr, sp2);
+  model_shared.luau: Mod_FrameGroupify + parser, Mod_BuildTriangleNeighbors, Mod_ValidateElements,
+  Mod_BuildNormals, Mod_LoadSkinFiles / FreeSkinFiles / CountSkinFiles, dispatch hooks; matrixlib.luau: 13 more
+  functions (bone poses, quaternions, Normalize3 ...). Census of work/vfs-high by magic: md3 273, iqm 152,
+  dpm 52, spr 41, obj 31, bsp 31, mdl 13, sp2 3, zym 2, psk 0, md2 0.
+  Check A: tests/integration/model_alias.test.luau, all 536 models load, 12,685 checks against the independent
+  decoder tools/testgen/models_vectors.py (tests/vectors/models.tsv). Check B: C build on fixture models
+  (tools/testgen/make_model_fixtures.py, alias_vectors.{c,sh}, tests/fixtures/models, tests/vectors/alias.tsv,
+  tests/unit/model_alias_ref.test.luau): 1,101 lines identical. Open: Mod_PSKMODEL_Load (no release file),
+  the SSE skeletal path (the release uses it on x86; the generic path is ported and equal on the fixtures),
+  the OBJ loader (model_brush.c, 31 files), raw MDL normals (m_bytenormals literals) not in the C vectors.
+- engine/prvm_cmds.luau: getsurface* (#434-439, #486, #628, #629) with getmodel / animatemodel / getmatrix /
+  applytransform_* / clippointtosurface, VM_uri_get (the no-libcurl path); Matrix4x4_Invert_Full and
+  Matrix4x4_Transform3x3 are local there for now (move to matrixlib.luau). animatemodel's animated-mesh path
+  uses the base arrays (NOT YET PORTED, logged). engine/svvm_cmds.luau: WriteDest + Write* (#52-59, #456),
+  WritePicture #501, setattachment #443, setpause #531, SV_GetEntityMatrix, SV_GetTagIndex, gettagindex #451,
+  frameforname #276, frameduration #277. MSG_ONE has no netconnection yet ("non-client" branch).
+- **The QC init frames now complete** on stormkeep and space-elevator; 300 SV_Physics frames run (sv.state
+  ss_active; stormkeep 4,050 live edicts, space-elevator 4,222). tests/unit/getsurface.test.luau 1,899 checks.
+- The three older server integration tests were rebased onto SV_SpawnServer (stopped at its
+  PRVM_ED_LoadFromFile call) and made order-independent: fixed srand, pinned Sys_DirtyTime and the new
+  prvm_cmds.time() hook (worldspawn formats strftime / gettime values, which shifted temp-string offsets).
+- Not checked against the C build: registry, SV_SpawnServer, getsurface*, Write*, the tag / frame builtins.
+
 ## Next step
-1. prvm_cmds.c getsurface* (#434-437 and friends), frameduration #277, gettagindex #451, setattachment #443,
-   so the QC init frame completes; rebase the two old server integration tests onto SV_SpawnServer.
-2. model_alias.c + the format loaders (md3 / iqm / dpm / zym / psk), model_sprite.c: real model boxes, frames,
-   tags (gettagindex needs them).
-3. SV_StartSound, WriteByte / WriteShort and the rest of the message builtins, SV_ClientThink (sv_user.c),
-   checkclient / checkpvs / aim (PVS), then the host frame loop (Host_Main / SV_Frame).
-4. C reference for the registry / SV_SpawnServer / setmodel where feasible.
-5. Mod_Q3BSP_LoadLightmaps, tokenizer speed, BIH leaf memory, cached field offsets; compress the big vectors.
+1. gettaginfo #452 and the skel_* builtins (model_alias exports what they need), SV_StartSound and the other
+   builtins still stubbed: run a bot match's worth of frames with `onStub` to list them.
+2. Clients: sv_user.c (SV_ClientThink, user commands, player physics hooks), SV_ConnectClient / spawn of a
+   bot or local player, the host frame loop (Host_Main / SV_Frame) -- then a player walks on the map.
+3. C reference for the registry / SV_SpawnServer / setmodel / getsurface* / Write* where feasible.
+4. Mod_PSKMODEL_Load, the SSE skeletal path, OBJ loader, Mod_Q3BSP_LoadLightmaps; tokenizer speed, BIH leaf
+   memory, cached field offsets; compress the big vectors.
