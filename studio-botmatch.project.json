@@ -1,0 +1,48 @@
+{
+	"name": "XonoticBotMatch",
+	"tree": {
+		"$className": "DataModel",
+		"Workspace": {
+			"$className": "Workspace"
+		},
+		"ReplicatedStorage": {
+			"Xonotic": {
+				"$className": "Folder",
+				"engine": {
+					"$path": "engine"
+				},
+				"platform": {
+					"$className": "Folder",
+					"render": {
+						"$path": "platform/render"
+					}
+				}
+			},
+			"BotMatch": {
+				"$path": "tools/studio/botmatch"
+			}
+		},
+		"ServerStorage": {
+			"XonoticGame": {
+				"$className": "Folder",
+				"progs": {
+					"$path": "game/generated/progs"
+				},
+				"vfs": {
+					"$path": "game/generated/vfs"
+				}
+			}
+		},
+		"ServerScriptService": {
+			"$className": "ServerScriptService"
+		},
+		"StarterPlayer": {
+			"$className": "StarterPlayer"
+		},
+		"Lighting": {
+			"$properties": {
+				"Technology": "Future"
+			}
+		}
+	}
+}

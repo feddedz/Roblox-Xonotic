@@ -22,6 +22,9 @@ LIMIT = 180_000  # chars of source per module (D-020: ≤ 190k)
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--build", default="high")
+    ap.add_argument("--also", action="append", default=[], metavar="LISTFILE",
+                    help="also pack the files named in LISTFILE (one VFS path per line; repeatable), "
+                         "e.g. work/studio/botmatch_files.txt from tools/studio/list_botmatch_files.luau")
     a = ap.parse_args()
     rows = [l.split("\t") for l in (ROOT / f"assets/manifest/vfs-{a.build}.tsv").read_text().splitlines()
             if l and not l.startswith("#")]
@@ -29,6 +32,17 @@ def main() -> None:
     pk3s = sorted({r[2] for r in rows})
     pack_of = "".join(chr(48 + pk3s.index(r[2])) for r in rows)  # one char per name, same order
     want = [r[0] for r in rows if r[1] == "config" or r[0] == "progs.dat"]
+    if a.also:
+        extra: set[str] = set()
+        for lf in a.also:
+            p = Path(lf) if Path(lf).is_absolute() else ROOT / lf
+            extra.update(l.strip() for l in p.read_text().splitlines() if l.strip())
+        known = set(names)
+        missing = sorted(extra - known)
+        if missing:
+            raise SystemExit(f"--also: {len(missing)} paths are not in the VFS manifest, e.g. {missing[:5]}")
+        have = set(want)
+        want += [n for n in names if n in extra and n not in have]  # manifest order, after the default set
     out = ROOT / "game/generated/vfs"
     out.mkdir(parents=True, exist_ok=True)
     for old in out.glob("*.luau"):
@@ -160,6 +174,9 @@ return {{
 ''')
     total = sum((out / f"{m}.luau").stat().st_size for m in mods)
     print(f"packed {len(names)} names, {len(want)} files into {len(mods)} modules ({total / 1e6:.1f} MB) -> {out.relative_to(ROOT)}")
+    if a.also:
+        raw = sum((ROOT / f"work/vfs-{a.build}" / v).stat().st_size for v in want)
+        print(f"  (--also: {len(want)} files, {raw / 1e6:.1f} MB raw before base64)")
 
 
 if __name__ == "__main__":
