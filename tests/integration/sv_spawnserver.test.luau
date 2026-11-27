@@ -48,6 +48,10 @@ return function(ctx: t.Ctx)
 	end
 	fs.SetProvider(p)
 	host.Host_Init_Dedicated()
+	-- a fresh process: sv zeroed (another test in this Lune process may have left a server running)
+	server.Clear()
+	require("../../engine/host_cmd").sv_active = false
+	require("../../engine/svvm_cmds").VM_CustomStats_Clear()
 
 	local stubs: { [string]: number } = {}
 	local generated = (require :: any)("../../game/generated/progs")
@@ -91,41 +95,27 @@ return function(ctx: t.Ctx)
 			ok, err = pcall(sv_main.SV_SpawnServer, name)
 		end
 		local spawnstubs = sorted(stubs)
-		-- KNOWN BLOCKER (2026-11-26): the QC warpzone setup in the first init frame (StartFrame) needs
-		-- VM_getsurfacetexture / getsurfacenumpoints / getsurfacepoint / getsurfacenormal (prvm_cmds.c
-		-- L7005-7157, not ported: engine/prvm_cmds.luau). With the stub it stops in a QC error
-		-- ("cannot infer origin/angles for this warpzone"). Until they exist the stop is accepted here only
-		-- when it is that QC error and getsurfacetexture was called as a stub; everything before the init
-		-- frames (world model, precaches, area grid, entity load) is still checked below.
-		local blocked = not ok
-			and string.find(tostring(err), "WarpZone_InitStep_UpdateTransform", 1, true) ~= nil
-			and stubs["#437 VM_getsurfacetexture"] ~= nil
-		t.ok(ctx, ok or blocked, name .. ": SV_SpawnServer completes: " .. tostring(err))
+		local allstubs: { [string]: number } = table.clone(stubs)
+		-- SV_SpawnServer runs the QC init frames (sv_main.c: the two SV_Physics frames with sv.state ==
+		-- ss_loading); they must finish without a QC error (the warpzone setup needs the getsurface* builtins)
+		t.ok(ctx, ok, name .. ": SV_SpawnServer and its QC init frames complete without a QC error: " .. tostring(err))
 		print(
 			string.format(
 				"  %s: SV_SpawnServer %s",
 				name,
-				if ok
-					then "completed"
-					elseif blocked then "STOPPED IN THE FIRST INIT FRAME (known blocker: getsurface* builtins): "
-						.. string.gsub(tostring(err), "\n.*", "")
-					else "stopped: " .. tostring(err)
+				if ok then "completed (QC init frames finished)" else "stopped: " .. tostring(err)
 			)
 		)
 		local sv = server.sv
 		local prog: any = cvar.prvm_prog_list[0]
-		if not (ok or blocked) or not prog then
+		if not ok or not prog then
 			print("  stubs while spawning: " .. spawnstubs)
 			return
 		end
 		local worldname = "maps/" .. name .. ".bsp"
 		local wm = sv.worldmodel
 		t.ok(ctx, sv.active, name .. ": sv.active")
-		if ok then
-			t.eq(ctx, sv.state, server.ss_active, name .. ": sv.state == ss_active")
-		else
-			t.eq(ctx, sv.state, server.ss_loading, name .. ": sv.state is still ss_loading (stopped in an init frame)")
-		end
+		t.eq(ctx, sv.state, server.ss_active, name .. ": sv.state == ss_active")
 		t.eq(ctx, sv.worldname, worldname, name .. ": sv.worldname")
 		t.eq(ctx, sv.name, name, name .. ": sv.name")
 		t.eq(ctx, sv.worldbasename, name, name .. ": sv.worldbasename")
@@ -302,25 +292,22 @@ return function(ctx: t.Ctx)
 		print("  stubs while spawning: " .. spawnstubs)
 		-- server frames
 		table.clear(stubs)
-		local frames = 100
-		local failedframes, otherfail, errf = 0, 0, nil :: any
+		local frames = 300
+		local failedframes, errf = 0, nil :: any
 		for _ = 1, frames do
 			sv.frametime = 0.0166667 -- sys_ticrate default of Xonotic (frame time is a double)
 			local okf1, e1 = pcall(sv_phys.SV_Physics)
 			if not okf1 then
 				failedframes += 1
 				errf = errf or e1
-				if not (blocked and string.find(tostring(e1), "WarpZone_InitStep_UpdateTransform", 1, true)) then
-					otherfail += 1
-				end
 			end
 		end
 		local okf = failedframes == 0
 		t.eq(
 			ctx,
-			otherfail,
+			failedframes,
 			0,
-			name .. ": SV_Physics frames run (no error except the known blocker): " .. tostring(errf)
+			name .. ": " .. frames .. " SV_Physics frames run without a QC error: " .. tostring(errf)
 		)
 		if failedframes > 0 then
 			print(
@@ -341,16 +328,26 @@ return function(ctx: t.Ctx)
 		end
 		print(
 			string.format(
-				"  %s: %d SV_Physics frames %s; sv.time %.4f, num_edicts %d, %d live",
+				"  %s: %d SV_Physics frames %s; sv.time %.4f, num_edicts %d, %d live; message buffers (never sent: no SV_SendClientMessages yet): datagram %d, reliable_datagram %d, signon %d bytes; paused %s",
 				name,
 				frames,
 				if okf then "ran" else "stopped: " .. tostring(errf),
 				sv.time,
 				prog.num_edicts,
-				live2
+				live2,
+				sv.datagram.cursize,
+				sv.reliable_datagram.cursize,
+				sv.signon.cursize,
+				tostring(sv.paused)
 			)
 		)
 		print("  stubs while running frames: " .. sorted(stubs))
+		for k, v in stubs do
+			allstubs[k] = (allstubs[k] or 0) + v
+		end
+		print(
+			string.format("  %s: builtins still hit as stubs (spawn + %d frames): %s", name, frames, sorted(allstubs))
+		)
 	end
 
 	runmap("stormkeep", true)

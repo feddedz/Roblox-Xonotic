@@ -30,9 +30,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 	Mod_CreateShaderPassFromQ3ShaderLayer, Mod_LoadTextureFromQ3Shader (end of this file; the renderer calls
 	they make on a client are hooks, see R_SkinFrame_LoadMissing below).
 	Model registry (task M4-SPAWN): Mod_Init (dedicated part), Mod_UnloadModel, Mod_FindPotentialDeforms,
-	Mod_LoadModel (Q3 BSP through model_brush.Mod_IBSP_Load; the other format loaders log NOT YET PORTED and
-	leave the 16-unit default box), Mod_ClearUsed, Mod_PurgeUnused, Mod_FindName, Mod_ForName, Mod_Reload.
-	NOT YET PORTED: everything else (the alias / sprite / OBJ / Q1BSP loaders, Mod_FrameGroupify, mod_start /
+	Mod_LoadModel (Q3 BSP through model_brush.Mod_IBSP_Load; alias models through engine/model_alias.luau and
+	sprites through engine/model_sprite.luau, which install their loaders here; OBJ / Q1BSP / MAP log NOT YET
+	PORTED and leave the 16-unit default box), Mod_ClearUsed, Mod_PurgeUnused, Mod_FindName, Mod_ForName,
+	Mod_Reload.
+	For the alias / sprite loaders (task M4-ALIAS): Mod_FrameGroupify and its parser, Mod_LoadSkinFiles /
+	Mod_FreeSkinFiles / Mod_CountSkinFiles, Mod_ValidateElements, Mod_BuildNormals, Mod_BuildTriangleNeighbors.
+	NOT YET PORTED: everything else (the OBJ / Q1BSP loaders, Mod_BuildVBOs (renderer buffers), mod_start /
 	mod_shutdown / mod_newmap (renderer module), Mod_Print / Mod_Precache / Mod_Decompile_f commands,
 	skins, shadow meshes, lightmap allocation, ...).
 ]]
@@ -66,6 +70,30 @@ model_shared.loadmodel = nil :: any
 ]]
 model_shared.Mod_IBSP_Load = nil :: any -- model_brush.c Mod_IBSP_Load (installed by model_brush.luau)
 model_shared.Mod_BrushInit = nil :: any -- model_brush.c Mod_BrushInit (installed by model_brush.luau)
+-- model_alias.c / model_sprite.c entry points, installed by model_alias.luau / model_sprite.luau when they load
+-- (they require this module; ensure_alias_sprite below loads them on first use, after this module is done)
+model_shared.Mod_AliasInit = nil :: any
+model_shared.Mod_IDP0_Load = nil :: any
+model_shared.Mod_IDP2_Load = nil :: any
+model_shared.Mod_IDP3_Load = nil :: any
+model_shared.Mod_ZYMOTICMODEL_Load = nil :: any
+model_shared.Mod_DARKPLACESMODEL_Load = nil :: any
+model_shared.Mod_PSKMODEL_Load = nil :: any
+model_shared.Mod_INTERQUAKEMODEL_Load = nil :: any
+model_shared.Mod_SpriteInit = nil :: any
+model_shared.Mod_IDSP_Load = nil :: any
+model_shared.Mod_IDS2_Load = nil :: any
+
+-- port support: load model_alias.luau and model_sprite.luau (no require cycle: this runs after model_shared has
+-- finished loading, so their require of model_shared gets the finished module)
+local function ensure_alias_sprite()
+	if model_shared.Mod_AliasInit == nil then
+		require("./model_alias")
+	end
+	if model_shared.Mod_SpriteInit == nil then
+		require("./model_sprite")
+	end
+end
 
 local registry: { records: { [number]: any }, allocflags: { [number]: boolean } } = { records = {}, allocflags = {} }
 model_shared.registry = registry
@@ -179,8 +207,9 @@ function model_shared.Mod_Init()
 	registry.allocflags = {}
 
 	model_shared.Mod_BrushInit()
-	NOT_YET_PORTED("Mod_AliasInit (model_alias.c)")
-	NOT_YET_PORTED("Mod_SpriteInit (model_sprite.c)")
+	ensure_alias_sprite()
+	model_shared.Mod_AliasInit()
+	model_shared.Mod_SpriteInit()
 
 	-- Cvar_RegisterVariable(&r_enableshadowvolumes) ... (&mod_generatelightmaps_gridradius): registered by
 	-- engine/host.luau from engine/_port/sv_init_defs.luau, like every cvar of the dedicated init path.
@@ -390,28 +419,29 @@ function model_shared.Mod_LoadModel(mod: any, crash: boolean, checkdisk: boolean
 		end
 		-- call the apropriate loader
 		model_shared.loadmodel = mod
+		ensure_alias_sprite()
 		if string.lower(FS_FileExtension(mod.name)) == "obj" then
 			loader_not_ported("Mod_OBJ_Load (model_brush.c)", mod)
 		elseif magic("IDPO") then
-			loader_not_ported("Mod_IDP0_Load (model_alias.c)", mod)
+			model_shared.Mod_IDP0_Load(mod, data)
 		elseif magic("IDP2") then
-			loader_not_ported("Mod_IDP2_Load (model_alias.c)", mod)
+			model_shared.Mod_IDP2_Load(mod, data)
 		elseif magic("IDP3") then
-			loader_not_ported("Mod_IDP3_Load (model_alias.c)", mod)
+			model_shared.Mod_IDP3_Load(mod, data)
 		elseif magic("IDSP") then
-			loader_not_ported("Mod_IDSP_Load (model_sprite.c)", mod)
+			model_shared.Mod_IDSP_Load(mod, data)
 		elseif magic("IDS2") then
-			loader_not_ported("Mod_IDS2_Load (model_sprite.c)", mod)
+			model_shared.Mod_IDS2_Load(mod, data)
 		elseif magic("IBSP") then
 			model_shared.Mod_IBSP_Load(mod, data)
 		elseif magic("ZYMOTICMODEL") then
-			loader_not_ported("Mod_ZYMOTICMODEL_Load (model_alias.c)", mod)
+			model_shared.Mod_ZYMOTICMODEL_Load(mod, data)
 		elseif magic("DARKPLACESMODEL\0") then
-			loader_not_ported("Mod_DARKPLACESMODEL_Load (model_alias.c)", mod)
+			model_shared.Mod_DARKPLACESMODEL_Load(mod, data)
 		elseif magic("ACTRHEAD") then
-			loader_not_ported("Mod_PSKMODEL_Load (model_alias.c)", mod)
+			model_shared.Mod_PSKMODEL_Load(mod, data)
 		elseif magic("INTERQUAKEMODEL\0") then
-			loader_not_ported("Mod_INTERQUAKEMODEL_Load (model_alias.c)", mod)
+			model_shared.Mod_INTERQUAKEMODEL_Load(mod, data)
 		elseif #mod.name >= 4 and string.sub(mod.name, -4) == ".map" then
 			loader_not_ported("Mod_MAP_Load (model_brush.c)", mod)
 		elseif num == 29 or num == 30 or magic("BSP2") or magic("2PSB") then -- BSPVERSION 29
@@ -426,7 +456,8 @@ function model_shared.Mod_LoadModel(mod: any, crash: boolean, checkdisk: boolean
 		-- va(vabuf, sizeof(vabuf), "%s.framegroups", mod->name): vabuf is char[1024]
 		local fg = fs.FS_LoadFile(string.sub(mod.name .. ".framegroups", 1, 1023), false)
 		if fg then
-			NOT_YET_PORTED("Mod_FrameGroupify (model_shared.c L322-341), for " .. mod.name)
+			model_shared.Mod_FrameGroupify(mod, fg)
+			-- Mem_Free(buf);
 		end
 
 		-- Mod_BuildVBOs(): OpenGL vertex buffers (no renderer on the server)
@@ -784,6 +815,446 @@ function model_shared.Mod_MakeSortedSurfaces(mod: any)
 		sorted[firstsurfacefortexture[t + 1] + 1] = k + mod.firstmodelsurface
 		firstsurfacefortexture[t + 1] += 1
 	end
+end
+
+-- ---------------------------------------------------------------------------------------------------------
+-- Mesh helpers and skin files the alias / sprite loaders call (task M4-ALIAS)
+
+-- #if 1: fast way, using an edge hash
+local TRIANGLEEDGEHASH = 8192
+-- port: model_shared.c Mod_BuildTriangleNeighbors L709-777 @xonotic-v0.8.6
+-- (neighbors, elements: i32 buffers from triangle 0. The hash chains are Luau arrays walked from the last
+-- entry, as the C pushes each entry at the head of its chain.)
+function model_shared.Mod_BuildTriangleNeighbors(neighbors: buffer, elements: buffer, numtriangles: number)
+	if numtriangles == 0 then
+		return
+	end
+	local edgehash: { [number]: { number } } = {}
+	-- entry k (= i * 3 + j) holds triangle i and the edge (e[p], e[j])
+	local htri = table.create(numtriangles * 3, 0)
+	local he1 = table.create(numtriangles * 3, 0)
+	local he2 = table.create(numtriangles * 3, 0)
+	-- find neighboring triangles
+	for i = 0, numtriangles - 1 do
+		local p = 2
+		for j = 0, 2 do
+			local e1 = readi32(elements, (i * 3 + p) * 4)
+			local e2 = readi32(elements, (i * 3 + j) * 4)
+			-- this hash index works for both forward and backward edges
+			local hashindex = ((e1 + e2) % 4294967296) % TRIANGLEEDGEHASH
+			local k = i * 3 + j
+			local chain = edgehash[hashindex]
+			if not chain then
+				chain = {}
+				edgehash[hashindex] = chain
+			end
+			table.insert(chain, k)
+			htri[k + 1] = i
+			he1[k + 1] = e1
+			he2[k + 1] = e2
+			p = j
+		end
+	end
+	for i = 0, numtriangles - 1 do
+		local p = 2
+		for j = 0, 2 do
+			local e1 = readi32(elements, (i * 3 + p) * 4)
+			local e2 = readi32(elements, (i * 3 + j) * 4)
+			-- this hash index works for both forward and backward edges
+			local hashindex = ((e1 + e2) % 4294967296) % TRIANGLEEDGEHASH
+			local count = 0
+			local match = -1
+			local chain = edgehash[hashindex]
+			for c = #chain, 1, -1 do
+				local k = chain[c] + 1
+				if he1[k] == e2 and he2[k] == e1 then
+					if htri[k] ~= i then
+						match = htri[k]
+					end
+					count += 1
+				elseif he1[k] == e1 and he2[k] == e2 then
+					count += 1
+				end
+			end
+			-- detect edges shared by three triangles and make them seams
+			if count > 2 then
+				match = -1
+			end
+			writei32(neighbors, (i * 3 + p) * 4, match)
+			p = j
+		end
+
+		-- also send a keepalive here (this can take a while too!)
+		-- CL_KeepaliveMessage(false): network keepalive while loading, no effect on the data (not ported)
+	end
+	-- free the allocated buffer
+end
+
+-- port: model_shared.c Mod_ValidateElements L819-834 @xonotic-v0.8.6 (elements: i32 buffer + byte offset)
+function model_shared.Mod_ValidateElements(
+	elements: buffer,
+	eofs: number,
+	numtriangles: number,
+	firstvertex: number,
+	numverts: number,
+	filename: string,
+	fileline: number
+)
+	local warned = false
+	local endvertex = firstvertex + numverts
+	for i = 0, numtriangles * 3 - 1 do
+		local o = eofs + i * 4
+		local e = readi32(elements, o)
+		if e < firstvertex or e >= endvertex then
+			if not warned then
+				warned = true
+				Con_Printf("Mod_ValidateElements: out of bounds elements detected at %s:%d\n", filename, fileline)
+			end
+			writei32(elements, o, firstvertex)
+		end
+	end
+end
+
+-- warning: this is an expensive function!
+-- port: model_shared.c Mod_BuildNormals L837-875 @xonotic-v0.8.6
+-- (vertex3f / normal3f: f32 buffers from vertex 0; elements: i32 buffer + byte offset)
+function model_shared.Mod_BuildNormals(
+	firstvertex: number,
+	numvertices: number,
+	numtriangles: number,
+	vertex3f: buffer,
+	elements: buffer,
+	eofs: number,
+	normal3f: buffer,
+	areaweighting: boolean
+)
+	-- clear the vectors
+	buffer.fill(normal3f, 3 * firstvertex * 4, 0, numvertices * 12)
+	-- process each vertex of each triangle and accumulate the results
+	-- use area-averaging, to make triangles with a big area have a bigger
+	-- weighting on the vertex normal than triangles with a small area
+	-- to do so, just add the 'normals' together (the bigger the area
+	-- the greater the length of the normal is
+	for i = 0, numtriangles - 1 do
+		local eo = eofs + i * 12
+		local a = readi32(elements, eo) * 12
+		local b = readi32(elements, eo + 4) * 12
+		local c = readi32(elements, eo + 8) * 12
+		local a0, a1, a2 = readf32(vertex3f, a), readf32(vertex3f, a + 4), readf32(vertex3f, a + 8)
+		local b0, b1, b2 = readf32(vertex3f, b), readf32(vertex3f, b + 4), readf32(vertex3f, b + 8)
+		local c0, c1, c2 = readf32(vertex3f, c), readf32(vertex3f, c + 4), readf32(vertex3f, c + 8)
+		-- TriangleNormal (mathlib.h L140-144)
+		local n0 = R(R(R(a1 - b1) * R(c2 - b2)) - R(R(a2 - b2) * R(c1 - b1)))
+		local n1 = R(R(R(a2 - b2) * R(c0 - b0)) - R(R(a0 - b0) * R(c2 - b2)))
+		local n2 = R(R(R(a0 - b0) * R(c1 - b1)) - R(R(a1 - b1) * R(c0 - b0)))
+
+		if not areaweighting then
+			-- VectorNormalize (mathlib.h)
+			local ilength = R(math.sqrt(R(R(R(n0 * n0) + R(n1 * n1)) + R(n2 * n2))))
+			if ilength ~= 0 then
+				ilength = R(1.0 / ilength)
+			end
+			n0, n1, n2 = R(n0 * ilength), R(n1 * ilength), R(n2 * ilength)
+		end
+
+		for j = 0, 2 do
+			local o = readi32(elements, eo + j * 4) * 12
+			writef32(normal3f, o, readf32(normal3f, o) + n0)
+			writef32(normal3f, o + 4, readf32(normal3f, o + 4) + n1)
+			writef32(normal3f, o + 8, readf32(normal3f, o + 8) + n2)
+		end
+	end
+	-- and just normalize the accumulated vertex normal in the end
+	for i = 0, numvertices - 1 do
+		VectorNormalize_b(normal3f, (firstvertex + i) * 12)
+	end
+end
+
+--[[
+	skinfile_t / skinfileitem_t (model_shared.h): { next: skinfile?, items: skinfileitem? } and
+	{ next: skinfileitem?, name: string, replacement: string } (linked lists as in C; nil = NULL).
+]]
+-- port: model_shared.c Mod_LoadSkinFiles L2873-2976 @xonotic-v0.8.6
+function model_shared.Mod_LoadSkinFiles(): any
+	local loadmodel = model_shared.loadmodel
+	local words: number
+	local wordsoverflow: boolean
+	local skinfile: any = nil
+	local first: any = nil
+	-- char word[10][MAX_QPATH], cleared once: a line with fewer words keeps the words of the lines before it
+	local word: { string } = { "", "", "", "", "", "", "", "", "", "" }
+	local developer_loading = cvarint_ms("developer_loading", 0) ~= 0
+	local QC = common.COM_ParseToken_QuakeC
+
+	--[[
+sample file:
+U_bodyBox,models/players/Legoman/BikerA2.tga
+U_RArm,models/players/Legoman/BikerA1.tga
+U_LArm,models/players/Legoman/BikerA1.tga
+U_armor,common/nodraw
+U_sword,common/nodraw
+U_shield,common/nodraw
+U_homb,common/nodraw
+U_backpack,common/nodraw
+U_colcha,common/nodraw
+tag_head,
+tag_weapon,
+tag_torso,
+]]
+	local i = 0
+	while i < 256 do
+		-- va(vabuf, sizeof(vabuf), "%s_%i.skin", loadmodel->name, i): vabuf is char[1024]
+		local text = fs.FS_LoadFile(string.sub(string.format("%s_%d.skin", loadmodel.name, i), 1, 1023), true)
+		if not text then
+			break
+		end
+		-- (the C buffer is a C string: it ends at the first NUL)
+		local nul = string.find(text, "\0", 1, true)
+		if nul then
+			text = string.sub(text, 1, nul - 1)
+		end
+		local data: number? = 1
+		-- If it's the first file we parse
+		if skinfile == nil then
+			skinfile = { next = nil, items = nil }
+			first = skinfile
+		else
+			skinfile.next = { next = nil, items = nil }
+			skinfile = skinfile.next
+		end
+		skinfile.next = nil
+
+		local line = 0
+		while true do
+			-- parse line
+			local ok
+			ok, data = QC(text, data, true)
+			if not ok then
+				break
+			end
+			if common.com_token == "\n" then
+				line += 1
+				continue
+			end
+			words = 0
+			wordsoverflow = false
+			repeat
+				if words < 10 then
+					words += 1
+					word[words] = string.sub(common.com_token, 1, 127) -- strlcpy(word[words++], com_token, sizeof (word[0]))
+				else
+					wordsoverflow = true
+				end
+				ok, data = QC(text, data, true)
+			until not (ok and common.com_token ~= "\n")
+			if wordsoverflow then
+				Con_Printf(
+					'Mod_LoadSkinFiles: parsing error in file "%s_%i.skin" on line #%i: line with too many statements, skipping\n',
+					loadmodel.name,
+					i,
+					line
+				)
+				line += 1
+				continue
+			end
+			-- words is always >= 1
+			-- selene: allow(empty_if)
+			if word[1] == "replace" then
+				if words == 3 then
+					if developer_loading then
+						Con_Printf('Mod_LoadSkinFiles: parsed mesh "%s" shader replacement "%s"\n', word[2], word[3])
+					end
+					local skinfileitem = { next = skinfile.items, name = word[2], replacement = word[3] }
+					skinfile.items = skinfileitem
+				else
+					Con_Printf(
+						'Mod_LoadSkinFiles: parsing error in file "%s_%i.skin" on line #%i: wrong number of parameters to command "%s", see documentation in DP_GFX_SKINFILES extension in dpextensions.qc\n',
+						loadmodel.name,
+						i,
+						line,
+						word[1]
+					)
+				end
+			elseif words >= 2 and string.sub(word[1], 1, 4) == "tag_" then
+				-- tag name, like "tag_weapon,"
+				-- not used for anything (not even in Quake3)
+			elseif words >= 2 and word[2] == "," then
+				-- mesh shader name, like "U_RArm,models/players/Legoman/BikerA1.tga"
+				if developer_loading then
+					Con_Printf('Mod_LoadSkinFiles: parsed mesh "%s" shader replacement "%s"\n', word[1], word[3])
+				end
+				local skinfileitem = { next = skinfile.items, name = word[1], replacement = word[3] }
+				skinfile.items = skinfileitem
+			else
+				Con_Printf(
+					'Mod_LoadSkinFiles: parsing error in file "%s_%i.skin" on line #%i: does not look like tag or mesh specification, or replace command, see documentation in DP_GFX_SKINFILES extension in dpextensions.qc\n',
+					loadmodel.name,
+					i,
+					line
+				)
+			end
+			line += 1
+		end
+		-- Mem_Free(text);
+		i += 1
+	end
+	if i ~= 0 then
+		loadmodel.numskins = i
+	end
+	return first
+end
+
+-- port: model_shared.c Mod_FreeSkinFiles L2978-2992 @xonotic-v0.8.6 (memory only: nothing to do here)
+function model_shared.Mod_FreeSkinFiles(_skinfile: any) end
+
+-- port: model_shared.c Mod_CountSkinFiles L2994-2999 @xonotic-v0.8.6
+function model_shared.Mod_CountSkinFiles(skinfile: any): number
+	local i = 0
+	while skinfile do
+		skinfile = skinfile.next
+		i += 1
+	end
+	return i
+end
+
+-- port: model_shared.c Mod_FrameGroupify_ParseGroups L234-305 @xonotic-v0.8.6
+-- (cb: the callback, or nil = NULL; name nil = NULL)
+local function Mod_FrameGroupify_ParseGroups(
+	buf: string,
+	cb: ((number, number, number, number, boolean, string?, any) -> ())?,
+	pass: any
+): number
+	local bufptr: number?
+	local start: number
+	local len: number
+	local fps: number
+	local i: number
+	local loop: boolean
+	local name: string
+	local P = common.COM_ParseToken_Simple
+	local function tok(): string
+		return common.com_token
+	end
+
+	bufptr = 1
+	i = 0
+	while bufptr do
+		-- an anim scene!
+
+		-- REQUIRED: fetch start
+		bufptr = select(2, P(buf, bufptr, true, false, true))
+		if not bufptr then
+			break -- end of file
+		end
+		if tok() == "\n" then
+			continue -- empty line
+		end
+		start = libc.atoi(tok())
+
+		-- REQUIRED: fetch length
+		bufptr = select(2, P(buf, bufptr, true, false, true))
+		if not bufptr or tok() == "\n" then
+			Con_Printf("framegroups file: missing number of frames\n")
+			continue
+		end
+		len = libc.atoi(tok())
+
+		-- OPTIONAL args start
+		bufptr = select(2, P(buf, bufptr, true, false, true))
+
+		-- OPTIONAL: fetch fps
+		fps = 20
+		if bufptr and tok() ~= "\n" then
+			fps = R(libc.atof(tok()))
+			bufptr = select(2, P(buf, bufptr, true, false, true))
+		end
+
+		-- OPTIONAL: fetch loopflag
+		loop = true
+		if bufptr and tok() ~= "\n" then
+			loop = (libc.atoi(tok()) ~= 0)
+			bufptr = select(2, P(buf, bufptr, true, false, true))
+		end
+
+		-- OPTIONAL: fetch name
+		name = ""
+		if bufptr and tok() ~= "\n" then
+			name = string.sub(tok(), 1, 63) -- strlcpy(name, com_token, sizeof(name))
+			bufptr = select(2, P(buf, bufptr, true, false, true))
+		end
+
+		-- OPTIONAL: remaining unsupported tokens (eat them)
+		while bufptr and tok() ~= "\n" do
+			bufptr = select(2, P(buf, bufptr, true, false, true))
+		end
+
+		--Con_Printf("data: %d %d %d %f %d (%s)\n", i, start, len, fps, loop, name);
+
+		if cb then
+			cb(i, start, len, fps, loop, if name ~= "" then name else nil, pass)
+		end
+		i += 1
+	end
+
+	return i
+end
+
+-- port: model_shared.c Mod_FrameGroupify_ParseGroups_Store L307-320 @xonotic-v0.8.6
+local function Mod_FrameGroupify_ParseGroups_Store(
+	i: number,
+	start: number,
+	len: number,
+	fps: number,
+	loop: boolean,
+	name: string?,
+	pass: any
+)
+	local mod = pass
+	local anim = mod.animscenes[i + 1]
+	if name then
+		anim.name = string.sub(name, 1, 31) -- strlcpy(anim->name, name, sizeof(anim[i].name))
+	else
+		anim.name = string.sub(string.format("groupified_%d_anim", i), 1, 31)
+	end
+	-- bound(0, start, mod->num_poses - 1), bound(1, len, ...), max(1, fps) (mathlib.h ternaries)
+	local num_poses = mod.num_poses or 0 -- (0 in a zeroed dp_model_t: sprites do not set it)
+	local hi = num_poses - 1
+	anim.firstframe = if start >= 0 then (if start < hi then start else hi) else 0
+	hi = num_poses - anim.firstframe
+	anim.framecount = if len >= 1 then (if len < hi then len else hi) else 1
+	anim.framerate = if 1 > fps then 1 else fps
+	anim.loop = loop
+	--Con_Printf("frame group %d is %d %d %f %d\n", i, start, len, fps, loop);
+end
+
+-- port: model_shared.c Mod_FrameGroupify L322-341 @xonotic-v0.8.6
+function model_shared.Mod_FrameGroupify(mod: any, buf: string)
+	local cnt: number
+
+	-- (the C buffer is a C string: it ends at the first NUL)
+	local nul = string.find(buf, "\0", 1, true)
+	if nul then
+		buf = string.sub(buf, 1, nul - 1)
+	end
+
+	-- 0. count
+	cnt = Mod_FrameGroupify_ParseGroups(buf, nil, nil)
+	if cnt == 0 then
+		Con_Printf("no scene found in framegroups file, aborting\n")
+		return
+	end
+	mod.numframes = cnt
+
+	-- 1. reallocate
+	-- (we do not free the previous animscenes, but model unloading will free the pool owning them, so it's okay)
+	local scenes = table.create(cnt)
+	for k = 1, cnt do
+		scenes[k] = { name = "", firstframe = 0, framecount = 0, loop = false, framerate = 0 }
+	end
+	mod.animscenes = scenes
+
+	-- 2. parse
+	Mod_FrameGroupify_ParseGroups(buf, Mod_FrameGroupify_ParseGroups_Store, mod)
 end
 
 -- ---------------------------------------------------------------------------------------------------------

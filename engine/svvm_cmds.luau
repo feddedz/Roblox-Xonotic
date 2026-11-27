@@ -12,6 +12,8 @@ Copyright (C) 1996-1997 Id Software, Inc. (DarkPlaces svvm_cmds.c; GPLv2 or late
 	priv.server->suspendedinairflag (nil = false). sv_phys is required inside the functions (sv_phys ->
 	sv_main -> svvm_cmds would be a require cycle).
 	builtinsprofile counters (prog->xfunction->builtinsprofile) are profiling only and not ported.
+	Also here: the message builtins (WriteDest, WriteByte .. WriteEntity #52-#59, WriteUnterminatedString #456,
+	WritePicture #501 without Image_Compress), setattachment #443, setpause #531 and SV_GetEntityMatrix.
 ]]
 local names = require("./_port/builtin_names")
 
@@ -915,6 +917,403 @@ PORTED.VM_SV_tracetoss = VM_SV_tracetoss
 -- #67 movetogoal: sv_move.c VM_SV_MoveToGoal (engine/sv_move.luau)
 PORTED.VM_SV_MoveToGoal = function(prog: any)
 	require("./sv_move").VM_SV_MoveToGoal(prog)
+end
+
+local notported: { [string]: boolean } = {}
+local function NOT_YET_PORTED(what: string)
+	if not notported[what] then
+		notported[what] = true
+		print("NOT YET PORTED: " .. what)
+	end
+end
+
+--[[
+===============================================================================
+
+MESSAGE WRITING
+
+===============================================================================
+
+	svs.clients is host_cmd.svs.clients (0-based: svs.clients[i] is C svs.clients + i; nil = zeroed memory); a
+	client's netconnection is a table whose `message` is its sizebuf_t (nil netconnection = NULL). Nothing
+	creates netconnections yet (M6-NET), so MSG_ONE takes the "non-client" branch until clients connect.
+	sv.writeentitiestoclient_msg is the sizebuf_t * the entity sender points at the message being built (nil =
+	NULL, as it is outside SendEntity calls in this port).
+]]
+local MSG_BROADCAST = 0 -- unreliable to all
+local MSG_ONE = 1 -- reliable to one (msg_entity)
+local MSG_ALL = 2 -- reliable to all
+local MSG_INIT = 3 -- write to the init string
+local MSG_ENTITY = 5
+
+-- port: svvm_cmds.c WriteDest L1385-1421 @xonotic-v0.8.6
+local function WriteDest(prog: any): common.SizeBuf
+	local entnum
+	local dest
+	local ent
+	local sv = server.sv :: any
+	local svs = host_cmd.svs :: any
+
+	dest = toint(G_FLOAT(prog, OFS_PARM0))
+	if dest == MSG_BROADCAST then
+		return sv.datagram
+	elseif dest == MSG_ONE then
+		ent = G_INT(prog, GlobalOfs(prog, "msg_entity")) -- PRVM_PROG_TO_EDICT(PRVM_serverglobaledict(msg_entity))
+		entnum = ent -- PRVM_NUM_FOR_EDICT
+		local client = if svs.clients then svs.clients[entnum - 1] else nil
+		if
+			entnum < 1
+			or entnum > svs.maxclients
+			or not (client and client.active)
+			or not (client and client.netconnection)
+		then
+			prvm_cmds.VM_Warning(prog, "WriteDest: tried to write to non-client\n")
+			return sv.reliable_datagram
+		else
+			return client.netconnection.message
+		end
+	elseif dest == MSG_ALL then
+		return sv.reliable_datagram
+	elseif dest == MSG_INIT then
+		return sv.signon
+	elseif dest == MSG_ENTITY then
+		local msg = sv.writeentitiestoclient_msg
+		if msg == nil then
+			-- the C returns the NULL pointer and the MSG_Write* call after it dereferences it
+			error("WriteDest: MSG_ENTITY outside an entity send (sv.writeentitiestoclient_msg is NULL)", 0)
+		end
+		return msg
+	else
+		prvm_cmds.VM_Warning(prog, "WriteDest: bad destination\n")
+		-- (falls through to case MSG_ALL)
+		return sv.reliable_datagram
+	end
+
+	--return NULL;
+end
+
+-- port: svvm_cmds.c VM_SV_WriteByte L1423-1427 @xonotic-v0.8.6
+local function VM_SV_WriteByte(prog: any)
+	SAFEPARMCOUNT(prog, 2, "VM_SV_WriteByte")
+	common.MSG_WriteByte(WriteDest(prog), toint(G_FLOAT(prog, OFS_PARM1)))
+end
+PORTED.VM_SV_WriteByte = VM_SV_WriteByte
+
+-- port: svvm_cmds.c VM_SV_WriteChar L1429-1433 @xonotic-v0.8.6
+local function VM_SV_WriteChar(prog: any)
+	SAFEPARMCOUNT(prog, 2, "VM_SV_WriteChar")
+	common.MSG_WriteChar(WriteDest(prog), toint(G_FLOAT(prog, OFS_PARM1)))
+end
+PORTED.VM_SV_WriteChar = VM_SV_WriteChar
+
+-- port: svvm_cmds.c VM_SV_WriteShort L1435-1439 @xonotic-v0.8.6
+local function VM_SV_WriteShort(prog: any)
+	SAFEPARMCOUNT(prog, 2, "VM_SV_WriteShort")
+	common.MSG_WriteShort(WriteDest(prog), toint(G_FLOAT(prog, OFS_PARM1)))
+end
+PORTED.VM_SV_WriteShort = VM_SV_WriteShort
+
+-- port: svvm_cmds.c VM_SV_WriteLong L1441-1445 @xonotic-v0.8.6
+local function VM_SV_WriteLong(prog: any)
+	SAFEPARMCOUNT(prog, 2, "VM_SV_WriteLong")
+	common.MSG_WriteLong(WriteDest(prog), toint(G_FLOAT(prog, OFS_PARM1)))
+end
+PORTED.VM_SV_WriteLong = VM_SV_WriteLong
+
+-- port: svvm_cmds.c VM_SV_WriteAngle L1447-1451 @xonotic-v0.8.6
+local function VM_SV_WriteAngle(prog: any)
+	SAFEPARMCOUNT(prog, 2, "VM_SV_WriteAngle")
+	common.MSG_WriteAngle(WriteDest(prog), G_FLOAT(prog, OFS_PARM1), server.sv.protocol)
+end
+PORTED.VM_SV_WriteAngle = VM_SV_WriteAngle
+
+-- port: svvm_cmds.c VM_SV_WriteCoord L1453-1457 @xonotic-v0.8.6
+local function VM_SV_WriteCoord(prog: any)
+	SAFEPARMCOUNT(prog, 2, "VM_SV_WriteCoord")
+	common.MSG_WriteCoord(WriteDest(prog), G_FLOAT(prog, OFS_PARM1), server.sv.protocol)
+end
+PORTED.VM_SV_WriteCoord = VM_SV_WriteCoord
+
+-- port: svvm_cmds.c VM_SV_WriteString L1459-1463 @xonotic-v0.8.6
+local function VM_SV_WriteString(prog: any)
+	SAFEPARMCOUNT(prog, 2, "VM_SV_WriteString")
+	common.MSG_WriteString(WriteDest(prog), G_STRING(prog, OFS_PARM1))
+end
+PORTED.VM_SV_WriteString = VM_SV_WriteString
+
+-- port: svvm_cmds.c VM_SV_WriteUnterminatedString L1465-1469 @xonotic-v0.8.6
+local function VM_SV_WriteUnterminatedString(prog: any)
+	SAFEPARMCOUNT(prog, 2, "VM_SV_WriteUnterminatedString")
+	common.MSG_WriteUnterminatedString(WriteDest(prog), G_STRING(prog, OFS_PARM1))
+end
+PORTED.VM_SV_WriteUnterminatedString = VM_SV_WriteUnterminatedString
+
+-- port: svvm_cmds.c VM_SV_WriteEntity L1472-1476 @xonotic-v0.8.6
+local function VM_SV_WriteEntity(prog: any)
+	SAFEPARMCOUNT(prog, 2, "VM_SV_WriteEntity")
+	common.MSG_WriteShort(WriteDest(prog), G_INT(prog, OFS_PARM1)) -- PRVM_G_EDICTNUM
+end
+PORTED.VM_SV_WriteEntity = VM_SV_WriteEntity
+
+-- writes a picture as at most size bytes of data
+-- message:
+--   IMGNAME \0 SIZE(short) IMGDATA
+-- if failed to read/compress:
+--   IMGNAME \0 \0 \0
+--#501 void(float dest, string name, float maxsize) WritePicture (DP_SV_WRITEPICTURE))
+-- port: svvm_cmds.c VM_SV_WritePicture L1484-1509 @xonotic-v0.8.6
+-- NOT YET PORTED: Image_Compress (image.c: load the image, JPEG-encode it into at most size bytes). Until it is
+-- ported it logs once and reports failure, so the placeholder is written (the C writes the picture data when
+-- the image loads and compresses).
+local function VM_SV_WritePicture(prog: any)
+	local imgname
+	local size
+
+	SAFEPARMCOUNT(prog, 3, "VM_SV_WritePicture")
+
+	imgname = G_STRING(prog, OFS_PARM1)
+	-- size = (size_t) PRVM_G_FLOAT(OFS_PARM2): gcc on x86-64 converts a float below 2^63 with the signed
+	-- cvttss2si, so values <= -1 and NaN become huge unsigned numbers (clamped to 65535 below)
+	local f = G_FLOAT(prog, OFS_PARM2)
+	size = if f ~= f or f <= -1 then math.huge else math.floor(f) -- (math.huge: any value > 65535)
+	if size > 65535 then
+		size = 65535
+	end
+
+	common.MSG_WriteString(WriteDest(prog), imgname)
+	NOT_YET_PORTED("Image_Compress (image.c) in VM_SV_WritePicture: the placeholder is written")
+	local compressed = false -- Image_Compress(imgname, size, &buf, &size)
+	if compressed then
+		-- actual picture: MSG_WriteShort(WriteDest(prog), (int)size); SZ_Write(WriteDest(prog), buf, (int)size)
+		common.MSG_WriteShort(WriteDest(prog), size)
+	else
+		-- placeholder
+		common.MSG_WriteShort(WriteDest(prog), 0)
+	end
+end
+PORTED.VM_SV_WritePicture = VM_SV_WritePicture
+
+--void(entity e, entity tagentity, string tagname) setattachment = #443; // attachs e to a tag on tagentity (note: use "" to attach to entity origin/angles instead of a tag)
+-- port: svvm_cmds.c VM_SV_setattachment L2354-2394 @xonotic-v0.8.6
+-- Mod_Alias_GetTagIndexForName (model_alias.c L585-599) comes from engine/model_alias.luau, required on first
+-- use. While that module or function is missing it logs NOT YET PORTED once and the tag index is 0, the
+-- result the C function gives for a model with no bone and no tag of that name (it then prints the "could not
+-- find it" developer message, as C does).
+local function Mod_Alias_GetTagIndexForName(model: any, skin: number, tagname: string): number
+	local ok, model_alias = pcall(function(): any
+		return (require :: any)("./model_alias")
+	end)
+	local fn = if ok and type(model_alias) == "table" then model_alias.Mod_Alias_GetTagIndexForName else nil
+	if not fn then
+		NOT_YET_PORTED("Mod_Alias_GetTagIndexForName (model_alias.c) in VM_SV_setattachment: tag index 0")
+		return 0
+	end
+	return fn(model, skin, tagname)
+end
+
+local function VM_SV_setattachment(prog: any)
+	local e = G_INT(prog, OFS_PARM0)
+	local tagentity = G_INT(prog, OFS_PARM1)
+	local tagname = G_STRING(prog, OFS_PARM2)
+	local model
+	local tagindex
+	SAFEPARMCOUNT(prog, 3, "VM_SV_setattachment")
+
+	if e == 0 then
+		prvm_cmds.VM_Warning(prog, "setattachment: can not modify world entity\n")
+		return
+	end
+	if prog.ed_free[e] then
+		prvm_cmds.VM_Warning(prog, "setattachment: can not modify free entity\n")
+		return
+	end
+
+	-- (tagentity == NULL: PRVM_G_EDICT is never NULL; tagentity = prog->edicts)
+
+	tagindex = 0
+
+	if tagentity ~= 0 and tagname ~= "" then
+		model = require("./sv_main").SV_GetModelFromEdict(tagentity) -- sv_main requires this module
+		if model then
+			-- (int)skin converted to the unsigned int parameter
+			tagindex = Mod_Alias_GetTagIndexForName(model, toint(EF(prog, tagentity, "skin")) % 4294967296, tagname)
+			if tagindex == 0 then
+				console.Con_DPrintf(
+					'setattachment(edict %i, edict %i, string "%s"): tried to find tag named "%s" on entity %i (model "%s") but could not find it\n',
+					e,
+					tagentity,
+					tagname,
+					tagname,
+					tagentity,
+					model.name
+				)
+			end
+		else
+			console.Con_DPrintf(
+				'setattachment(edict %i, edict %i, string "%s"): tried to find tag named "%s" on entity %i but it has no model\n',
+				e,
+				tagentity,
+				tagname,
+				tagname,
+				tagentity
+			)
+		end
+	end
+
+	SET_EI(prog, e, "tag_entity", tagentity) -- PRVM_EDICT_TO_PROG(tagentity)
+	SET_EF(prog, e, "tag_index", tagindex)
+end
+PORTED.VM_SV_setattachment = VM_SV_setattachment
+
+-- DP_MD3_TAGINFO extension coded by VorteX
+-- port: svvm_cmds.c SV_GetTagIndex L2399-2408 @xonotic-v0.8.6
+local function SV_GetTagIndex(prog: any, e: number, tagname: string): number
+	local i = toint(EF(prog, e, "modelindex"))
+	if i < 1 or i >= 8192 then -- MAX_MODELS
+		return -1
+	end
+
+	return Mod_Alias_GetTagIndexForName(
+		require("./sv_main").SV_GetModelByIndex(i),
+		toint(EF(prog, e, "skin")) % 4294967296,
+		tagname
+	)
+end
+
+--float(entity ent, string tagname) gettagindex;
+-- port: svvm_cmds.c VM_SV_gettagindex L2561-2594 @xonotic-v0.8.6
+local function VM_SV_gettagindex(prog: any)
+	SAFEPARMCOUNT(prog, 2, "VM_SV_gettagindex")
+
+	local ent = G_INT(prog, OFS_PARM0)
+	local tag_name = G_STRING(prog, OFS_PARM1)
+
+	if ent == 0 then
+		prvm_cmds.VM_Warning(prog, string.format("VM_SV_gettagindex(entity #%i): can't affect world entity\n", ent))
+		return
+	end
+	if prog.ed_free[ent] then
+		prvm_cmds.VM_Warning(prog, string.format("VM_SV_gettagindex(entity #%i): can't affect free entity\n", ent))
+		return
+	end
+
+	local tag_index = 0
+	if not require("./sv_main").SV_GetModelFromEdict(ent) then
+		console.Con_DPrintf("VM_SV_gettagindex(entity #%i): null or non-precached model\n", ent)
+	else
+		tag_index = SV_GetTagIndex(prog, ent, tag_name)
+		if tag_index == 0 then
+			if cvarint("developer_extra", 0) ~= 0 then
+				console.Con_DPrintf('VM_SV_gettagindex(entity #%i): tag "%s" not found\n', ent, tag_name)
+			end
+		end
+	end
+	SET_G_FLOAT(prog, OFS_RETURN, tag_index)
+end
+PORTED.VM_SV_gettagindex = VM_SV_gettagindex
+
+-- #276 float(float modlindex, string framename) frameforname = #276; // (FTE_CSQC_SKELETONOBJECTS) finds number of a specified frame in the animation, returns -1 if no match found
+-- port: svvm_cmds.c VM_SV_frameforname L3158-3175 @xonotic-v0.8.6
+local function VM_SV_frameforname(prog: any)
+	local modelindex = toint(G_FLOAT(prog, OFS_PARM0))
+	local model = require("./sv_main").SV_GetModelByIndex(modelindex)
+	local name = string.lower(G_STRING(prog, OFS_PARM1))
+	SET_G_FLOAT(prog, OFS_RETURN, -1)
+	if not model or not model.animscenes then
+		return
+	end
+	for i = 0, model.numframes - 1 do
+		if string.lower(model.animscenes[i + 1].name) == name then
+			SET_G_FLOAT(prog, OFS_RETURN, i)
+			break
+		end
+	end
+end
+PORTED.VM_SV_frameforname = VM_SV_frameforname
+
+-- #277 float(float modlindex, float framenum) frameduration = #277; // (FTE_CSQC_SKELETONOBJECTS) returns the intended play time (in seconds) of the specified framegroup, if it does not exist the result is 0, if it is a single frame it may be a small value around 0.1 or 0.
+-- port: svvm_cmds.c VM_SV_frameduration L3178-3188 @xonotic-v0.8.6
+local function VM_SV_frameduration(prog: any)
+	local modelindex = toint(G_FLOAT(prog, OFS_PARM0))
+	local model = require("./sv_main").SV_GetModelByIndex(modelindex)
+	local framenum = toint(G_FLOAT(prog, OFS_PARM1))
+	SET_G_FLOAT(prog, OFS_RETURN, 0)
+	if not model or not model.animscenes or framenum < 0 or framenum >= model.numframes then
+		return
+	end
+	local scene = model.animscenes[framenum + 1]
+	if scene.framerate ~= 0 then
+		SET_G_FLOAT(prog, OFS_RETURN, R(scene.framecount / scene.framerate))
+	end
+end
+PORTED.VM_SV_frameduration = VM_SV_frameduration
+
+local svc_setpause = 24 -- protocol.h L220: [byte] on / off
+
+-- #531 void(float pause) setpause
+-- port: svvm_cmds.c VM_SV_setpause L2867-2882 @xonotic-v0.8.6
+local function VM_SV_setpause(prog: any)
+	local sv = server.sv :: any
+	local pauseValue
+	pauseValue = toint(G_FLOAT(prog, OFS_PARM0))
+	if pauseValue ~= 0 then --pause the game
+		sv.paused = true
+		sv.pausedstart = prvm_edict.realtime
+	else --disable pause, in case it was enabled
+		if sv.paused then
+			sv.paused = false
+			sv.pausedstart = 0
+		end
+	end
+	-- send notification to all clients
+	common.MSG_WriteByte(sv.reliable_datagram, svc_setpause)
+	common.MSG_WriteByte(sv.reliable_datagram, if sv.paused then 1 else 0)
+end
+PORTED.VM_SV_setpause = VM_SV_setpause
+
+-- port: svvm_cmds.c SV_GetEntityMatrix L2432-2448 @xonotic-v0.8.6
+-- (out: a matrixlib matrix4x4_t; the Matrix4x4_CreateFromQuakeEntity parameters are doubles: the float values
+-- are passed exactly, the float products are rounded first)
+function svvm_cmds.SV_GetEntityMatrix(prog: any, ent: number, out: any, viewmatrix: boolean)
+	local matrixlib = require("./matrixlib")
+	local scale
+	local pitchsign = 1
+
+	scale = EF(prog, ent, "scale")
+	if scale == 0 then
+		scale = 1.0
+	end
+
+	if viewmatrix then
+		-- cl_viewmodel_scale (view.c) is registered by V_Init from CL_Init, which a dedicated server never runs:
+		-- the unregistered cvar_t has value 0
+		local c = cvar.Cvar_FindVar("cl_viewmodel_scale")
+		local cl_viewmodel_scale = if c then c.value else 0
+		local origin, view_ofs, v_angle = EV(prog, ent, "origin"), EV(prog, ent, "view_ofs"), EV(prog, ent, "v_angle")
+		matrixlib.Matrix4x4_CreateFromQuakeEntity(
+			out,
+			origin[1],
+			origin[2],
+			R(origin[3] + view_ofs[3]),
+			v_angle[1],
+			v_angle[2],
+			v_angle[3],
+			R(scale * cl_viewmodel_scale)
+		)
+	else
+		pitchsign = require("./sv_phys").SV_GetPitchSign(prog, ent) -- sv_phys requires this module
+		local origin, angles = EV(prog, ent, "origin"), EV(prog, ent, "angles")
+		matrixlib.Matrix4x4_CreateFromQuakeEntity(
+			out,
+			origin[1],
+			origin[2],
+			origin[3],
+			R(pitchsign * angles[1]),
+			angles[2],
+			angles[3],
+			scale
+		)
+	end
 end
 
 svvm_cmds.PORTED = PORTED
