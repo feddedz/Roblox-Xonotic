@@ -6,7 +6,8 @@ Copyright (C) 1996-1997 Id Software, Inc. (DarkPlaces common.c; GPLv2 or later, 
 	Port of common.c @xonotic-v0.8.6. PARTIAL: COM_ParseToken_Console (used by cmd.c).
 	A C `const char *` into a string is (s, i): byte index i (1-based); i > #s reads as the NUL terminator.
 	Also InfoString_GetValue / InfoString_SetValue, CRC_Block / CRC_Block_CaseInsensitive (CRC-16/CCITT, crctable generated from its polynomial 0x1021).
-	NOT YET PORTED: the rest of common.c (other tokenizers, sizebuf/MSG_*, COM_CheckParm, ...).
+	Also the sizebuf writers (SZ_*, MSG_Write*) and readers (MSG_InitReadBuffer, MSG_BeginReading, MSG_Read*).
+	NOT YET PORTED: the rest of common.c (other tokenizers, COM_CheckParm, ...).
 ]]
 local common = {}
 
@@ -747,8 +748,17 @@ common.PROTOCOL = {
 }
 local P = common.PROTOCOL
 
--- sizebuf_t (common.h): data is a buffer of maxsize bytes
-export type SizeBuf = { data: buffer, maxsize: number, cursize: number, allowoverflow: boolean, overflowed: boolean }
+-- sizebuf_t (common.h): data is a buffer of maxsize bytes. readcount / badread (common.h L49-50) are the read
+-- state of the MSG_Read* functions; nil is the zeroed C memory (0 / false) of a sizebuf that was only written.
+export type SizeBuf = {
+	data: buffer,
+	maxsize: number,
+	cursize: number,
+	allowoverflow: boolean,
+	overflowed: boolean,
+	readcount: number?,
+	badread: boolean?,
+}
 function common.SZ_New(maxsize: number): SizeBuf
 	return { data = buffer.create(maxsize), maxsize = maxsize, cursize = 0, allowoverflow = false, overflowed = false }
 end
@@ -901,6 +911,273 @@ function common.MSG_WriteAngle(sb: SizeBuf, f: number, protocol: number)
 		common.MSG_WriteAngle8i(sb, f)
 	else
 		common.MSG_WriteAngle16i(sb, f)
+	end
+end
+
+--[[
+	reading functions (common.c L405-577, common.h L178-182). sb.readcount nil = 0, sb.badread nil = false.
+	The int results are C ints (sign as in C); the float results are float values (f32-rounded doubles).
+]]
+local fround = require("./_port/f32").round
+local readu8 = buffer.readu8
+
+-- port: common.c MSG_InitReadBuffer L409-415 @xonotic-v0.8.6
+function common.MSG_InitReadBuffer(buf: SizeBuf, data: buffer, size: number)
+	-- memset(buf, 0, sizeof(*buf))
+	buf.allowoverflow = false
+	buf.overflowed = false
+	buf.data = data
+	buf.cursize = size
+	buf.maxsize = buf.cursize
+	common.MSG_BeginReading(buf)
+end
+
+-- port: common.c MSG_BeginReading L417-421 @xonotic-v0.8.6
+function common.MSG_BeginReading(sb: SizeBuf)
+	sb.readcount = 0
+	sb.badread = false
+end
+
+-- port: common.c MSG_ReadLittleShort L423-432 @xonotic-v0.8.6
+function common.MSG_ReadLittleShort(sb: SizeBuf): number
+	local rc = sb.readcount or 0
+	if rc + 2 > sb.cursize then
+		sb.badread = true
+		return -1
+	end
+	rc += 2
+	sb.readcount = rc
+	-- (short)(data[rc-2] | (data[rc-1]<<8))
+	return buffer.readi16(sb.data, rc - 2)
+end
+
+-- port: common.c MSG_ReadBigShort L434-443 @xonotic-v0.8.6
+function common.MSG_ReadBigShort(sb: SizeBuf): number
+	local rc = sb.readcount or 0
+	if rc + 2 > sb.cursize then
+		sb.badread = true
+		return -1
+	end
+	rc += 2
+	sb.readcount = rc
+	local v = readu8(sb.data, rc - 2) * 256 + readu8(sb.data, rc - 1)
+	return if v >= 0x8000 then v - 0x10000 else v -- (short)
+end
+
+-- port: common.c MSG_ReadLittleLong L445-454 @xonotic-v0.8.6
+function common.MSG_ReadLittleLong(sb: SizeBuf): number
+	local rc = sb.readcount or 0
+	if rc + 4 > sb.cursize then
+		sb.badread = true
+		return -1
+	end
+	rc += 4
+	sb.readcount = rc
+	return buffer.readi32(sb.data, rc - 4)
+end
+
+-- port: common.c MSG_ReadBigLong L456-465 @xonotic-v0.8.6
+function common.MSG_ReadBigLong(sb: SizeBuf): number
+	local rc = sb.readcount or 0
+	if rc + 4 > sb.cursize then
+		sb.badread = true
+		return -1
+	end
+	rc += 4
+	sb.readcount = rc
+	local d = sb.data
+	-- (data<<24) + ... in int: the top byte's shift wraps into the sign bit (x86)
+	local u = readu8(d, rc - 4) * 16777216 + readu8(d, rc - 3) * 65536 + readu8(d, rc - 2) * 256 + readu8(d, rc - 1)
+	return if u >= 0x80000000 then u - 0x100000000 else u
+end
+
+-- port: common.c MSG_ReadLittleFloat L467-482 @xonotic-v0.8.6
+function common.MSG_ReadLittleFloat(sb: SizeBuf): number
+	local rc = sb.readcount or 0
+	if rc + 4 > sb.cursize then
+		sb.badread = true
+		return -1
+	end
+	rc += 4
+	sb.readcount = rc
+	-- dat.l = the 4 bytes little endian; return dat.f
+	return buffer.readf32(sb.data, rc - 4)
+end
+
+local bigfloat_tmp = buffer.create(4)
+-- port: common.c MSG_ReadBigFloat L484-499 @xonotic-v0.8.6
+function common.MSG_ReadBigFloat(sb: SizeBuf): number
+	local rc = sb.readcount or 0
+	if rc + 4 > sb.cursize then
+		sb.badread = true
+		return -1
+	end
+	rc += 4
+	sb.readcount = rc
+	local d = sb.data
+	buffer.writeu8(bigfloat_tmp, 0, readu8(d, rc - 1))
+	buffer.writeu8(bigfloat_tmp, 1, readu8(d, rc - 2))
+	buffer.writeu8(bigfloat_tmp, 2, readu8(d, rc - 3))
+	buffer.writeu8(bigfloat_tmp, 3, readu8(d, rc - 4))
+	return buffer.readf32(bigfloat_tmp, 0)
+end
+
+-- port: common.h MSG_ReadChar L178 @xonotic-v0.8.6 (macro)
+function common.MSG_ReadChar(sb: SizeBuf): number
+	local rc = sb.readcount or 0
+	if rc >= sb.cursize then
+		sb.badread = true
+		return -1
+	end
+	sb.readcount = rc + 1
+	return buffer.readi8(sb.data, rc) -- (signed char)
+end
+
+-- port: common.h MSG_ReadByte L179 @xonotic-v0.8.6 (macro)
+function common.MSG_ReadByte(sb: SizeBuf): number
+	local rc = sb.readcount or 0
+	if rc >= sb.cursize then
+		sb.badread = true
+		return -1
+	end
+	sb.readcount = rc + 1
+	return readu8(sb.data, rc) -- (unsigned char)
+end
+
+-- common.h L180-182: MSG_ReadShort / MSG_ReadLong / MSG_ReadFloat are the little-endian readers
+common.MSG_ReadShort = common.MSG_ReadLittleShort
+common.MSG_ReadLong = common.MSG_ReadLittleLong
+common.MSG_ReadFloat = common.MSG_ReadLittleFloat
+
+-- port: common.c MSG_ReadString L501-511 @xonotic-v0.8.6
+-- (returns the string: the C static buffer `string` of maxstring bytes holds at most maxstring - 1 characters;
+-- the rest of the message string is still consumed)
+function common.MSG_ReadString(sb: SizeBuf, maxstring: number): string
+	local rc = sb.readcount or 0
+	local start = rc
+	local d, cursize = sb.data, sb.cursize
+	local l -- characters read (c > 0)
+	-- while ((c = MSG_ReadByte(sb)) > 0)
+	while true do
+		if rc >= cursize then
+			sb.badread = true -- MSG_ReadByte returned -1
+			l = rc - start
+			break
+		end
+		local c = readu8(d, rc)
+		rc += 1
+		if c == 0 then
+			l = rc - 1 - start
+			break
+		end
+	end
+	sb.readcount = rc
+	-- if (l < maxstring - 1) string[l++] = c;
+	if l > maxstring - 1 then
+		l = maxstring - 1
+	end
+	return buffer.readstring(d, start, l)
+end
+
+-- port: common.c MSG_ReadBytes L513-519 @xonotic-v0.8.6 (out: a buffer written from offset 0)
+function common.MSG_ReadBytes(sb: SizeBuf, numbytes: number, out: buffer): number
+	local l = 0
+	while l < numbytes do
+		local c = common.MSG_ReadByte(sb)
+		if c == -1 then
+			break
+		end
+		buffer.writeu8(out, l, c)
+		l += 1
+	end
+	return l
+end
+
+-- port: common.c MSG_ReadCoord13i L521-524 @xonotic-v0.8.6
+function common.MSG_ReadCoord13i(sb: SizeBuf): number
+	return fround(common.MSG_ReadLittleShort(sb) * (1.0 / 8.0))
+end
+
+-- (signed short) of an int
+local function sshort(v: number): number
+	v = bit32.band(v, 0xFFFF)
+	return if v >= 0x8000 then v - 0x10000 else v
+end
+
+-- port: common.c MSG_ReadCoord16i L526-529 @xonotic-v0.8.6
+function common.MSG_ReadCoord16i(sb: SizeBuf): number
+	return sshort(common.MSG_ReadLittleShort(sb))
+end
+
+-- port: common.c MSG_ReadCoord32f L531-534 @xonotic-v0.8.6
+function common.MSG_ReadCoord32f(sb: SizeBuf): number
+	return common.MSG_ReadLittleFloat(sb)
+end
+
+-- port: common.c MSG_ReadCoord L536-546 @xonotic-v0.8.6 (DARKPLACES1 and the default branch are the same in C)
+-- selene: allow(if_same_then_else)
+function common.MSG_ReadCoord(sb: SizeBuf, protocol: number): number
+	if
+		protocol == P.QUAKE
+		or protocol == P.QUAKEDP
+		or protocol == P.NEHAHRAMOVIE
+		or protocol == P.NEHAHRABJP
+		or protocol == P.NEHAHRABJP2
+		or protocol == P.NEHAHRABJP3
+		or protocol == P.QUAKEWORLD
+	then
+		return common.MSG_ReadCoord13i(sb)
+	elseif protocol == P.DARKPLACES1 then
+		return common.MSG_ReadCoord32f(sb)
+	elseif protocol == P.DARKPLACES2 or protocol == P.DARKPLACES3 or protocol == P.DARKPLACES4 then
+		return common.MSG_ReadCoord16i(sb)
+	else
+		return common.MSG_ReadCoord32f(sb)
+	end
+end
+
+-- port: common.c MSG_ReadVector L548-553 @xonotic-v0.8.6
+function common.MSG_ReadVector(sb: SizeBuf, v: { number }, protocol: number)
+	v[1] = common.MSG_ReadCoord(sb, protocol)
+	v[2] = common.MSG_ReadCoord(sb, protocol)
+	v[3] = common.MSG_ReadCoord(sb, protocol)
+end
+
+-- port: common.c MSG_ReadAngle8i L556-559 @xonotic-v0.8.6
+function common.MSG_ReadAngle8i(sb: SizeBuf): number
+	local b = bit32.band(common.MSG_ReadByte(sb), 0xFF)
+	local sc = if b >= 0x80 then b - 0x100 else b -- (signed char)
+	return fround(sc * (360.0 / 256.0))
+end
+
+-- port: common.c MSG_ReadAngle16i L561-564 @xonotic-v0.8.6
+function common.MSG_ReadAngle16i(sb: SizeBuf): number
+	return fround(sshort(common.MSG_ReadLittleShort(sb)) * (360.0 / 65536.0))
+end
+
+-- port: common.c MSG_ReadAngle32f L566-569 @xonotic-v0.8.6
+function common.MSG_ReadAngle32f(sb: SizeBuf): number
+	return common.MSG_ReadLittleFloat(sb)
+end
+
+-- port: common.c MSG_ReadAngle L571-577 @xonotic-v0.8.6
+function common.MSG_ReadAngle(sb: SizeBuf, protocol: number): number
+	if
+		protocol == P.QUAKE
+		or protocol == P.QUAKEDP
+		or protocol == P.NEHAHRAMOVIE
+		or protocol == P.NEHAHRABJP
+		or protocol == P.NEHAHRABJP2
+		or protocol == P.NEHAHRABJP3
+		or protocol == P.DARKPLACES1
+		or protocol == P.DARKPLACES2
+		or protocol == P.DARKPLACES3
+		or protocol == P.DARKPLACES4
+		or protocol == P.QUAKEWORLD
+	then
+		return common.MSG_ReadAngle8i(sb)
+	else
+		return common.MSG_ReadAngle16i(sb)
 	end
 end
 

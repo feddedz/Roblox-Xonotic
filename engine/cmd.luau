@@ -26,7 +26,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 	use strcasecmp and return the first match in list order, like the C loops.
 	Commands get their arguments through cmd.Cmd_Argc / cmd.Cmd_Argv like C.
 	NOT YET PORTED (log when reached): Cmd_ForwardToServer / Cmd_ForwardStringToServer (client),
-	CL_VM_ConsoleCommand (csqc), SCR_CenterPrint (cprint), src_client execution (needs host_client),
+	CL_VM_ConsoleCommand (csqc), SCR_CenterPrint (cprint),
 	thread mutexes (single-threaded), command completion (client UI).
 ]]
 local common = require("./common")
@@ -1101,6 +1101,7 @@ function cmd.Cmd_Exists(cmd_name: string): boolean
 end
 cvar.Cmd_Exists = cmd.Cmd_Exists
 
+local server_mod: any = nil
 -- port: cmd.c Cmd_ExecuteString L1909-1994 @xonotic-v0.8.6
 function cmd.Cmd_ExecuteString(text: string, src: number, _lockmutex: boolean)
 	local oldpos = cmd_tokenizebufferpos
@@ -1145,7 +1146,11 @@ function cmd.Cmd_ExecuteString(text: string, src: number, _lockmutex: boolean)
 		-- command_found:
 		-- if it's a client command and no command was found, say so.
 		if cmd.cmd_source == cmd.src_client then
-			notPorted('src_client "player tried to" message (needs host_client)')
+			-- (host_client: engine/server.luau, which requires this module's users: required on first use and kept)
+			if not server_mod then
+				server_mod = require("./server")
+			end
+			Con_Printf('player "%s" tried to %s\n', server_mod.host_client.name.str, text)
 			break
 		end
 		-- check alias

@@ -107,3 +107,58 @@ tests/unit/{protocol_ref,sv_send}.test.luau, tests/integration/sv_send_client.te
    connection can sign on and move by packets; VM_SV_UpdateCustomStats, FatPVS, filecrc, SV_SetIdealPitch.
 2. C reference for the send side. 3. Client: cl_parse.c + cl_ents*.c readers, CSQC VM (csprogs.c,
    clvm_cmds.c), then the renderer.
+---
+
+# Part 3 — M6-CONN (2026-11-28)
+
+## Goal
+The connection layer (netconn.c, lhnet.c, server side) and reading what a client sends (sv_user.c).
+
+## Done
+- **engine/netconn.luau, engine/lhnet.luau** (Helper S): packet layer (NetConn_SendUnreliableMessage and
+  NetConn_ReceivedMessage NQ/DP branches complete: fragments, acks, resend, rate / burst), sockets,
+  challenge / status responses, NetConn_ServerParsePacket (getchallenge, connect, getinfo / getstatus,
+  CCREQ_*, routing to SV_ReadClientMessage), NetConn_ServerFrame, Heartbeat, net_stats; crypto entry points
+  as a build without d0_blind_id; lhnet addresses + the loopback packet list. C reference
+  `tools/testgen/netconn_vectors.c` → `tests/vectors/netconn.tsv`: 6,921 rows, all identical.
+  NOT YET PORTED (logged): QW branches, rcon / srcon, authenticated crypto, DNS / IPv6, the whole client side.
+- **Socket backend for Roblox** = `lhnet.backend = { open(address) -> handle?, err?; close(handle);
+  read(handle, buf, maxlen, address) -> n; write(handle, buf, len, address) -> n }` (to be implemented by
+  platform/net on RemoteEvents). Without it INET sockets open, read nothing and swallow writes.
+- **engine/sv_user.luau** (Helper R): SV_SetIdealPitch, SV_ReadClientMove, SV_ExecuteClientMoves,
+  SV_FrameLost / Ack, SV_ReadClientMessage (all clc_ cases). **common.luau:** MSG_BeginReading + all
+  MSG_Read* (sizebuf fields readcount / badread). **svvm_cmds.luau:** VM_SV_UpdateCustomStats.
+  **prvm_edict.luau:** prog.filecrc. **model_brush.luau:** Mod_Q1BSP_FatPVS, Mod_Q1BSP_FindBoxClusters.
+  host_cmd.Host_InitClientCommands (client-source command table; prespawn / spawn / begin wired).
+- host.luau: NetConn_Init, UpdateSockets, ServerFrame, Heartbeat in the host frame; SV_DropClient sends
+  svc_disconnect and closes the connection. sv_main.luau: NetConn_OpenServerPorts in SV_SpawnServer.
+- **End to end over loopback** (tests/integration/netconn_client.test.luau): getchallenge → connect →
+  accept; serverinfo (21,766 bytes, 22 fragments); prespawn / spawn / begin as reliable stringcmds; then
+  150 frames of clc_move + clc_ackframe: 152 datagrams, 147 reliable messages, no loss. With clc_move
+  through SV_ReadClientMessage (sv_readclient_match): the client's player walks 3,678 units, 80 custom
+  stats non-zero, PVS culls ~14 entities per frame.
+
+## Files changed
+engine/{netconn,lhnet}.luau (new), engine/{sv_user,common,svvm_cmds,prvm_edict,model_brush,cmd,host_cmd,host,
+sv_main}.luau, tools/testgen/netconn_vectors.{c,sh}, .github/workflows/testgen.yml, tests/vectors/netconn.tsv,
+tests/unit/{netconn_ref,msg_read,sv_readclient,pvs,sv_send}.test.luau,
+tests/integration/{netconn_client,sv_readclient_match}.test.luau.
+
+## Tests run and results
+Full suite with BOTMATCH_FRAMES=600: see the PR (all files pass). netconn_ref 6,922 checks, msg_read 129,
+sv_readclient 100, pvs 27, netconn_client 27, sv_readclient_match 26. tests/unit/sv_send switches
+SV_SetIdealPitch off (its synthetic server has no world to trace).
+
+## Problems / dead ends
+- Things the loopback client showed, to look at next: `name` / `rate` stringcmds have no effect yet
+  (Host_Name_f, Host_Rate_f ... not ported: the player stays "unconnected"); 149 of 151 datagrams carry
+  svc_setangle and a small reliable message goes out every frame (check against the real engine: may be
+  normal for Xonotic's QC during the first seconds, may be a bug).
+- Not checked against C: sv_user.c, the sv_main.c send side, FatPVS (unit tests only).
+- All loopback peers share one connect-flood slot (C quirk): a second local client within 5 s is dropped.
+
+## Next step
+1. platform/net: the `lhnet.backend` on RemoteEvents (server + client ends), then run it in Studio.
+2. Host_Name_f / Color_f / Rate_f / Playermodel_f / Playerskin_f; the setangle / per-frame reliable question.
+3. Client: cl_parse.c, cl_ents*.c readers, cl_input.c, CSQC VM (csprogs.c, clvm_cmds.c), then the renderer.
+4. C reference for sv_user.c and the send side.

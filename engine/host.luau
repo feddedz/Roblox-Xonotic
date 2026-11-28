@@ -28,6 +28,7 @@ local model_shared = require("./model_shared")
 local common = require("./common")
 local console = require("./console")
 local libc = require("./_port/libc")
+local netconn = require("./netconn")
 local prvm_cmds = require("./prvm_cmds")
 local prvm_edict = require("./prvm_edict")
 local server = require("./server")
@@ -74,6 +75,10 @@ function host.Host_Init_Dedicated(opts: { com_argv: { string }?, maxclients: num
 			end
 		end
 	end
+	-- the client functions of the Cmd_AddCommand_WithClientCommand commands (prespawn, spawn, begin, ...)
+	host_cmd.Host_InitClientCommands()
+	-- NetConn_Init (host.c Host_Init L1265): its cvars / commands are in the table above
+	netconn.NetConn_Init()
 	-- Collision_Init and Mod_Init -> Mod_BrushInit (host.c Host_Init): their cvars are in the table above; the
 	-- calls bind the cvar_t records that the trace code reads as struct fields (collision.cv, model_brush.cv).
 	collision.Collision_Init()
@@ -281,7 +286,11 @@ function host.SV_DropClient(crash: boolean)
 		-- tell the client to be gone
 		if not crash then
 			-- LordHavoc: no opportunity for resending, so use unreliable 3 times
-			notPorted("NetConn_SendUnreliableMessage of svc_disconnect (netconn.c, M6-NET) in SV_DropClient")
+			local buf = common.SZ_New(8)
+			common.MSG_WriteByte(buf, 2) -- svc_disconnect
+			netconn.NetConn_SendUnreliableMessage(host_client.netconnection, buf, sv.protocol, 10000, 0, false)
+			netconn.NetConn_SendUnreliableMessage(host_client.netconnection, buf, sv.protocol, 10000, 0, false)
+			netconn.NetConn_SendUnreliableMessage(host_client.netconnection, buf, sv.protocol, 10000, 0, false)
 		end
 	end
 
@@ -303,7 +312,7 @@ function host.SV_DropClient(crash: boolean)
 
 	if host_client.netconnection then
 		-- break the net connection
-		notPorted("NetConn_Close (netconn.c, M6-NET) in SV_DropClient")
+		netconn.NetConn_Close(host_client.netconnection)
 		host_client.netconnection = nil
 	end
 
@@ -347,7 +356,7 @@ function host.SV_DropClient(crash: boolean)
 
 	-- update server listing on the master because player count changed
 	-- (which the master uses for filtering empty/full servers)
-	notPorted("NetConn_Heartbeat (netconn.c, M6-NET) in SV_DropClient")
+	netconn.NetConn_Heartbeat(1)
 
 	if sv.loadgame then
 		i = 0
@@ -421,8 +430,8 @@ Runs all active servers
 	  * Host_Init and setjmp(host_abortframe) / SCR_ClearLoadingScreen (a Host_Error raises a Luau error here);
 	  * Key_EventQueue_Unblock, SndSys_SendKeyEvents, Sys_SendKeyEvents (input), Host_GetConsoleCommands
 	    (Sys_ConsoleInput: there is no stdin console; the host can Cbuf_AddText), Log_DestBuffer_Flush (log file);
-	  * NetConn_UpdateSockets, NetConn_ServerFrame (reads client packets and checks client timeouts),
-	    NetConn_Heartbeat, Curl_Run: network (M6-NET), logged once;
+	  * Curl_Run (downloads; NetConn_UpdateSockets, NetConn_ServerFrame and NetConn_Heartbeat are
+	    engine/netconn.luau's);
 	  * CL_VM_PreventInformationLeaks (csqc, returns at once without a loaded csqc: a dedicated server has none);
 	  * the sleep: Sys_Sleep / NetConn_SleepMicroseconds and the perf_acc_sleeptime it measures (the caller's
 	    wait between calls is the sleep), so perf_cpuload counts no sleep;
@@ -526,12 +535,14 @@ function host.Host_Main_Frame(elapsed: number): boolean
 
 	-- get new key events (Key_EventQueue_Unblock, SndSys_SendKeyEvents, Sys_SendKeyEvents: no input here)
 
-	-- NetConn_UpdateSockets(); Log_DestBuffer_Flush();
+	netconn.NetConn_UpdateSockets()
+
+	-- Log_DestBuffer_Flush(); (no log file)
 
 	-- receive packets on each main loop iteration, as the main loop may
 	-- be undersleeping due to select() detecting a new packet
-	if sv.active then
-		notPorted("NetConn_ServerFrame (netconn.c: client packets, connection timeouts, M6-NET) in Host_Main")
+	if sv.active then -- (&& !svs.threaded)
+		netconn.NetConn_ServerFrame()
 	end
 
 	-- Curl_Run();
@@ -656,7 +667,7 @@ function host.Host_Main_Frame(elapsed: number): boolean
 		end
 
 		-- send an heartbeat if enough time has passed since the last one
-		notPorted("NetConn_Heartbeat (netconn.c, M6-NET) in Host_Main")
+		netconn.NetConn_Heartbeat(0)
 		--	R_TimeReport("servernetwork");
 	end
 
