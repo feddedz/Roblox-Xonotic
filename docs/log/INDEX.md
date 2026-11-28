@@ -1,4 +1,5 @@
 # Session log index (newest first)
+2026-11-27 Claude-Quartz M6-SEND — engine/protocol.luau (DP7 + CSQC entity frames, stats; 7,747 checks identical to C) and the send side of sv_main.c (serverinfo, clientdata, entity gathering, client datagram); a fake client signs on to the stormkeep bot match and gets a datagram every frame → docs/log/2026-11-27-Claude-Quartz.md
 2026-11-27 Claude-Quartz STUDIO-BOTMATCH — the bot match runs inside Roblox Studio from packed data (boot 95 s, 4-15 ms per frame, packed run identical to disk) with a debug view: textured stormkeep + entity boxes → docs/log/2026-11-27-Claude-Quartz.md
 2026-11-27 Claude-Quartz M4-CLIENT — a bot match runs: `map stormkeep`, 4 bots, 3,000 host frames (Host_Main_Frame), no QC error, no stub builtin hit; SV_ConnectClient / SV_DropClient / SV_StartSound, sv_user.c, frame blends, 17 more builtins → docs/log/2026-11-26-Claude-Quartz.md
 2026-11-27 Claude-Quartz M4-SPAWN + M4-ALIAS — alias / sprite model loaders (536 models load; C fixtures identical), getsurface* / Write* / tag builtins; stormkeep starts with the real QC, init frames complete, 300 physics frames run → docs/log/2026-11-26-Claude-Quartz.md

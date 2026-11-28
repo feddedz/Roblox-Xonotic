@@ -9,7 +9,9 @@
 	keeps the value sv_protocolname "DP7" (the Xonotic default) selects.
 	Strings of char arrays are Luau strings (truncated to the array size - 1 by the writer, as strlcpy does).
 	sv.models is `dp_model_t *models[MAX_MODELS]`: C element i at [i] (nil = NULL), like the precache lists.
-	NOT YET PORTED: the rest of server_t (entity frames, ...), added with their users.
+	The client sending state (csqc_prog*, writeentitiestoclient_*, sendentities, sententities, ...) is used by
+	engine/sv_main.luau (SV_SendClientMessages).
+	NOT YET PORTED: the rest of server_t (flood address lists, ...), added with their users.
 ]]
 local common = require("./common")
 local world = require("./world")
@@ -52,10 +54,42 @@ export type Server = {
 	loadgame: boolean, -- qboolean loadgame (server.h L85): client spawn parms come from a saved game
 	-- port support: the address of a char array of this struct as an engine string reference (see CStrRef)
 	stringrefs: { [string]: { str: string } },
+	-- the client sending state of sv_main.c (server.h L97-100, L146-173). Arrays indexed by an entity number
+	-- (sendentitiesindex, sententities, sententitiesconsideration, csqcentityversion) hold entity e at [e]
+	-- (nil = 0 / NULL, like the prog.ed_* tables); the other arrays hold C element i at [i + 1].
+	csqc_progcrc: number, -- int csqc_progcrc (server.h L98)
+	csqc_progsize: number, -- int csqc_progsize (server.h L99)
+	csqc_progname: string, -- char csqc_progname[MAX_QPATH] (server.h L100)
+	writeentitiestoclient_stats_culled_pvs: number,
+	writeentitiestoclient_stats_culled_trace: number,
+	writeentitiestoclient_stats_visibleentities: number,
+	writeentitiestoclient_stats_totalentities: number,
+	writeentitiestoclient_cliententitynumber: number,
+	writeentitiestoclient_clientnumber: number,
+	writeentitiestoclient_eyes: { { number } }, -- vec3_t [MAX_CLIENTNETWORKEYES]
+	writeentitiestoclient_numeyes: number,
+	writeentitiestoclient_pvsbytes: number,
+	writeentitiestoclient_pvs: buffer, -- unsigned char [MAX_MAP_LEAFS/8]
+	writeentitiestoclient_sendstates: { any }, -- const entity_state_t *[MAX_EDICTS]
+	writeentitiestoclient_csqcsendstates: { number }, -- unsigned short [MAX_EDICTS]
+	numsendentities: number,
+	sendentities: { any }, -- entity_state_t [MAX_EDICTS] (tables created on first use, reused)
+	sendentitiesindex: { [number]: any }, -- entity_state_t *[MAX_EDICTS], entity e at [e]
+	sententitiesmark: number,
+	sententities: { [number]: number }, -- int [MAX_EDICTS], entity e at [e]
+	sententitiesconsideration: { [number]: number }, -- int [MAX_EDICTS], entity e at [e]
+	csqcentityversion: { [number]: number }, -- unsigned char [MAX_EDICTS], entity e at [e]
 }
+
+local MAX_CLIENTNETWORKEYES = 16 -- quakedef.h (not DP_SMALLMEMORY)
+local MAX_MAP_LEAFS = 65536 -- quakedef.h (not DP_SMALLMEMORY)
 
 -- a cleared server_t (memset 0 in SV_SpawnServer, then the buffers are set up, sv_main.c L3423-3433)
 function server.New(): Server
+	local eyes = table.create(MAX_CLIENTNETWORKEYES)
+	for i = 1, MAX_CLIENTNETWORKEYES do
+		eyes[i] = { 0, 0, 0 }
+	end
 	return {
 		active = false,
 		state = server.ss_dead,
@@ -83,6 +117,28 @@ function server.New(): Server
 		particleeffectname = {},
 		loadgame = false,
 		stringrefs = {},
+		csqc_progcrc = 0,
+		csqc_progsize = 0,
+		csqc_progname = "",
+		writeentitiestoclient_stats_culled_pvs = 0,
+		writeentitiestoclient_stats_culled_trace = 0,
+		writeentitiestoclient_stats_visibleentities = 0,
+		writeentitiestoclient_stats_totalentities = 0,
+		writeentitiestoclient_cliententitynumber = 0,
+		writeentitiestoclient_clientnumber = 0,
+		writeentitiestoclient_eyes = eyes,
+		writeentitiestoclient_numeyes = 0,
+		writeentitiestoclient_pvsbytes = 0,
+		writeentitiestoclient_pvs = buffer.create(MAX_MAP_LEAFS // 8),
+		writeentitiestoclient_sendstates = {},
+		writeentitiestoclient_csqcsendstates = {},
+		numsendentities = 0,
+		sendentities = {},
+		sendentitiesindex = {},
+		sententitiesmark = 0,
+		sententities = {},
+		sententitiesconsideration = {},
+		csqcentityversion = {},
 	}
 end
 
