@@ -719,8 +719,8 @@ static void nv_scenario_b(void)
 	nv_svframe();
 	nv_clread(3);
 	// a hostname long enough that the player lines do not fit: infoResponse conversion
-	memset(s, 'h', 2660);
-	s[2660] = 0;
+	memset(s, 'h', 2590);
+	s[2590] = 0;
 	nv_cv("hostname", s);
 	nv_time(t += 2.0);
 	nv_pkts(3, "getstatus");
