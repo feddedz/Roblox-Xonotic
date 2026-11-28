@@ -69,7 +69,7 @@ void Con_Printf(const char *fmt, ...)
 	char buf[16384];
 	va_list a;
 	va_start(a, fmt);
-	vsnprintf(buf, sizeof(buf), fmt, a);
+	dpvsnprintf(buf, sizeof(buf), fmt, a);
 	va_end(a);
 	Con_Print(buf);
 }
@@ -564,7 +564,7 @@ static void nv_prog(void)
 	for (i = 0; i < 4; i++)
 	{
 		ofs[i] = nv_stringssize;
-		strcpy(nv_strings + nv_stringssize, strs[i]);
+		memcpy(nv_strings + nv_stringssize, strs[i], strlen(strs[i]) + 1);
 		nv_stringssize += (int)strlen(strs[i]) + 1;
 	}
 	printf("PROG");
