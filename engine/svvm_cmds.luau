@@ -494,6 +494,52 @@ function svvm_cmds.VM_CustomStats_Clear()
 	server.vm_customstats_last = -1
 end
 
+-- port: svvm_cmds.c VM_SV_UpdateCustomStats L1646-1688 @xonotic-v0.8.6
+-- (ent: edict number; stats: the 0-based int table of SV_SendClientDatagram; client and msg are unused, as in C.
+-- vm_customstats == NULL is the empty table here: vm_customstats_last is then -1 and the loop does nothing.)
+function svvm_cmds.VM_SV_UpdateCustomStats(_client: any, ent: number, _msg: any, stats: { [number]: number })
+	local prog: any = cvar.prvm_prog_list[0] -- SVVM_prog
+	local customstats = server.vm_customstats
+	local fields, base = prog.edictsfields, ent * prog.entityfields
+
+	for i = 0, server.vm_customstats_last do
+		local cs = customstats[i]
+		if not cs or cs.type == 0 then
+			continue
+		end
+		local stype = cs.type
+		--string as 16 bytes
+		if stype == 1 then
+			-- memset(s, 0, 17); strlcpy(s, PRVM_E_STRING(ent, fieldoffset), 16): at most 15 characters, s[15] = 0
+			local str = libc.cstr(prvm_edict.PRVM_GetString(prog, buffer.readi32(fields, (base + cs.fieldoffset) * 4)))
+			local function sch(k: number): number -- s[k] as a (signed) char
+				local b = string.byte(str, k + 1)
+				if not b or k >= 15 then
+					return 0
+				end
+				return if b >= 128 then b - 256 else b
+			end
+			local function word(k: number): number -- s[k] + s[k+1] * 256 + s[k+2] * 65536 + s[k+3] * 16777216 (int)
+				local v = sch(k) + sch(k + 1) * 256 + sch(k + 2) * 65536 + sch(k + 3) * 16777216
+				v = v % 4294967296
+				return if v >= 0x80000000 then v - 0x100000000 else v
+			end
+			stats[i + 32] = word(0)
+			stats[i + 33] = word(4)
+			stats[i + 34] = word(8)
+			stats[i + 35] = word(12)
+		--float field sent as-is
+		elseif stype == 8 then
+			-- can't directly use PRVM_E_INT on the field because it may be PRVM_64 and a double is not the representation we want to send
+			-- (u.f = PRVM_E_FLOAT(...); stats = u.i: the bits of the 32-bit float slot)
+			stats[i + 32] = buffer.readi32(fields, (base + cs.fieldoffset) * 4)
+		--integer value of float field
+		elseif stype == 2 then
+			stats[i + 32] = libc.toint(buffer.readf32(fields, (base + cs.fieldoffset) * 4))
+		end
+	end
+end
+
 -- #333 void(entity e, float mdlindex) setmodelindex (EXT_CSQC)
 -- port: svvm_cmds.c VM_SV_setmodelindex L2733-2777 @xonotic-v0.8.6
 local function VM_SV_setmodelindex(prog: any)

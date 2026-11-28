@@ -42,7 +42,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 	Textures go through model_shared.Mod_LoadTextureFromQ3Shader (scripts/*.shader through engine/fs.luau: set
 	the VFS provider before loading a map, or every texture takes the no-shader path).
 	NOT YET PORTED (each logs once when reached): Mod_Q3BSP_LoadLightmaps and the lightmap parts of
-	Mod_Q3BSP_LoadFaces (surfaces load as on a dedicated server), Mod_Q1BSP_MakePortals, Mod_Q1BSP_CreateShadowMesh, the PVS functions except Mod_Q1BSP_GetPVS / Mod_Q1BSP_BoxTouchingPVS, the light-point functions, the Q1 / Q2 /
+	Mod_Q3BSP_LoadFaces (surfaces load as on a dedicated server), Mod_Q1BSP_MakePortals, Mod_Q1BSP_CreateShadowMesh, the PVS functions except Mod_Q1BSP_GetPVS / Mod_Q1BSP_BoxTouchingPVS / Mod_Q1BSP_FatPVS / Mod_Q1BSP_FindBoxClusters, the light-point functions, the Q1 / Q2 /
 	HL BSP and OBJ loaders, Mod_BrushInit (cvar registration: the cvars are read with their defaults).
 ]]
 local bih = require("./bih")
@@ -2023,6 +2023,61 @@ local function firstclipnode(model: any): any
 	return model.brush.data_nodes[first + 1]
 end
 
+-- port: model_brush.c Mod_Q1BSP_FindBoxClusters L180-244 @xonotic-v0.8.6 (the #if 1 branch; clusterlist: C element
+-- i at [i + 1])
+local function Mod_Q1BSP_FindBoxClusters(
+	model: any,
+	mins: { number },
+	maxs: { number },
+	maxclusters: number,
+	clusterlist: { number }
+): number
+	local numclusters = 0
+	local nodestackindex = 0
+	local node: any
+	local nodestack: { any } = {} -- mnode_t *nodestack[1024]
+	if (model.brush.num_pvsclusters or 0) == 0 then
+		return -1
+	end
+	node = firstclipnode(model)
+	while true do
+		if node.plane then
+			-- node - recurse down the BSP tree
+			local sides = BoxOnPlaneSide(mins, maxs, node.plane)
+			if sides < 3 then
+				if sides == 0 then
+					return -1 -- ERROR: NAN bounding box!
+				end
+				-- box is on one side of plane, take that path
+				node = node.children[sides]
+			else
+				-- box crosses plane, take one path and remember the other
+				if nodestackindex < 1024 then
+					nodestackindex += 1
+					nodestack[nodestackindex] = node.children[1]
+				end
+				node = node.children[2]
+			end
+			continue
+		else
+			-- leaf - add clusterindex to list
+			if numclusters < maxclusters then
+				clusterlist[numclusters + 1] = node.clusterindex
+			end
+			numclusters += 1
+		end
+		-- try another path we didn't take earlier
+		if nodestackindex == 0 then
+			break
+		end
+		node = nodestack[nodestackindex]
+		nodestackindex -= 1
+	end
+	-- return number of clusters found (even if more than the maxclusters)
+	return numclusters
+end
+model_brush.Mod_Q1BSP_FindBoxClusters = Mod_Q1BSP_FindBoxClusters
+
 -- port: model_brush.c Mod_Q1BSP_BoxTouchingPVS L246-315 @xonotic-v0.8.6 (the #if 1 branch)
 local function Mod_Q1BSP_BoxTouchingPVS(
 	model: any,
@@ -2101,6 +2156,77 @@ local function Mod_Q1BSP_GetPVS(model: any, p: { number }): (buffer?, number)
 	end
 end
 model_brush.Mod_Q1BSP_GetPVS = Mod_Q1BSP_GetPVS
+
+-- port: model_brush.c Mod_Q1BSP_FatPVS_RecursiveBSPNode L3779-3803 @xonotic-v0.8.6
+local function Mod_Q1BSP_FatPVS_RecursiveBSPNode(
+	model: any,
+	org: { number },
+	radius: number,
+	pvsbuffer: buffer,
+	pvsbytes: number,
+	node: any
+)
+	while node.plane do
+		local plane = node.plane
+		local n = plane.normal
+		-- float d = PlaneDiff(org, node->plane);
+		local d = R(
+			(
+				if plane.type < 3
+					then org[plane.type + 1]
+					else R(R(R(org[1] * n[1]) + R(org[2] * n[2])) + R(org[3] * n[3]))
+			) - plane.dist
+		)
+		if d > radius then
+			node = node.children[1]
+		elseif d < -radius then
+			node = node.children[2]
+		else
+			-- go down both sides
+			Mod_Q1BSP_FatPVS_RecursiveBSPNode(model, org, radius, pvsbuffer, pvsbytes, node.children[1])
+			node = node.children[2]
+		end
+	end
+	-- if this leaf is in a cluster, accumulate the pvs bits
+	if node.clusterindex >= 0 then
+		local pvs = model.brush.data_pvsclusters
+		local pvsofs = node.clusterindex * model.brush.num_pvsclusterbytes
+		for i = 0, pvsbytes - 1 do
+			buffer.writeu8(pvsbuffer, i, bit32.bor(readu8(pvsbuffer, i), readu8(pvs, pvsofs + i)))
+		end
+	end
+end
+
+--Calculates a PVS that is the inclusive or of all leafs within radius pixels
+--of the given point.
+-- port: model_brush.c Mod_Q1BSP_FatPVS L3807-3820 @xonotic-v0.8.6
+-- (r_novis / r_trippy are renderer cvars a dedicated server never registers: their static cvar_t is 0)
+local function Mod_Q1BSP_FatPVS(
+	model: any,
+	org: { number },
+	radius: number,
+	pvsbuffer: buffer,
+	pvsbufferlength: number,
+	merge: boolean
+): number
+	local bytes = model.brush.num_pvsclusterbytes or 0
+	bytes = if bytes < pvsbufferlength then bytes else pvsbufferlength -- min(bytes, pvsbufferlength)
+	if
+		cvi("r_novis", 0) ~= 0
+		or cvi("r_trippy", 0) ~= 0
+		or (model.brush.num_pvsclusters or 0) == 0
+		or Mod_Q1BSP_GetPVS(model, org) == nil
+	then
+		buffer.fill(pvsbuffer, 0, 0xFF, bytes)
+		return bytes
+	end
+	if not merge then
+		buffer.fill(pvsbuffer, 0, 0, bytes)
+	end
+	Mod_Q1BSP_FatPVS_RecursiveBSPNode(model, org, radius, pvsbuffer, bytes, firstclipnode(model))
+	return bytes
+end
+model_brush.Mod_Q1BSP_FatPVS = Mod_Q1BSP_FatPVS
 
 -- port: model_brush.c Mod_Q3BSP_TraceLineOfSight_RecursiveNodeCheck L6800-6860 @xonotic-v0.8.6
 -- (p1, p2, endpos are double[3]: no float rounding)
@@ -3934,9 +4060,12 @@ local function Mod_Q3BSP_Load(mod: dp_model_t, data: string)
 	mod.TraceLineAgainstSurfaces = Mod_CollisionBIH_TraceLine
 	mod.brush.TraceLineOfSight = Mod_Q3BSP_TraceLineOfSight
 	mod.brush.GetPVS = Mod_Q1BSP_GetPVS
+	mod.brush.FatPVS = Mod_Q1BSP_FatPVS
 	mod.brush.BoxTouchingPVS = Mod_Q1BSP_BoxTouchingPVS
-	-- mod->brush.FatPVS, BoxTouchingLeafPVS, BoxTouchingVisibleLeafs, FindBoxClusters, LightPoint,
-	-- FindNonSolidLocation, PointInLeaf, mod->Draw ... DrawLight (function pointers): NOT YET PORTED (nil)
+	-- mod->brush.BoxTouchingLeafPVS, BoxTouchingVisibleLeafs: NOT YET PORTED (nil)
+	mod.brush.FindBoxClusters = Mod_Q1BSP_FindBoxClusters
+	-- mod->brush.LightPoint, FindNonSolidLocation, PointInLeaf, mod->Draw ... DrawLight (function pointers):
+	-- NOT YET PORTED (nil)
 	mod.brush.SuperContentsFromNativeContents = Mod_Q3BSP_SuperContentsFromNativeContents
 	mod.brush.NativeContentsFromSuperContents = Mod_Q3BSP_NativeContentsFromSuperContents
 

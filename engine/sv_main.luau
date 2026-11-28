@@ -615,7 +615,7 @@ function sv_main.SV_SpawnServer(servername: string)
 		end
 	else
 		-- open server port
-		notPorted("NetConn_OpenServerPorts (netconn.c, M6-NET) in SV_SpawnServer")
+		require("./netconn").NetConn_OpenServerPorts(true)
 	end
 
 	--
@@ -867,7 +867,7 @@ function sv_main.SV_SpawnServer(servername: string)
 	cvar.Cvar_SetQuick(cv("sv_worldmessage"), sv.worldmessage)
 
 	console.Con_DPrint("Server spawned.\n")
-	notPorted("NetConn_Heartbeat (netconn.c, M6-NET) in SV_SpawnServer")
+	require("./netconn").NetConn_Heartbeat(2)
 
 	-- if(cls.state == ca_dedicated) Sys_MakeProcessMean();
 
@@ -1127,7 +1127,9 @@ local function defaultstate(): any
 end
 
 --[[
-	netconn.c / lhnet.c hooks (not ported, M6-NET). A netconn module or a test sets
+	netconn.c / lhnet.c hooks: engine/netconn.luau's netconn.install() (run by NetConn_Init, i.e. by
+	host.Host_Init_Dedicated) sets them to its NetConn_CanSend / NetConn_SendUnreliableMessage and lhnet.luau's
+	LHNETADDRESS_GetAddressType; a test can set its own:
 	  sv_main.netconn = { NetConn_CanSend = function(conn): boolean,
 	                      NetConn_SendUnreliableMessage = function(conn, msg, protocol, rate, burstsize,
 	                                                               suppress_reliables): number }
@@ -1610,10 +1612,7 @@ function sv_main.SV_SendServerinfo(c: any)
 	local msg = c.netconnection.message
 	common.SZ_Clear(msg)
 	common.MSG_WriteByte(msg, svc_print)
-	if prog.filecrc == nil then
-		notPorted("prog->filecrc (prvm_edict.c PRVM_Prog_Load L1969: CRC_Block of progs.dat) in SV_SendServerinfo")
-	end
-	message = libc.snprintf(128, "\nServer: %s build %s (progs %i crc)\n", gamename, buildstring, prog.filecrc or 0)
+	message = libc.snprintf(128, "\nServer: %s build %s (progs %i crc)\n", gamename, buildstring, prog.filecrc)
 	common.MSG_WriteString(msg, message)
 
 	SV_StopDemoRecording(c) -- to split up demos into different files
@@ -2945,9 +2944,13 @@ local function SV_CleanupEnts()
 	end
 end
 
--- sv_user.c SV_SetIdealPitch is not ported (engine/sv_user.luau)
+-- sv_user.c SV_SetIdealPitch (engine/sv_user.luau; required on first use and kept)
+local svusermod: any = nil
 local function SV_SetIdealPitch()
-	notPorted("SV_SetIdealPitch (sv_user.c L35-99) in SV_WriteClientdataToMessage")
+	if not svusermod then
+		svusermod = require("./sv_user")
+	end
+	svusermod.SV_SetIdealPitch()
 end
 
 --[[
@@ -3517,7 +3520,7 @@ local function SV_SendClientDatagram(c: any)
 		-- add the client specific data to the datagram
 		sv_main.SV_WriteClientdataToMessage(c, c.edict, msg, stats)
 		-- now update the stats[] array using any registered custom fields
-		notPorted("VM_SV_UpdateCustomStats (svvm_cmds.c L1646-1688) in SV_SendClientDatagram")
+		svvm_cmds.VM_SV_UpdateCustomStats(c, c.edict, msg, stats)
 		-- set host_client->statsdeltabits
 		local f = PROTOCOL("Protocol_UpdateClientStats")
 		if f then

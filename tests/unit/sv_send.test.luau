@@ -16,6 +16,7 @@ local protocol = require("../../engine/protocol")
 local prvm_edict = require("../../engine/prvm_edict")
 local server = require("../../engine/server")
 local sv_main = require("../../engine/sv_main")
+local sv_user = require("../../engine/sv_user")
 
 local R = f32.round
 local P = common.PROTOCOL
@@ -85,6 +86,11 @@ end
 return function(ctx: t.Ctx)
 	local oldsink = console.sink
 	console.sink = function(_l: string) end
+	-- This test pins message byte layouts on a synthetic server that has no world to trace through:
+	-- SV_SetIdealPitch (sv_user.c, traces the floor ahead of an on-ground player) is switched off here and
+	-- the idealpitch field is set by hand. It runs for real in tests/integration/sv_readclient_match.
+	local oldidealpitch = sv_user.SV_SetIdealPitch
+	sv_user.SV_SetIdealPitch = function() end
 	fs.SetProvider({
 		files = {},
 		load = function(_p: string): string?
@@ -680,4 +686,5 @@ return function(ctx: t.Ctx)
 	prvm_edict.realtime = oldrealtime
 	fs.SetProvider(nil)
 	console.sink = oldsink
+	sv_user.SV_SetIdealPitch = oldidealpitch
 end

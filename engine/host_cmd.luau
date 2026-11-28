@@ -373,4 +373,61 @@ host_cmd.CLIENTCOMMANDS = {
 	begin = Host_Begin_f,
 } :: { [string]: () -> () }
 
+--[[
+	The Cmd_AddCommand_WithClientCommand registrations of Host_InitCommands (host_cmd.c L3018-3090) and
+	SV_InitOperatorCommands (sv_main.c L451-452): { name, console function is NULL }. engine/host.luau registers
+	every command of engine/_port/sv_init_defs.luau as a console command (the table does not record the client
+	function), so Host_InitClientCommands gives these their client function (the ported one from CLIENTCOMMANDS
+	or a stub that logs NOT YET PORTED) and clears the console function where C passes NULL. Call it once after
+	the command registration of host.Host_Init_Dedicated (before Cmd_SaveInitState); it is idempotent.
+]]
+host_cmd.WITHCLIENTCOMMAND = {
+	{ "status", false },
+	{ "god", true },
+	{ "notarget", true },
+	{ "fly", true },
+	{ "noclip", true },
+	{ "give", true },
+	{ "say", false },
+	{ "say_team", false },
+	{ "tell", false },
+	{ "kill", true },
+	{ "pause", false },
+	{ "ping", false },
+	{ "name", false },
+	{ "color", false },
+	{ "rate", false },
+	{ "rate_burstsize", false },
+	{ "pmodel", false },
+	{ "playermodel", false },
+	{ "playerskin", false },
+	{ "prespawn", true },
+	{ "spawn", true },
+	{ "begin", true },
+	{ "pings", true },
+	{ "sv_startdownload", true },
+	{ "download", true },
+} :: { { any } }
+
+function host_cmd.Host_InitClientCommands()
+	local byname: { [string]: any } = {}
+	for _, c in cmd.commands() do
+		byname[c.name] = c
+	end
+	for _, d in host_cmd.WITHCLIENTCOMMAND do
+		local name, noconsole = d[1] :: string, d[2] :: boolean
+		local c = byname[name]
+		if c then
+			if noconsole then
+				c.consolefunction = nil
+			end
+			c.clientfunction = host_cmd.CLIENTCOMMANDS[name]
+				or host_cmd.PORTED[name]
+				or function()
+					notPorted("client command " .. name)
+				end
+		end
+	end
+end
+
 return host_cmd

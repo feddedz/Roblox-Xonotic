@@ -57,6 +57,7 @@ export type Prog = {
 	-- loaded program
 	progs_version: number,
 	progs_crc: number,
+	filecrc: number, -- int filecrc (progsvm.h): CRC_Block of the whole progs file (PRVM_Prog_Load)
 	progs_numstatements: number,
 	progs_numglobals: number,
 	progs_numfunctions: number,
@@ -295,6 +296,7 @@ function prvm_edict.NewProg(name: string): Prog
 		end,
 		progs_version = 0,
 		progs_crc = 0,
+		filecrc = 0,
 		progs_numstatements = 0,
 		progs_numglobals = 0,
 		progs_numfunctions = 0,
@@ -485,7 +487,16 @@ function prvm_edict.PRVM_ED_Free(prog: Prog, e: number)
 	p.ed_freetime[e] = prvm_edict.realtime
 end
 
--- port: prvm_edict.c PRVM_Prog_Load L1916-2468 @xonotic-v0.8.6 (PARTIAL: header .. last-statement check, L1983-2276)
+-- CRC_Block (common.c, engine/common.luau) of the first size bytes of a buffer
+local common_mod: any = nil
+local function crcBlockOfBuffer(data: buffer, size: number): number
+	if not common_mod then
+		common_mod = require("./common")
+	end
+	return common_mod.CRC_Block(buffer.readstring(data, 0, size))
+end
+
+-- port: prvm_edict.c PRVM_Prog_Load L1916-2468 @xonotic-v0.8.6 (PARTIAL: filecrc L1969, header .. last-statement check, L1972-2276)
 function prvm_edict.PRVM_Prog_Load(
 	prog: Prog,
 	filename: string,
@@ -503,6 +514,8 @@ function prvm_edict.PRVM_Prog_Load(
 	prog.firstfreeknownstring = 0
 	prog.knownstrings = {}
 	(prog :: any).knownstrings_freeable = {}
+	-- L1969: prog->filecrc = CRC_Block((unsigned char *)dprograms, filesize);
+	prog.filecrc = crcBlockOfBuffer(data, filesize)
 	-- dprograms_t header
 	prog.progs_version = L(0)
 	prog.progs_crc = L(4)
