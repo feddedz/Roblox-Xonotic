@@ -764,8 +764,10 @@ static void nv_scenario_b(void)
 	// the server sends to slot 1 (reliable fragments) and slot 1 acks them
 	{
 		netconn_t *c = svs.clients[1].netconnection;
-		printf("SVQ\t1\t3000\n");
 		nv_fill(3000);
+		printf("SVQ\t1");
+		nv_hex(nv_data, 3000);
+		printf("\n");
 		SZ_Write(&c->message, nv_data, 3000);
 		for (i = 0; i < 4; i++)
 		{
